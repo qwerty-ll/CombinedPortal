@@ -7,6 +7,10 @@ import {
   Lightbulb, Trophy, ThumbsUp, RefreshCw
 } from 'lucide-react';
 import MascotMessage from '../components/MascotMessage';
+import { SUBJECTS } from '../data/subjectsData';
+import RoadmapSection from '../components/RoadmapSection';
+import { StepFoundation, StepRoadmap, StepChatbot } from '../components/StepIntroCards';
+import RewardsModal from '../components/RewardsModal';
 
 // Level Connector sub-component
 const LevelConnector = ({ direction = "right" }) => (
@@ -46,14 +50,22 @@ const LevelConnector = ({ direction = "right" }) => (
 );
 
 // Disciplines Accordion Item
-const DisciplineItem = ({ title, content }) => {
+const DisciplineItem = ({ subject }) => {
   const [isOpen, setIsOpen] = useState(false);
   return (
-    <div className={`acc-item-wrapper ${isOpen ? 'open' : ''}`}>
-      <div className="acc-item" onClick={() => setIsOpen(!isOpen)}>
-        {title} 
+    <div className={`acc-item-wrapper ${isOpen ? 'open' : ''}`} style={{ marginBottom: '10px' }}>
+      <div className="acc-item" onClick={() => setIsOpen(!isOpen)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '14px 18px', background: 'white', border: '1px solid #e9ecef', borderRadius: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '1.2rem' }}>{subject.emoji}</span>
+          <div>
+            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '800' }}>{subject.name}</h4>
+            <span style={{ fontSize: '0.78rem', color: '#888' }}>
+              {subject.type}{subject.extraType ? ` + ${subject.extraType}` : ''} • {subject.hours} ч. • {subject.credits} з.е.
+            </span>
+          </div>
+        </div>
         <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.3 }}>
-          <ChevronDown size={16}/>
+          <ChevronDown size={18}/>
         </motion.div>
       </div>
       <AnimatePresence>
@@ -64,8 +76,21 @@ const DisciplineItem = ({ title, content }) => {
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3 }}
+            style={{ padding: '16px 18px', background: 'rgba(0,127,255,0.03)', borderRadius: '0 0 14px 14px', border: '1px solid rgba(0,127,255,0.1)', borderTop: 'none' }}
           >
-            {content}
+            <p style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#333', lineHeight: '1.5' }}>{subject.description}</p>
+            
+            {subject.mascotHack && (
+              <div style={{ background: '#E8F4FF', padding: '10px 14px', borderRadius: '10px', fontSize: '0.85rem', color: 'var(--primary)', fontWeight: '600', marginBottom: '8px' }}>
+                💡 {subject.mascotHack}
+              </div>
+            )}
+            
+            {subject.seniorAdvice && (
+              <div style={{ fontSize: '0.82rem', color: '#666', italic: 'true' }}>
+                💬 <strong>Совет старшекурсника:</strong> {subject.seniorAdvice}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -77,8 +102,52 @@ const FreshmanGuide = () => {
   const [activeTab, setActiveTab] = useState('access');
   const [selectedFloor, setSelectedFloor] = useState(1);
   const [activeQuiz, setActiveQuiz] = useState(null); // 'intro' or 'mood' or null
-  const [quizScore, setQuizScore] = useState(null);
-  const [moodResult, setMoodResult] = useState(null);
+  const [selectedSemester, setSelectedSemester] = useState(1);
+
+  // Roadmap & Step Modal States
+  const [completedSteps, setCompletedSteps] = useState(() => {
+    try {
+      const saved = localStorage.getItem('freshman_roadmap_completed');
+      return saved ? JSON.parse(saved) : [0];
+    } catch { return [0]; }
+  });
+  const [activeStepModal, setActiveStepModal] = useState(null);
+  const [isRewardsOpen, setIsRewardsOpen] = useState(false);
+
+  const activeStep = Math.min(9, completedSteps.length);
+
+  const handleStepClick = (stepId) => {
+    if (stepId === 0 || stepId === 1 || stepId === 2) {
+      setActiveStepModal(stepId);
+    } else if (stepId === 3) {
+      setActiveQuiz('intro');
+    } else if (stepId === 4) {
+      const el = document.getElementById('level-links');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    } else if (stepId === 5) {
+      const el = document.getElementById('level-map');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    } else if (stepId === 6) {
+      const el = document.getElementById('level-disciplines');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    } else if (stepId === 7) {
+      setActiveQuiz('mood');
+    } else if (stepId === 8) {
+      setIsRewardsOpen(true);
+    } else if (stepId === 9) {
+      const el = document.getElementById('level-tests');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const completeStep = (stepId) => {
+    if (!completedSteps.includes(stepId)) {
+      const next = [...completedSteps, stepId];
+      setCompletedSteps(next);
+      localStorage.setItem('freshman_roadmap_completed', JSON.stringify(next));
+    }
+    setActiveStepModal(null);
+  };
 
   // Zoom & Pan states for the floor maps in Guide
   const [zoom, setZoom] = useState(1);
@@ -411,8 +480,17 @@ const FreshmanGuide = () => {
         <h1>Путь первокурсника</h1>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '30px' }}>
         
+        {/* ROADMAP ADAPTATION SECTION */}
+        <section id="level-roadmap">
+          <RoadmapSection 
+            activeStep={activeStep}
+            completedSteps={completedSteps}
+            onStepClick={handleStepClick}
+          />
+        </section>
+
         {/* LEVEL 1: LINKS */}
         <section id="level-links" className="level-section">
           <MascotMessage text="Привет! Давай знакомиться с нашим вузом. Здесь ты быстро найдешь все самые полезные ссылки!" />
@@ -565,24 +643,42 @@ const FreshmanGuide = () => {
           <LevelConnector direction="left" />
         </section>
 
-        {/* LEVEL 3: DISCIPLINES */}
+        {/* LEVEL 3: DISCIPLINES (ALL 24 SUBJECTS OF IVITSH KSU) */}
         <section id="level-disciplines" className="level-section">
-          <MascotMessage text="Здесь спрятан список твоих будущих предметов на направлении ИСиТ. Сразу видно: что тебя ждет на парах!" />
+          <MascotMessage text="Здесь опубликован полный каталог всех 24 предметов ИВИТШ КГУ! Нажми на предмет, чтобы узнать лайфхак от ВИТШика и совет старшекурсника." />
           
           <div className="level-card disciplines-card">
-             <h3 style={{ margin: '0 0 20px 0', fontWeight: '750' }}>Ключевые дисциплины</h3>
-             <DisciplineItem 
-               title="Информационные системы и технологии" 
-               content="Основы объектно-ориентированного программирования (C++, C#), разработка баз данных SQL, клиент-серверная архитектура, проектирование информационных систем." 
-             />
-             <DisciplineItem 
-               title="Математический анализ" 
-               content="Теория пределов, дифференциальное и интегральное исчисление, функции нескольких переменных, бесконечные ряды. Базовый фундамент для анализа данных и ИТ." 
-             />
-             <DisciplineItem 
-               title="Информационная безопасность" 
-               content="Основы криптографии, безопасность сетевых протоколов, методы защиты операционных систем от несанкционированного доступа, анализ уязвимостей." 
-             />
+             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+               <h3 style={{ margin: 0, fontWeight: '750' }}>Дисциплины ИВИТШ КГУ ({SUBJECTS.filter(s => s.semester === selectedSemester).length})</h3>
+               
+               <div style={{ display: 'flex', gap: '8px' }}>
+                 {[1, 2].map(sem => (
+                   <button 
+                     key={sem} 
+                     className={`floor-tab ${selectedSemester === sem ? 'active' : ''}`}
+                     onClick={() => setSelectedSemester(sem)}
+                     style={{
+                       padding: '6px 14px',
+                       borderRadius: '8px',
+                       border: '1px solid #dee2e6',
+                       background: selectedSemester === sem ? 'var(--primary)' : 'white',
+                       color: selectedSemester === sem ? 'white' : '#666',
+                       fontWeight: '600',
+                       fontSize: '0.85rem',
+                       cursor: 'pointer'
+                     }}
+                   >
+                     {sem}-й семестр
+                   </button>
+                 ))}
+               </div>
+             </div>
+
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+               {SUBJECTS.filter(s => s.semester === selectedSemester).map(subject => (
+                 <DisciplineItem key={subject.id} subject={subject} />
+               ))}
+             </div>
           </div>
           <LevelConnector direction="right" />
         </section>
@@ -1019,6 +1115,23 @@ const FreshmanGuide = () => {
         </section>
 
       </div>
+
+      {/* STEP INTRO MODALS (Steps 0, 1, 2) */}
+      <AnimatePresence>
+        {activeStepModal !== null && (
+          <div className="modal-overlay" onClick={() => setActiveStepModal(null)}>
+            <div className="auth-modal" onClick={(e) => e.stopPropagation()} style={{ width: '520px', padding: '25px' }}>
+              <button className="close-modal" onClick={() => setActiveStepModal(null)}>×</button>
+              {activeStepModal === 0 && <StepFoundation onComplete={() => completeStep(0)} />}
+              {activeStepModal === 1 && <StepRoadmap onComplete={() => completeStep(1)} />}
+              {activeStepModal === 2 && <StepChatbot onComplete={() => completeStep(2)} />}
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* REWARDS MODAL */}
+      <RewardsModal isOpen={isRewardsOpen} onClose={() => setIsRewardsOpen(false)} />
     </div>
   );
 };

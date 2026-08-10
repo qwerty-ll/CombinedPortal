@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, X, Send, XCircle, Menu } from 'lucide-react';
+import { MessageCircle, X, Send, XCircle, Menu, ExternalLink, MapPin, Maximize2 } from 'lucide-react';
 import './App.css';
+import { searchKnowledgeBase, mapImageNameToPath } from './data/knowledgeData';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -25,6 +26,7 @@ function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isChatActive, setIsChatActive] = useState(false);
+  const [zoomedImage, setZoomedImage] = useState(null);
 
   // Scroll to top on route change
   useEffect(() => {
@@ -33,46 +35,54 @@ function App() {
 
   // Chat States
   const [chatMessages, setChatMessages] = useState([
-    { text: 'Привет! Я ВИТШик, твой помощник. Чем могу помочь?', sender: 'bot', isInitial: true }
+    { text: 'Привет! Я ВИТШик, твой ассистент по Высшей ИТ-школе КГУ. Задай мне любой вопрос об аудиториях, стипендиях, коворкинге или клубах! 🐱', sender: 'bot', isInitial: true }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
 
   const suggestions = [
-    'Где расписание?',
-    'Где найти 209 кабинет?',
-    'Про стипендию',
-    'Кто мой куратор?',
-    'Заселение в общежитие'
+    'Где найти Б-209?',
+    'Стипендии и ПГАС',
+    'Клубы и объединения ВИТШ',
+    'Где находится коворкинг?',
+    'Где поесть рядом?'
   ];
 
-  // Mascot smart reply offline engine
+  const playMeow = () => {
+    try {
+      const audio = new Audio('/meow.mp3');
+      audio.volume = 0.4;
+      audio.play().catch(() => {});
+    } catch (e) {}
+  };
+
+  // Mascot RAG Smart reply engine
   const getSmartReply = (message) => {
-    const text = message.toLowerCase();
+    const text = message.toLowerCase().trim();
+
+    if (text.includes('мяу') || text.includes('котик') || text.includes('кот')) {
+      playMeow();
+      return 'Мяу! 🐱 Я цифровой житель ИВИТШ КГУ. Помогаю первакам найти аудитории и узнать про учёбу!';
+    }
     
-    if (text.includes('расписание') || text.includes('пара') || text.includes('урок') || text.includes('заняти')) {
-      return 'Актуальное расписание занятий доступно в разделе «Путь первокурсника» (Быстрый доступ) или на портале ЕИОС. Введите номер вашей группы на главной странице для быстрого доступа!';
-    }
-    if (text.includes('209') || text.includes('дирекц') || text.includes('секретар') || text.includes('декан')) {
-      return 'Дирекция ИВИТШ (кабинет секретарши, заказ справок) находится на <b>втором этаже в кабинете 209</b>. Секретарь работает по будням с 9:00 до 17:00.';
-    }
-    if (text.includes('стипенди') || text.includes('пгас') || text.includes('деньги')) {
-      return 'Повышенная стипендия (ПГАС) выдается за достижения в учебной, спортивной, научной и творческой жизни. Подать документы можно в начале каждого семестра в деканат (209 каб). Подробности доступны на странице FAQ.';
-    }
-    if (text.includes('куратор')) {
-      return 'Информацию о вашем кураторе можно найти в разделе «Личный кабинет» (Профиль). Если данные ещё не заполнены, обратитесь к администратору портала.';
-    }
-    if (text.includes('общежит') || text.includes('жиль')) {
-      return 'Оформление общежития обычно проходит в конце августа. Вам понадобятся: паспорт, копия паспорта, медицинская справка 086-у и 4 фотографии 3х4. Инструкцию можно найти в чек-листе Гида.';
-    }
-    if (text.includes('привет') || text.includes('здравствуй') || text.includes('ку') || text.includes('hello')) {
-      return 'Привет! Я ВИТШик, твой пушистый помощник по Высшей ИТ-школе. Могу подсказать про кабинеты, куратора, стипендию или расписание. Задавай вопросы!';
-    }
-    if (text.includes('мяу') || text.includes('кот') || text.includes('котик')) {
-      return 'Мяу! 🐱 Я очень люблю кодить и помогать первокурсникам освоиться в нашей ИТ-школе!';
+    // 1. First check real knowledge base of IVITSH KSU
+    const ragResult = searchKnowledgeBase(text);
+    if (ragResult) {
+      return ragResult;
     }
 
-    return 'Интересный вопрос! Я пока бета-версия ИИ-ассистента и не знаю точного ответа, но советую спросить ребят на Форуме или обратиться в дирекцию в кабинете 209!';
+    // 2. Fallbacks
+    if (text.includes('расписание') || text.includes('пара') || text.includes('урок') || text.includes('заняти')) {
+      return '### Расписание занятий\nАктуальное расписание занятий доступно в разделе «Путь первокурсника» (Быстрый доступ) или на портале ЕИОС: https://eios.kosgos.ru. Введите номер вашей группы на главном дашборде!';
+    }
+    if (text.includes('209') || text.includes('дирекц') || text.includes('секретар') || text.includes('декан')) {
+      return '### Дирекция ИВИТШ\nДирекция ИВИТШ находится на **2 этаже Корпуса Б в кабинете Б-209**.\nГрафик работы: Пн–Пт с 9:00 до 17:00 (перерыв 12:00–13:00).\n\n[IMG:209.png]';
+    }
+    if (text.includes('стипенди') || text.includes('пгас') || text.includes('деньги')) {
+      return '### Стипендии КГУ\n- **Академическая**: 3000 руб (сессия на «4» и «5») или 4500 руб (только «5»).\n- **ПГАС (Повышенная)**: от 5000 до 10000 руб за успехи в науке, спорте и творчестве.\n- **Социальная**: 2980 руб.';
+    }
+
+    return 'Извини, я не нашёл точного ответа в базе знаний ИВИТШ КГУ 😿 Попробуй спросить про аудитории (101-409), коворкинг, стипендии или объединения ИВИТШ!';
   };
 
   const handleSendMessage = async (text = inputValue) => {
@@ -202,18 +212,50 @@ function App() {
               )}
               
               <div className="chat-body">
-                {chatMessages.map((msg, i) => (
-                  <div key={i} className={`message-wrapper ${msg.sender} ${msg.isSystem ? 'system' : ''}`}>
-                    {msg.sender === 'bot' && !msg.isSystem && (
-                      <div className="chat-msg-avatar" style={{ border: '1px solid #dee2e6', background: 'white' }}>
-                        <img src="/img/mascot.png" alt="Mascot" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                {chatMessages.map((msg, i) => {
+                  if (msg.sender === 'user') {
+                    return (
+                      <div key={i} className="message-wrapper user">
+                        <div className="message user">{msg.text}</div>
                       </div>
-                    )}
-                    <div className={`message ${msg.sender} ${msg.isSystem ? 'system' : ''}`}>
-                      <div style={{ margin: 0 }} dangerouslySetInnerHTML={{ __html: msg.text }} />
+                    );
+                  }
+
+                  // Parse [IMG:...] tags in bot message
+                  const imgMatch = msg.text.match(/\[IMG:(.*?)\]/);
+                  const cleanText = msg.text.replace(/\[IMG:(.*?)\]/g, '').trim();
+                  const imgPath = imgMatch ? mapImageNameToPath(imgMatch[1]) : '';
+
+                  return (
+                    <div key={i} className="message-wrapper bot">
+                      <div className="chat-msg-avatar" style={{ border: '1px solid #dee2e6', background: 'white', cursor: 'pointer' }} onClick={playMeow}>
+                        <img src="/img/mascot.png" alt="ВИТШик" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                      </div>
+                      <div className="message bot" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>{cleanText}</div>
+
+                        {imgPath && (
+                          <div 
+                            style={{ 
+                              position: 'relative', 
+                              borderRadius: '12px', 
+                              overflow: 'hidden', 
+                              border: '1px solid rgba(0,127,255,0.2)',
+                              cursor: 'pointer',
+                              marginTop: '4px'
+                            }}
+                            onClick={() => setZoomedImage(imgPath)}
+                          >
+                            <img src={imgPath} alt="Схема аудитории" style={{ width: '100%', display: 'block', maxHeight: '180px', objectFit: 'cover' }} />
+                            <div style={{ position: 'absolute', bottom: '6px', right: '6px', background: 'rgba(0,0,0,0.6)', color: 'white', padding: '4px 8px', borderRadius: '6px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Maximize2 size={12} /> Нажми для зума
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {isTyping && (
                   <div className="message-wrapper bot">
                     <div className="chat-msg-avatar" style={{ border: '1px solid #dee2e6', background: 'white' }}>
@@ -261,7 +303,7 @@ function App() {
               <div className="chat-footer" style={{ opacity: isChatActive ? 1 : 0.5, pointerEvents: isChatActive ? 'auto' : 'none' }}>
                 <input 
                   type="text" 
-                  placeholder={isChatActive ? "Задай вопрос..." : "Начни чат, чтобы писать"} 
+                  placeholder={isChatActive ? "Задай вопрос про КГУ и ИВИТШ..." : "Начни чат, чтобы писать"} 
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
@@ -271,6 +313,23 @@ function App() {
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* FULLSCREEN IMAGE ZOOM MODAL */}
+      <AnimatePresence>
+        {zoomedImage && (
+          <div className="modal-overlay" onClick={() => setZoomedImage(null)} style={{ zIndex: 2000, background: 'rgba(0,0,0,0.85)' }}>
+            <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
+              <button 
+                onClick={() => setZoomedImage(null)} 
+                style={{ position: 'absolute', top: '-40px', right: '0', color: 'white', background: 'none', border: 'none', fontSize: '2rem', cursor: 'pointer' }}
+              >
+                ×
+              </button>
+              <img src={zoomedImage} alt="Увеличенная схема аудитории" style={{ width: '100%', height: '100%', maxH: '85vh', objectFit: 'contain', borderRadius: '12px' }} />
+            </div>
+          </div>
         )}
       </AnimatePresence>
 
