@@ -91,17 +91,42 @@ function App() {
     if (!messageToSend) return;
     
     const userMessage = { text: messageToSend, sender: 'user' };
-    setChatMessages(prev => [...prev, userMessage]);
+    const newHistory = [...chatMessages, userMessage];
+    setChatMessages(newHistory);
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate thinking delay
+    try {
+      // Build history payload for GigaChat API
+      const historyPayload = newHistory.slice(-4).map(m => ({
+        role: m.sender === 'user' ? 'user' : 'assistant',
+        content: m.text
+      }));
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: messageToSend, history: historyPayload })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.reply) {
+          setChatMessages(prev => [...prev, { text: data.reply, sender: 'bot' }]);
+          setIsTyping(false);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("GigaChat API call failed, falling back to local RAG:", e);
+    }
+
+    // Local RAG Fallback if API is offline
     setTimeout(() => {
       const replyText = getSmartReply(messageToSend);
-      const botReply = { text: replyText, sender: 'bot' };
-      setChatMessages(prev => [...prev, botReply]);
+      setChatMessages(prev => [...prev, { text: replyText, sender: 'bot' }]);
       setIsTyping(false);
-    }, 800);
+    }, 600);
   };
 
   const startChat = () => {
