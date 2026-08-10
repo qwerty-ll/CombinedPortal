@@ -17,10 +17,6 @@ const Profile = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 
-  // FIO Edit states
-  const [isEditingFio, setIsEditingFio] = useState(false);
-  const [fioInput, setFioInput] = useState('');
-
   // Load stats from localStorage
   const [onboardingCompleted, setOnboardingCompleted] = useState(0);
   const [checklistCompleted, setChecklistCompleted] = useState(0);
@@ -257,44 +253,7 @@ const Profile = () => {
 
           <div className="student-info-meta">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              {isEditingFio ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <input 
-                    type="text" 
-                    value={fioInput} 
-                    onChange={(e) => setFioInput(e.target.value)}
-                    placeholder="Введите ваше ФИО"
-                    style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--primary)', fontSize: '1.1rem', fontWeight: 'bold' }}
-                    autoFocus
-                  />
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      if (fioInput.trim()) {
-                        updateUserProfile({ fullName: fioInput.trim() });
-                        setIsEditingFio(false);
-                        toast.show('ФИО обновлено', 'success');
-                      }
-                    }} 
-                    style={{ padding: '6px 12px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                  >
-                    <Check size={16} /> Сохранить
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <h2>{/^\d{2}-[a-z0-9]+-\d+$/i.test((user.fullName || '').trim()) ? `Студент (${user.fullName.trim()})` : user.fullName}</h2>
-                  <button 
-                    type="button"
-                    onClick={() => { setFioInput(user.fullName); setIsEditingFio(true); }}
-                    title="Указать / изменить ФИО"
-                    style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '4px', display: 'inline-flex', alignItems: 'center' }}
-                  >
-                    <Edit3 size={16} />
-                  </button>
-                </>
-              )}
-
+              <h2>{user.fullName}</h2>
               {user.sdoToken && (
                 <span style={{ background: '#E6F4EA', color: '#137333', fontSize: '0.75rem', padding: '3px 8px', borderRadius: '8px', fontWeight: '800' }}>
                   ✓ СДО KOSGOS

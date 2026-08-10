@@ -79,7 +79,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen })
                 )}
               </div>
               <div className="sidebar-user-info">
-                <span className="sidebar-user-name">{/^\d{2}-[a-z0-9]+-\d+$/i.test((user.fullName || '').trim()) ? `Студент (${user.fullName.trim()})` : user.fullName}</span>
+                <span className="sidebar-user-name">{user.fullName}</span>
                 <span className="sidebar-user-role">
                   {user.role === 'admin' ? 'Администратор' : user.role === 'moderator' ? 'Модератор' : 'Студент'}
                 </span>
