@@ -67,3 +67,17 @@ export const chatApi = {
   sendMessage: (message, history) => apiFetch('/api/v1/chat', { method: 'POST', body: JSON.stringify({ message, history }) }),
   getTopQuestions: () => apiFetch('/api/v1/chat/top-questions'),
 };
+
+// Schedule EIOS Services
+export const scheduleApi = {
+  getYears: () => apiFetch('/api/v1/schedule/years'),
+  getGroups: (year = '2025-2026') => apiFetch(`/api/v1/schedule/groups?year=${encodeURIComponent(year)}`),
+  getTeachers: (year = '2025-2026') => apiFetch(`/api/v1/schedule/teachers?year=${encodeURIComponent(year)}`),
+  getAuditories: (year = '2025-2026') => apiFetch(`/api/v1/schedule/auditories?year=${encodeURIComponent(year)}`),
+  getSchedule: (idGroup, year = '2025-2026', sdate = '') => {
+    const query = new URLSearchParams({ year });
+    if (idGroup) query.append('idGroup', idGroup);
+    if (sdate) query.append('sdate', sdate);
+    return apiFetch(`/api/v1/schedule/rasp?${query.toString()}`);
+  }
+};

@@ -4,6 +4,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
+import requests
 
 from database import engine, Base, get_db
 import models
@@ -39,13 +40,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
+from fastapi.responses import HTMLResponse
+
+@app.get("/", response_class=HTMLResponse)
 def read_root():
-    return {
-        "status": "online",
-        "portal": "ИВИТШ КГУ",
-        "documentation": "/docs"
-    }
+    return """
+    <!DOCTYPE html>
+    <html lang="ru">
+      <head>
+        <meta charset="UTF-8">
+        <title>Портал ИВИТШ КГУ API</title>
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; background: #F8F9FA; color: #1C1E21; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+          .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.06); text-align: center; max-width: 480px; }
+          h1 { color: #007FFF; margin-top: 0; }
+          .btn { display: inline-block; margin-top: 20px; padding: 14px 28px; background: #007FFF; color: white; text-decoration: none; border-radius: 12px; font-weight: 700; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h1>🚀 REST API ИВИТШ КГУ</h1>
+          <p>Сервер бэкенда работает штатно на порту 8000.</p>
+          <a href="/docs" class="btn">Документация Swagger (/docs) ↗</a>
+        </div>
+      </body>
+    </html>
+    """
 
 # ==========================================
 # 1. AUTHENTICATION & PROFILES
@@ -353,3 +373,66 @@ def delete_faq_item(faq_id: int, current_user: models.User = Depends(auth.requir
         db.delete(f)
         db.commit()
     return {"status": "deleted"}
+
+# ==========================================
+# 5. EIOS KSU SCHEDULE API PROXY
+# ==========================================
+
+EIOS_BASE_URL = "https://eios.kosgos.ru/api"
+
+@app.get("/api/v1/schedule/years")
+def get_eios_years():
+    try:
+        resp = requests.get(f"{EIOS_BASE_URL}/Rasp/ListYears", timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        return {"data": {"years": ["2025-2026", "2024-2025"]}, "state": 1}
+
+@app.get("/api/v1/schedule/groups")
+def get_eios_groups(year: str = Query("2025-2026")):
+    try:
+        resp = requests.get(f"{EIOS_BASE_URL}/raspGrouplist", params={"year": year}, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        return {"data": [], "error": str(e)}
+
+@app.get("/api/v1/schedule/teachers")
+def get_eios_teachers(year: str = Query("2025-2026")):
+    try:
+        resp = requests.get(f"{EIOS_BASE_URL}/raspTeacherlist", params={"year": year}, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        return {"data": [], "error": str(e)}
+
+@app.get("/api/v1/schedule/auditories")
+def get_eios_auditories(year: str = Query("2025-2026")):
+    try:
+        resp = requests.get(f"{EIOS_BASE_URL}/raspAudlist", params={"year": year}, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        return {"data": [], "error": str(e)}
+
+@app.get("/api/v1/schedule/rasp")
+def get_eios_rasp(
+    idGroup: Optional[int] = Query(None),
+    idTeacher: Optional[int] = Query(None),
+    idAud: Optional[int] = Query(None),
+    year: str = Query("2025-2026"),
+    sdate: Optional[str] = Query(None)
+):
+    try:
+        params = {"year": year}
+        if idGroup: params["idGroup"] = idGroup
+        if idTeacher: params["idTeacher"] = idTeacher
+        if idAud: params["idAud"] = idAud
+        if sdate: params["sdate"] = sdate
+        
+        resp = requests.get(f"{EIOS_BASE_URL}/Rasp", params=params, timeout=15)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        return {"data": {"rasp": []}, "error": str(e)}

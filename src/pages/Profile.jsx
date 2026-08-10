@@ -150,56 +150,6 @@ const Profile = () => {
               <Lock size={16} /> Войти
             </button>
           </form>
-
-          {/* PREDEFINED TEST ACCOUNTS HINT BOX */}
-          <div className="demo-accounts-hint-box" style={{ marginTop: '25px', padding: '16px', background: 'rgba(0, 127, 255, 0.05)', borderRadius: '12px', border: '1px solid rgba(0, 127, 255, 0.15)' }}>
-            <div style={{ fontWeight: 'bold', fontSize: '0.88rem', marginBottom: '10px', color: 'var(--text)' }}>
-              🔑 Учетные данные для тестирования (нажмите для входа):
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button 
-                type="button"
-                className="demo-acc-btn"
-                onClick={() => {
-                  setLoginForm({ fullName: 'student', group: '25-ИСбо-1', password: 'student123' });
-                  login('student', '25-ИСбо-1', 'student123');
-                  toast.show('Выполнен вход: Студент', 'success');
-                }}
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', fontSize: '0.85rem' }}
-              >
-                <span><strong>👤 Студент:</strong> <code>student</code></span>
-                <span style={{ color: '#666' }}>пароль: <code>student123</code></span>
-              </button>
-
-              <button 
-                type="button"
-                className="demo-acc-btn"
-                onClick={() => {
-                  setLoginForm({ fullName: 'moderator', group: '24-ИСбо-1', password: 'mod123' });
-                  login('moderator', '24-ИСбо-1', 'mod123');
-                  toast.show('Выполнен вход: Модератор', 'success');
-                }}
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', fontSize: '0.85rem' }}
-              >
-                <span><strong>🛡️ Модератор:</strong> <code>moderator</code></span>
-                <span style={{ color: '#666' }}>пароль: <code>mod123</code></span>
-              </button>
-
-              <button 
-                type="button"
-                className="demo-acc-btn"
-                onClick={() => {
-                  setLoginForm({ fullName: 'admin', group: 'Администрация', password: 'admin123' });
-                  login('admin', 'Администрация', 'admin123');
-                  toast.show('Выполнен вход: Администратор', 'success');
-                }}
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', fontSize: '0.85rem' }}
-              >
-                <span><strong>⚙️ Администратор:</strong> <code>admin</code></span>
-                <span style={{ color: '#666' }}>пароль: <code>admin123</code></span>
-              </button>
-            </div>
-          </div>
         </motion.div>
       </div>
     );

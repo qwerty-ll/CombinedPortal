@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import ScheduleWidget from '../components/ScheduleWidget';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -156,76 +157,15 @@ const Dashboard = () => {
           </div>
         </motion.section>
 
-        {/* SCHEDULE BY GROUP */}
+        {/* SCHEDULE SECTION WITH DIRECT EIOS API CLIENT */}
         <motion.section 
           id="schedule-section"
-          className="next-lesson-section"
+          className="schedule-section"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          <h2>Расписание занятий</h2>
-          
-          {!groupSaved ? (
-            <div className="schedule-group-input-card">
-              <div className="schedule-group-icon">
-                <CalendarDays size={40} strokeWidth={1.5} />
-              </div>
-              <h3>Введите номер вашей группы</h3>
-              <p>Например: 25-ИСбо-1, 24-ПМбо-2</p>
-              <form onSubmit={handleSaveGroup} className="schedule-group-form">
-                <div className="schedule-input-row">
-                  <input 
-                    type="text" 
-                    placeholder="Номер группы..."
-                    value={groupNumber}
-                    onChange={(e) => setGroupNumber(e.target.value)}
-                    required
-                  />
-                  <button type="submit" className="btn-auth">
-                    <Search size={16} /> Найти
-                  </button>
-                </div>
-              </form>
-            </div>
-          ) : (
-            <div className="schedule-group-result">
-              <div className="schedule-group-header">
-                <div>
-                  <span className="schedule-group-label">Группа:</span>
-                  <span className="schedule-group-value">{groupNumber}</span>
-                </div>
-                <button className="schedule-change-btn" onClick={handleResetGroup}>Изменить группу</button>
-              </div>
-
-              {/* Display EIOS directly on the portal */}
-              <div className="schedule-iframe-wrapper" style={{ position: 'relative', overflow: 'hidden', borderRadius: '16px', border: '1px solid rgba(0, 127, 255, 0.15)', background: 'white', marginTop: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.05)' }}>
-                <iframe 
-                  src="https://eios.kosgos.ru/WebApp/#/Rasp" 
-                  style={{ width: '100%', height: '650px', border: 'none', display: 'block' }}
-                  title="Расписание ЕИОС"
-                />
-              </div>
-
-              {/* Redirect external link */}
-              <a 
-                href={`https://eios.kosgos.ru/WebApp/#/Rasp`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="schedule-eios-link"
-                style={{ marginTop: '15px' }}
-              >
-                <div className="schedule-eios-link-content">
-                  <CalendarDays size={22} />
-                  <div>
-                    <h4>Открыть расписание в новой вкладке</h4>
-                    <span>Перейти на официальный сайт ЕИОС КГУ</span>
-                  </div>
-                </div>
-                <ExternalLink size={18} />
-              </a>
-            </div>
-          )}
+          <ScheduleWidget />
         </motion.section>
 
         {/* ANNOUNCEMENTS */}
