@@ -31,12 +31,29 @@ const Dashboard = () => {
     setGroupSaved(false);
   };
 
-  // --- Announcements from localStorage (admin-managed) ---
+  const INITIAL_ANNOUNCEMENTS = [
+    {
+      id: 1,
+      title: 'Добро пожаловать в Высшую ИТ-школу КГУ! 🚀',
+      text: 'Поздравляем с началом учебного года! Наш портал поможет быстро сориентироваться по аудиториям Корпуса Б (101-409), узнать расписание, подключиться к студенческим клубам и задать вопросы ВИТШику.',
+      time: '1 сентября 2025',
+      read: false
+    },
+    {
+      id: 2,
+      title: 'Открыт набор в студенческие объединения ИВИТШ!',
+      text: 'Приглашаем на презентацию клубов ВИТШ-медиа, ИДЕЯ, Спортивное программирование, NextHub и Играй. Встреча пройдёт в Коворкинге (Корпус Б, 4 этаж).',
+      time: '5 сентября 2025',
+      read: false
+    }
+  ];
+
+  // --- Announcements from localStorage (or fallback to INITIAL_ANNOUNCEMENTS) ---
   const [announcements, setAnnouncements] = useState(() => {
     try {
       const saved = localStorage.getItem('portal_announcements');
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
+      return (saved && JSON.parse(saved).length > 0) ? JSON.parse(saved) : INITIAL_ANNOUNCEMENTS;
+    } catch { return INITIAL_ANNOUNCEMENTS; }
   });
   const [expandedAdIds, setExpandedAdIds] = useState([]);
 

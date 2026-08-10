@@ -2,16 +2,63 @@ import React, { useState } from 'react';
 import { Search, Mail, Users as UsersIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const INITIAL_TEACHERS = [
+  {
+    id: 1,
+    name: 'Киприн Сергей Сергеевич',
+    department: 'Дирекция ИВИТШ КГУ',
+    role: 'Директор ИВИТШ, кандидат технических наук',
+    email: 's_kiprin@ksu.edu.ru',
+    office: 'Б-209',
+    hours: 'Пн-Пт 9:00 - 17:00 (перерыв 12:00-13:00)',
+    courses: 'Введение в специальность, Информационные системы',
+    photo: ''
+  },
+  {
+    id: 2,
+    name: 'Денисов Артем Андреевич',
+    department: 'Дирекция ИВИТШ КГУ',
+    role: 'Заместитель директора по учебной работе',
+    email: 'a_denisov@ksu.edu.ru',
+    office: 'Б-209',
+    hours: 'Пн-Пт 10:00 - 16:00',
+    courses: 'Алгоритмизация и программирование',
+    photo: ''
+  },
+  {
+    id: 3,
+    name: 'Лебедев Глеб Дмитриевич',
+    department: 'Кафедра ИТ и Программирования',
+    role: 'Старший преподаватель, рук. Спортивного программирования',
+    email: 'g_lebedev@ksu.edu.ru',
+    office: 'Б-306',
+    hours: 'Вт, Чт 14:00 - 17:00',
+    courses: 'Структуры данных и алгоритмы, Спортивное программирование',
+    photo: ''
+  },
+  {
+    id: 4,
+    name: 'Горева Ирина Николаевна',
+    department: 'Кафедра ИТ и Программирования',
+    role: 'Доцент, куратор направления «ИДЕЯ»',
+    email: 'i_goreva@ksu.edu.ru',
+    office: 'Б-308',
+    hours: 'Ср, Пт 11:00 - 15:00',
+    courses: 'Веб-дизайн и UI/UX, Компьютерная графика',
+    photo: ''
+  }
+];
+
 const Teachers = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState(null);
 
-  // Read teachers from localStorage (admin-managed)
+  // Read teachers from localStorage (or fallback to INITIAL_TEACHERS)
   const teachersList = (() => {
     try {
       const saved = localStorage.getItem('portal_teachers');
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
+      return (saved && JSON.parse(saved).length > 0) ? JSON.parse(saved) : INITIAL_TEACHERS;
+    } catch { return INITIAL_TEACHERS; }
   })();
 
   const filteredTeachers = teachersList.filter(teacher => 
@@ -48,7 +95,7 @@ const Teachers = () => {
   return (
     <div className="container">
       <div className="page-header">
-        <h1>Преподаватели</h1>
+        <h1>Преподаватели ИВИТШ КГУ</h1>
       </div>
 
       {/* SEARCH BOX */}
@@ -66,13 +113,7 @@ const Teachers = () => {
 
       {/* DEPARTMENTS CONTAINER */}
       <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '35px' }}>
-        {teachersList.length === 0 ? (
-          <div className="empty-state-card">
-            <UsersIcon size={48} strokeWidth={1.5} />
-            <h4>Преподаватели ещё не добавлены</h4>
-            <p>Администратор может добавить преподавателей через панель управления</p>
-          </div>
-        ) : Object.keys(groupedTeachers).length > 0 ? (
+        {Object.keys(groupedTeachers).length > 0 ? (
           Object.keys(groupedTeachers).map(deptName => (
             <div key={deptName}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: '800', marginBottom: '15px', color: 'var(--text)', borderBottom: '2px solid rgba(0, 127, 255, 0.1)', paddingBottom: '8px' }}>
@@ -97,7 +138,7 @@ const Teachers = () => {
                           ? teacher.photo
                           : `/img/teachers/${teacher.photo || 'profile.png'}`} 
                         alt={teacher.name} 
-                        onError={(e) => { e.target.src = '/img/profile.png'; }}
+                        onError={(e) => { e.target.src = '/img/mascot.png'; }}
                       />
                     </div>
                     <div className="teacher-details-box">
@@ -132,7 +173,7 @@ const Teachers = () => {
         {selectedTeacher && (
           <div className="modal-overlay" onClick={() => setSelectedTeacher(null)}>
             <div className="auth-modal" onClick={(e) => e.stopPropagation()} style={{ width: '450px' }}>
-              <button className="close-modal" onClick={() => setSelectedTeacher(null)}>×</button>
+              <button className="close-modal" onClick={() => setSelectedTeacher(null)}>✕</button>
               <span className="modal-label" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>Консультации</span>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '20px' }}>
@@ -142,7 +183,7 @@ const Teachers = () => {
                       ? selectedTeacher.photo
                       : `/img/teachers/${selectedTeacher.photo || 'profile.png'}`} 
                     alt={selectedTeacher.name} 
-                    onError={(e) => { e.target.src = '/img/profile.png'; }}
+                    onError={(e) => { e.target.src = '/img/mascot.png'; }}
                   />
                 </div>
                 <div>
@@ -151,47 +192,27 @@ const Teachers = () => {
                 </div>
               </div>
 
-              {selectedTeacher.office && (
-                <div className="consultation-info-box">
-                  <h5>Аудитория консультаций</h5>
-                  <p>Кабинет {selectedTeacher.office}</p>
+              <div style={{ marginTop: '20px', background: '#F8F9FA', padding: '15px', borderRadius: '12px', fontSize: '0.9rem' }}>
+                <div style={{ marginBottom: '8px' }}>
+                  <strong>Кабинет:</strong> {selectedTeacher.office || 'Б-209'}
                 </div>
-              )}
-
-              {selectedTeacher.hours && (
-                <div className="consultation-info-box" style={{ marginTop: '12px' }}>
-                  <h5>Время консультаций</h5>
-                  <p>{selectedTeacher.hours}</p>
+                <div style={{ marginBottom: '8px' }}>
+                  <strong>Часы приёма:</strong> {selectedTeacher.hours || 'Пн-Пт 9:00 - 17:00'}
                 </div>
-              )}
-
-              {selectedTeacher.courses && selectedTeacher.courses.length > 0 && (
-                <div style={{ marginTop: '20px' }}>
-                  <h5 style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                    Читаемые курсы
-                  </h5>
-                  <div className="teacher-courses-tags">
-                    {selectedTeacher.courses.map((course, idx) => (
-                      <span key={idx} className="course-tag-pill">{course}</span>
-                    ))}
+                {selectedTeacher.courses && (
+                  <div>
+                    <strong>Дисциплины:</strong> {selectedTeacher.courses}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {selectedTeacher.email && (
                 <a 
                   href={`mailto:${selectedTeacher.email}`} 
                   className="btn-auth" 
-                  style={{ 
-                    marginTop: '25px', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center', 
-                    gap: '8px', 
-                    textDecoration: 'none' 
-                  }}
+                  style={{ display: 'block', textDecoration: 'none', textAlign: 'center', marginTop: '20px' }}
                 >
-                  <Mail size={16} /> Написать преподавателю
+                  Написать на email ✉️
                 </a>
               )}
             </div>
