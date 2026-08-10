@@ -1,5 +1,5 @@
-const https = require('https');
-const crypto = require('crypto');
+import https from 'https';
+import crypto from 'crypto';
 
 // --- GigaChat Credentials ---
 const CLIENT_ID = process.env.GIGACHAT_CLIENT_ID || "019e2c26-97a8-75cf-8d25-1caf90fcdd51";
@@ -100,11 +100,11 @@ const KNOWLEDGE_CHUNKS = [
   },
   {
     header: "Где поесть рядом с Корпусом Б",
-    content: "Жуй да Ешь (от 100р, Советская 42), Шаурмастер44 (от 140р, Советская 61), Еда-кафе (от 150р, Лермонтова 3), Coffee Like (Советская 26), Пятерочка (Советская 47)."
+    content: "Жуй да Ешь (столовая от 100р, ул. Советская 42/1), Шаурмастер44 (шаурма от 140р, ул. Советская 61/39), Еда-кафе (от 150р, ул. Лермонтова 3/1), Coffee Like (кофе, Советская 26/1), магазины Пятерочка (Советская 47) и Высшая лига."
   }
 ];
 
-// Token-efficient RAG matcher (Selects top 2 relevant chunks)
+// Smart RAG Matcher
 function getRelevantChunks(query) {
   const words = new Set(query.toLowerCase().match(/[а-яА-ЯёЁa-zA-Z0-9]+/g) || []);
   const scored = [];
@@ -127,8 +127,8 @@ function getRelevantChunks(query) {
   return top.map(c => `=== ${c.header} ===\n${c.content}`).join("\n\n");
 }
 
-// Vercel Serverless Function Handler
-module.exports = async function handler(req, res) {
+// ES Module Serverless Handler for Vercel
+export default async function handler(req, res) {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -144,29 +144,35 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { message, history = [] } = req.body || {};
-    const userMsg = (message || "").trim();
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch(e) {}
+    }
+
+    const userMsg = ((body && body.message) || "").trim();
 
     if (!userMsg) {
       return res.status(400).json({ reply: "Пожалуйста, введите сообщение." });
     }
 
-    // Mini-RAG token optimization
+    // Smart RAG Context
     const relevantContext = getRelevantChunks(userMsg);
 
-    const systemPrompt = `Ты — ВИТШик, лаконичный цифровой маскот Высшей ИТ-школы (ИВИТШ) КГУ. Твоя база знаний ниже — единственный источник правды.
+    const systemPrompt = `Ты — ВИТШик, дружелюбный, добрый и умный цифровой маскот Высшей ИТ-школы (ИВИТШ) КГУ. Твоя задача — давать грамотные, ухоженные, вежливые и естественные ответы студентам.
 
-СТРОГИЕ ПРАВИЛА:
-1. ОТВЕЧАЙ СТРОГО ПО БАЗЕ ЗНАНИЙ ИВИТШ КГУ. Если вопроса нет в базе знаний ниже, или спросили про сторонние темы (спорт мира, фильмы, общий код программирования, другие вузы), отвечай строго: 'Я помогаю только с вопросами ИВИТШ КГУ и не обсуждаю сторонние темы! 😸'
-2. КРАТКОСТЬ: Максимум 2-3 коротких предложения.
-3. ИСПОЛЬЗУЙ ТЕГ [IMG:filename.png] если спрашивают про кабинеты, этажи, 209 или коворкинг (например, [IMG:209.png], [IMG:coworking.png]).
+СТРОЖАЙШИЕ ПРАВИЛА ОБЩЕНИЯ:
+1. ОТВЕЧАЙ ЕСТЕСТВЕННЫМ И ЖИВЫМ ЯЗЫКОМ, как заботливый друг. Категорически ЗАПРЕЩЕНО просто цитировать заголовки '###' или сухой текст словарной статьи! Встраивай знания в приятные развёрнутые предложения.
+2. ИСПОЛЬЗУЙ ТОЛЬКО БАЗУ ЗНАНИЙ НИЖЕ. Если просят решить задачу по программированию, написать код или спрашивают про сторонние вузы/фильмы/спорт — вежливо откажи фразой: 'Я помогаю только с вопросами ИВИТШ КГУ и не обсуждаю сторонние темы! 😸'
+3. ЕСЛИ ИНФОРМАЦИИ НЕТ В БАЗЕ ЗНАНИЙ — отвечай: 'К сожалению, у меня в базе знаний нет информации об этом. Задай мне другой вопрос об ИВИТШ! 🐾'
+4. ВСТАВЛЯЙ ТЕГ [IMG:filename.png] на отдельной строке, если спрашиваешь или отвечаешь про кабинеты (например [IMG:209.png] для дирекции или [IMG:coworking.png] для коворкинга).
 
 База знаний для ответа:
 ${relevantContext}`;
 
     const messages = [{ role: "system", content: systemPrompt }];
 
-    // Limit history to last 3 turns for token economy
+    // Limit history to last 4 turns for token economy
+    const history = (body && body.history) || [];
     const recentHistory = history.slice(-4);
     for (const turn of recentHistory) {
       if (turn.role === "user" || turn.role === "assistant") {
@@ -175,13 +181,13 @@ ${relevantContext}`;
     }
     messages.push({ role: "user", content: userMsg });
 
-    // Fetch OAuth Token & Query GigaChat
+    // Fetch OAuth Token & Query GigaChat API
     const token = await getAccessToken();
     const chatPayload = {
       model: "GigaChat",
       messages: messages,
-      temperature: 0.3, // Low temperature for high accuracy & strict RAG
-      max_tokens: 256    // Token economy limit
+      temperature: 0.4,
+      max_tokens: 350
     };
 
     const chatHeaders = {
@@ -192,7 +198,7 @@ ${relevantContext}`;
     const chatResponse = await makeRequest(CHAT_URL, chatHeaders, JSON.stringify(chatPayload));
     let reply = chatResponse.choices?.[0]?.message?.content || "";
 
-    // Clean-up
+    // Clean up high unicode emojis
     reply = reply.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "");
 
     return res.status(200).json({ reply: reply.trim() });
@@ -200,4 +206,4 @@ ${relevantContext}`;
     console.error("GigaChat API Error:", e.message);
     return res.status(500).json({ error: e.message });
   }
-};
+}

@@ -132,7 +132,6 @@ export const KNOWLEDGE_TEXT = `
 - Магазины: Пятерочка (Советская, 47), Высшая лига (Советская, 61 и 22).
 `;
 
-// Helper RAG search engine for client-side mascot smart bot
 export const searchKnowledgeBase = (query) => {
   if (!query || !query.trim()) return '';
 
@@ -147,9 +146,8 @@ export const searchKnowledgeBase = (query) => {
     }
   }
 
-  const queryWords = new Set(
-    query.toLowerCase().match(/[а-яА-ЯёЁa-zA-Z0-9]+/g) || []
-  );
+  const queryLower = query.toLowerCase();
+  const queryWords = queryLower.match(/[а-яА-ЯёЁa-zA-Z]{3,}/g) || [];
 
   const scoredChunks = [];
   for (const chunk of chunks) {
@@ -157,23 +155,29 @@ export const searchKnowledgeBase = (query) => {
     const headerLower = chunk.header.toLowerCase();
     const contentLower = chunk.content.toLowerCase();
 
+    // Word matching
     for (const word of queryWords) {
-      if (word.length < 2) continue;
-      if (headerLower.includes(word)) score += 5;
-      if (contentLower.includes(word)) score += 1;
+      if (headerLower.includes(word)) score += 6;
+      if (contentLower.includes(word)) score += 2;
     }
 
-    if (score > 0) {
+    // Exact phrase bonus
+    if (headerLower.includes(queryLower)) score += 15;
+    if (contentLower.includes(queryLower)) score += 10;
+
+    if (score > 2) {
       scoredChunks.push({ score, chunk });
     }
   }
 
   scoredChunks.sort((a, b) => b.score - a.score);
-  const topChunks = scoredChunks.slice(0, 3).map(x => x.chunk);
+  const topChunks = scoredChunks.slice(0, 2).map(x => x.chunk);
 
-  if (topChunks.length === 0) return '';
+  if (topChunks.length === 0) {
+    return 'Извини, я не нашёл точной информации в базе знаний ИВИТШ КГУ 😿 Попробуй спросить про аудитории (101-409), Б-209, коворкинг, стипендии или объединения!';
+  }
 
-  return topChunks.map(c => `### ${c.header}\n${c.content}`).join('\n\n');
+  return topChunks.map(c => `${c.content}`).join('\n\n');
 };
 
 export const mapImageNameToPath = (imgName) => {

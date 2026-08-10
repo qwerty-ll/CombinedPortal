@@ -251,13 +251,73 @@ function App() {
                   const cleanText = msg.text.replace(/\[IMG:(.*?)\]/g, '').trim();
                   const imgPath = imgMatch ? mapImageNameToPath(imgMatch[1]) : '';
 
+                  // Rich Markdown & Link Formatter
+                  const formattedLines = cleanText.split('\n').map((line, lIdx) => {
+                    let trimmed = line.trim();
+                    if (!trimmed) return <div key={lIdx} style={{ height: '6px' }} />;
+
+                    let isHeader = false;
+                    if (trimmed.startsWith('###')) {
+                      isHeader = true;
+                      trimmed = trimmed.replace(/^###\s*/, '');
+                    } else if (trimmed.startsWith('===')) {
+                      isHeader = true;
+                      trimmed = trimmed.replace(/^===\s*/, '').replace(/\s*===$/, '');
+                    }
+
+                    // Render inline bold and links
+                    const parts = trimmed.split(/(\*\*.*?\*\*|https?:\/\/\S+)/).map((part, pIdx) => {
+                      if (part.startsWith('**') && part.endsWith('**')) {
+                        return <strong key={pIdx} style={{ color: 'var(--primary)' }}>{part.slice(2, -2)}</strong>;
+                      }
+                      if (part.startsWith('http')) {
+                        const cleanUrl = part.replace(/[<>]/g, '');
+                        return (
+                          <a 
+                            key={pIdx} 
+                            href={cleanUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            style={{ 
+                              display: 'inline-flex', 
+                              alignItems: 'center', 
+                              gap: '4px', 
+                              background: '#E8F4FF', 
+                              color: 'var(--primary)', 
+                              padding: '2px 8px', 
+                              borderRadius: '6px', 
+                              fontSize: '0.8rem', 
+                              fontWeight: '700', 
+                              textDecoration: 'none',
+                              margin: '0 2px' 
+                            }}
+                          >
+                            <span>{cleanUrl.replace(/^https?:\/\//, '')}</span>
+                            <ExternalLink size={12} />
+                          </a>
+                        );
+                      }
+                      return part;
+                    });
+
+                    if (isHeader) {
+                      return (
+                        <div key={lIdx} style={{ fontSize: '0.98rem', fontWeight: '800', color: 'var(--primary)', margin: '6px 0 2px 0' }}>
+                          {parts}
+                        </div>
+                      );
+                    }
+
+                    return <div key={lIdx} style={{ margin: '2px 0' }}>{parts}</div>;
+                  });
+
                   return (
                     <div key={i} className="message-wrapper bot">
                       <div className="chat-msg-avatar" style={{ border: '1px solid #dee2e6', background: 'white', cursor: 'pointer' }} onClick={playMeow}>
                         <img src="/img/mascot.png" alt="ВИТШик" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                       </div>
-                      <div className="message bot" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <div style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>{cleanText}</div>
+                      <div className="message bot" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ margin: 0, lineHeight: '1.45', fontSize: '0.88rem' }}>{formattedLines}</div>
 
                         {imgPath && (
                           <div 
@@ -267,7 +327,7 @@ function App() {
                               overflow: 'hidden', 
                               border: '1px solid rgba(0,127,255,0.2)',
                               cursor: 'pointer',
-                              marginTop: '4px'
+                              marginTop: '6px'
                             }}
                             onClick={() => setZoomedImage(imgPath)}
                           >
