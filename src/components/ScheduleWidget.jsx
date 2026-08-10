@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   CalendarDays, Search, Clock, MapPin, User, BookOpen, AlertCircle, 
   ChevronDown, GraduationCap, Building2, UserCheck, Calendar,
-  ChevronLeft, ChevronRight, RotateCcw
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { scheduleApi } from '../services/api';
 
 const EIOS_DIRECT_URL = 'https://eios.kosgos.ru/api';
@@ -43,7 +43,8 @@ const getLessonTypeBadge = (disciplineName) => {
 
 const ScheduleWidget = () => {
   const [targetType, setTargetType] = useState('group'); // 'group' | 'teacher' | 'aud'
-  
+  const availableYears = ['2025-2026', '2024-2025', '2023-2024', '2026-2027'];
+
   // Selected target object
   const [selectedId, setSelectedId] = useState(() => Number(localStorage.getItem('portal_sched_id')) || 8540);
   const [selectedName, setSelectedName] = useState(() => localStorage.getItem('portal_sched_name') || '24-ИСбо-1');
@@ -59,8 +60,17 @@ const ScheduleWidget = () => {
   // Selected date ISO string (default to today)
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
 
-  // Derived Academic Year (AUTOMATIC, ZERO MANUAL SELECTION NEEDED)
-  const selectedYear = useMemo(() => calculateAcademicYear(selectedDate), [selectedDate]);
+  // Academic Year State (Auto-synced with selectedDate, can also be manually selected)
+  const [selectedYear, setSelectedYear] = useState(() => calculateAcademicYear(new Date().toISOString().split('T')[0]));
+
+  // Auto-sync year when user picks a new date
+  const handleDateChange = (newDateIso) => {
+    setSelectedDate(newDateIso);
+    if (newDateIso) {
+      const autoYear = calculateAcademicYear(newDateIso);
+      setSelectedYear(autoYear);
+    }
+  };
 
   // Catalog items & Lessons state
   const [catalogItems, setCatalogItems] = useState([]);
@@ -80,7 +90,7 @@ const ScheduleWidget = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 1. Fetch Catalog Items for selected type & calculated year
+  // 1. Fetch Catalog Items for selected type & year
   useEffect(() => {
     let isMounted = true;
     const loadCatalog = async () => {
@@ -177,15 +187,6 @@ const ScheduleWidget = () => {
       }
 
       setRawLessons(raspData);
-
-      // Auto-set selectedDate to first available study date if current date has no lessons
-      if (raspData.length > 0) {
-        const hasToday = raspData.some(l => l.дата && l.дата.startsWith(selectedDate));
-        if (!hasToday) {
-          const firstDate = raspData[0].дата ? raspData[0].дата.split('T')[0] : '';
-          if (firstDate) setSelectedDate(firstDate);
-        }
-      }
     } catch (err) {
       setError('Не удалось загрузить расписание.');
       setRawLessons([]);
@@ -284,14 +285,14 @@ const ScheduleWidget = () => {
   const changeDateByDays = (daysDelta) => {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() + daysDelta);
-    setSelectedDate(d.toISOString().split('T')[0]);
+    handleDateChange(d.toISOString().split('T')[0]);
   };
 
   // Week navigation helper: +/- weeks
   const changeDateByWeeks = (weeksDelta) => {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() + (weeksDelta * 7));
-    setSelectedDate(d.toISOString().split('T')[0]);
+    handleDateChange(d.toISOString().split('T')[0]);
   };
 
   return (
@@ -375,11 +376,11 @@ const ScheduleWidget = () => {
         </div>
       </div>
 
-      {/* 2. UNIFIED SEARCH COMBOBOX */}
+      {/* 2. UNIFIED SEARCH COMBOBOX & ACADEMIC YEAR SELECT */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px', position: 'relative' }} ref={dropdownRef}>
         
         {/* Search Combobox Input */}
-        <div style={{ position: 'relative', flex: '1 1 300px' }}>
+        <div style={{ position: 'relative', flex: '1 1 260px' }}>
           <div 
             onClick={() => setIsDropdownOpen(true)}
             style={{
@@ -488,6 +489,33 @@ const ScheduleWidget = () => {
             </div>
           )}
         </div>
+
+        {/* Academic Year Select */}
+        <div style={{ position: 'relative', width: '140px' }}>
+          <select 
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 28px 10px 12px',
+              borderRadius: '14px',
+              border: '1px solid #DEE2E6',
+              background: '#F8F9FA',
+              fontSize: '0.88rem',
+              fontWeight: '750',
+              color: 'var(--text)',
+              outline: 'none',
+              cursor: 'pointer',
+              appearance: 'none',
+              WebkitAppearance: 'none'
+            }}
+          >
+            {availableYears.map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          <ChevronDown size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#666' }} />
+        </div>
       </div>
 
       {/* 3. CLEAN TOOLBAR: MODE SWITCHER (ДЕНЬ / НЕДЕЛЯ) & DATE NAVIGATION */}
@@ -543,7 +571,7 @@ const ScheduleWidget = () => {
               <input 
                 type="date"
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                onChange={(e) => handleDateChange(e.target.value)}
                 style={{ padding: '6px 12px', borderRadius: '10px', border: '1px solid #DEE2E6', background: 'white', fontSize: '0.86rem', fontWeight: '800', outline: 'none' }}
               />
 
