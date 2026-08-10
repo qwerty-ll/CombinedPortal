@@ -187,7 +187,7 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
     except Exception:
         pass
 
-    # 3. Query user courses if userid is available (core_enrol_get_users_courses)
+    # 3. Query user courses if userid is available (core_enrol_get_users_courses / timeline)
     courses_list = []
     detected_group = sdo_req.group_number.strip() if sdo_req.group_number else ""
 
@@ -196,12 +196,13 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
             "wstoken": wstoken,
             "moodlewsrestformat": "json",
             "wsfunction": "core_enrol_get_users_courses",
-            "userid": userid
+            "userid": userid,
+            "returnusercount": 0
         }
         try:
             course_resp = requests.post(rest_url, data=course_params, timeout=12, verify=False)
             course_json = course_resp.json()
-            if isinstance(course_json, list):
+            if isinstance(course_json, list) and len(course_json) > 0:
                 courses_list = [
                     {
                         "id": c.get("id"),
@@ -211,14 +212,35 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
                     }
                     for c in course_json
                 ]
-                # Auto-detect group pattern like 24-ИСбо-1 or 25-ИСбо-1 from course names if not provided
-                if not detected_group:
-                    import re
-                    for c in course_json:
-                        match = re.search(r'\b(\d{2}-[А-Яа-яA-Za-z]+-\d+)\b', c.get("fullname", "") + " " + c.get("shortname", ""))
-                        if match:
-                            detected_group = match.group(1)
-                            break
+            else:
+                # Fallback to core_course_get_enrolled_courses_by_timeline_classification
+                t_params = {
+                    "wstoken": wstoken,
+                    "moodlewsrestformat": "json",
+                    "wsfunction": "core_course_get_enrolled_courses_by_timeline_classification",
+                    "classification": "all"
+                }
+                t_resp = requests.post(rest_url, data=t_params, timeout=12, verify=False)
+                t_json = t_resp.json()
+                if isinstance(t_json, dict) and "courses" in t_json:
+                    courses_list = [
+                        {
+                            "id": c.get("id"),
+                            "fullname": c.get("fullname"),
+                            "shortname": c.get("shortname"),
+                            "progress": c.get("progress", 0)
+                        }
+                        for c in t_json["courses"]
+                    ]
+
+            # Auto-detect group pattern like 24-ИСбо-1 or 25-ИСбо-1 from course names if not provided
+            if not detected_group and courses_list:
+                import re
+                for c in courses_list:
+                    match = re.search(r'\b(\d{2}-[А-Яа-яA-Za-z]+-\d+)\b', c.get("fullname", "") + " " + c.get("shortname", ""))
+                    if match:
+                        detected_group = match.group(1)
+                        break
         except Exception:
             courses_list = []
 

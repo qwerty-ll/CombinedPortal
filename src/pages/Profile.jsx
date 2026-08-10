@@ -321,12 +321,6 @@ const Profile = () => {
           transition={{ delay: 0.1 }}
         >
           <div className="stat-box-profile">
-            <span><BookOpen size={18} style={{ verticalAlign: 'text-bottom', marginRight: '5px', color: 'var(--primary)' }} /> Дисциплины в СДО</span>
-            <h2>{user.courses ? user.courses.length : 0}</h2>
-            <p style={{ fontSize: '0.8rem', color: '#888', margin: 0 }}>курсов подключено в sdo.kosgos.ru</p>
-          </div>
-          
-          <div className="stat-box-profile">
             <span><Compass size={18} style={{ verticalAlign: 'text-bottom', marginRight: '5px', color: 'var(--primary)' }} /> Чек-лист гида</span>
             <h2>{checklistCompleted} / 5</h2>
             <p style={{ fontSize: '0.8rem', color: '#888', margin: 0 }}>задач отмечено в Гиде</p>
