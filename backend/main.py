@@ -1,0 +1,355 @@
+import os
+from typing import List, Optional
+from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from dotenv import load_dotenv
+
+from database import engine, Base, get_db
+import models
+import schemas
+import auth
+from rag_service import generate_chatbot_reply
+
+load_dotenv()
+
+# Initialize DB tables automatically on startup
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(
+    title="Портал ИВИТШ КГУ API",
+    description="Официальный REST API для сайта-портала и гайда адаптации первокурсников Высшей ИТ-Школы КГУ",
+    version="1.0.0"
+)
+
+# CORS setup for Vite frontend (localhost:5173 / localhost:3000 / Vercel domains)
+origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "https://combined-portal-freshman.vercel.app",
+    "*"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+def read_root():
+    return {
+        "status": "online",
+        "portal": "ИВИТШ КГУ",
+        "documentation": "/docs"
+    }
+
+# ==========================================
+# 1. AUTHENTICATION & PROFILES
+# ==========================================
+
+@app.post("/api/v1/auth/register", response_model=schemas.TokenResponse)
+def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.username == user_in.username).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Пользователь с таким логином уже существует")
+
+    hashed_pw = auth.get_password_hash(user_in.password)
+    new_user = models.User(
+        username=user_in.username,
+        full_name=user_in.full_name,
+        email=user_in.email,
+        group_number=user_in.group_number,
+        hashed_password=hashed_pw,
+        role=user_in.role or "student"
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    token = auth.create_access_token(data={"sub": new_user.username})
+    return schemas.TokenResponse(access_token=token, user=new_user)
+
+@app.post("/api/v1/auth/login", response_model=schemas.TokenResponse)
+def login(user_in: schemas.UserLogin, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.username == user_in.username).first()
+    if not db_user or not auth.verify_password(user_in.password, db_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Неверный логин или пароль")
+
+    token = auth.create_access_token(data={"sub": db_user.username})
+    return schemas.TokenResponse(access_token=token, user=db_user)
+
+@app.get("/api/v1/auth/me", response_model=schemas.UserResponse)
+def get_me(current_user: models.User = Depends(auth.require_current_user)):
+    return current_user
+
+# ==========================================
+# 2. STUDENT FORUM
+# ==========================================
+
+@app.get("/api/v1/forum/questions", response_model=List[schemas.ForumQuestionResponse])
+def get_forum_questions(
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    current_user: Optional[models.User] = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.ForumQuestion)
+    if category and category != "Все":
+        query = query.filter(models.ForumQuestion.category == category)
+    if search:
+        query = query.filter(
+            (models.ForumQuestion.title.ilike(f"%{search}%")) | 
+            (models.ForumQuestion.content.ilike(f"%{search}%"))
+        )
+
+    questions = query.order_by(models.ForumQuestion.is_pinned.desc(), models.ForumQuestion.created_at.desc()).all()
+
+    result = []
+    for q in questions:
+        upvotes = db.query(models.Vote).filter(models.Vote.question_id == q.id, models.Vote.vote_type == 1).count()
+        downvotes = db.query(models.Vote).filter(models.Vote.question_id == q.id, models.Vote.vote_type == -1).count()
+        answers_count = db.query(models.ForumAnswer).filter(models.ForumAnswer.question_id == q.id).count()
+
+        user_vote = 0
+        if current_user:
+            v = db.query(models.Vote).filter(models.Vote.question_id == q.id, models.Vote.user_id == current_user.id).first()
+            if v:
+                user_vote = v.vote_type
+
+        result.append(schemas.ForumQuestionResponse(
+            id=q.id,
+            author_id=q.author_id,
+            author_name=q.author.full_name,
+            title=q.title,
+            category=q.category,
+            content=q.content,
+            views_count=q.views_count,
+            votes_count=upvotes - downvotes,
+            answers_count=answers_count,
+            user_vote=user_vote,
+            is_pinned=q.is_pinned,
+            created_at=q.created_at
+        ))
+    return result
+
+@app.post("/api/v1/forum/questions", response_model=schemas.ForumQuestionResponse)
+def create_question(
+    q_in: schemas.ForumQuestionCreate,
+    current_user: models.User = Depends(auth.require_current_user),
+    db: Session = Depends(get_db)
+):
+    new_q = models.ForumQuestion(
+        author_id=current_user.id,
+        title=q_in.title,
+        category=q_in.category,
+        content=q_in.content
+    )
+    db.add(new_q)
+    db.commit()
+    db.refresh(new_q)
+
+    return schemas.ForumQuestionResponse(
+        id=new_q.id,
+        author_id=new_q.author_id,
+        author_name=current_user.full_name,
+        title=new_q.title,
+        category=new_q.category,
+        content=new_q.content,
+        views_count=0,
+        votes_count=0,
+        answers_count=0,
+        user_vote=0,
+        is_pinned=False,
+        created_at=new_q.created_at
+    )
+
+@app.get("/api/v1/forum/questions/{question_id}", response_model=schemas.ForumQuestionResponse)
+def get_question_detail(
+    question_id: int,
+    current_user: Optional[models.User] = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    q = db.query(models.ForumQuestion).filter(models.ForumQuestion.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=440, detail="Вопрос не найден")
+
+    q.views_count += 1
+    db.commit()
+
+    upvotes = db.query(models.Vote).filter(models.Vote.question_id == q.id, models.Vote.vote_type == 1).count()
+    downvotes = db.query(models.Vote).filter(models.Vote.question_id == q.id, models.Vote.vote_type == -1).count()
+    answers_count = db.query(models.ForumAnswer).filter(models.ForumAnswer.question_id == q.id).count()
+
+    user_vote = 0
+    if current_user:
+        v = db.query(models.Vote).filter(models.Vote.question_id == q.id, models.Vote.user_id == current_user.id).first()
+        if v:
+            user_vote = v.vote_type
+
+    return schemas.ForumQuestionResponse(
+        id=q.id,
+        author_id=q.author_id,
+        author_name=q.author.full_name,
+        title=q.title,
+        category=q.category,
+        content=q.content,
+        views_count=q.views_count,
+        votes_count=upvotes - downvotes,
+        answers_count=answers_count,
+        user_vote=user_vote,
+        is_pinned=q.is_pinned,
+        created_at=q.created_at
+    )
+
+@app.get("/api/v1/forum/questions/{question_id}/answers", response_model=List[schemas.ForumAnswerResponse])
+def get_question_answers(question_id: int, db: Session = Depends(get_db)):
+    answers = db.query(models.ForumAnswer).filter(models.ForumAnswer.question_id == question_id).order_by(models.ForumAnswer.created_at.asc()).all()
+    return [
+        schemas.ForumAnswerResponse(
+            id=a.id,
+            question_id=a.question_id,
+            author_id=a.author_id,
+            author_name=a.author.full_name,
+            content=a.content,
+            is_solution=a.is_solution,
+            created_at=a.created_at
+        )
+        for a in answers
+    ]
+
+@app.post("/api/v1/forum/questions/{question_id}/answers", response_model=schemas.ForumAnswerResponse)
+def post_answer(
+    question_id: int,
+    ans_in: schemas.ForumAnswerCreate,
+    current_user: models.User = Depends(auth.require_current_user),
+    db: Session = Depends(get_db)
+):
+    q = db.query(models.ForumQuestion).filter(models.ForumQuestion.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Вопрос не найден")
+
+    new_ans = models.ForumAnswer(
+        question_id=question_id,
+        author_id=current_user.id,
+        content=ans_in.content
+    )
+    db.add(new_ans)
+    db.commit()
+    db.refresh(new_ans)
+
+    return schemas.ForumAnswerResponse(
+        id=new_ans.id,
+        question_id=new_ans.question_id,
+        author_id=new_ans.author_id,
+        author_name=current_user.full_name,
+        content=new_ans.content,
+        is_solution=False,
+        created_at=new_ans.created_at
+    )
+
+@app.post("/api/v1/forum/questions/{question_id}/vote")
+def vote_question(
+    question_id: int,
+    req: schemas.VoteRequest,
+    current_user: models.User = Depends(auth.require_current_user),
+    db: Session = Depends(get_db)
+):
+    vote = db.query(models.Vote).filter(models.Vote.question_id == question_id, models.Vote.user_id == current_user.id).first()
+    if vote:
+        if vote.vote_type == req.vote_type:
+            db.delete(vote)
+        else:
+            vote.vote_type = req.vote_type
+    else:
+        new_vote = models.Vote(user_id=current_user.id, question_id=question_id, vote_type=req.vote_type)
+        db.add(new_vote)
+    db.commit()
+    return {"status": "ok"}
+
+# ==========================================
+# 3. AI CHATBOT & ANALYTICS
+# ==========================================
+
+@app.post("/api/v1/chat", response_model=schemas.ChatResponse)
+def chat_with_mascot(req: schemas.ChatRequest, db: Session = Depends(get_db)):
+    if not req.message.strip():
+        raise HTTPException(status_code=400, detail="Сообщение не может быть пустым")
+
+    history_list = [h.dict() for h in (req.history or [])]
+    reply = generate_chatbot_reply(req.message, history_list, db)
+    return schemas.ChatResponse(reply=reply)
+
+@app.get("/api/v1/chat/top-questions", response_model=List[str])
+def get_top_analytics_questions(db: Session = Depends(get_db)):
+    top = db.query(models.AnalyticsQuestion).order_by(models.AnalyticsQuestion.ask_count.desc()).limit(5).all()
+    if not top:
+        return ["Где расписание?", "Как найти 209 кабинет?", "Про стипендию ИВИТШ", "Где коворкинг?"]
+    return [q.question_text for q in top]
+
+# ==========================================
+# 4. ADMIN & DYNAMIC CONTENT
+# ==========================================
+
+@app.get("/api/v1/teachers", response_model=List[schemas.TeacherResponse])
+def get_teachers(db: Session = Depends(get_db)):
+    return db.query(models.Teacher).all()
+
+@app.post("/api/v1/admin/teachers", response_model=schemas.TeacherResponse)
+def create_teacher(t_in: schemas.TeacherCreate, current_user: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
+    new_t = models.Teacher(**t_in.dict())
+    db.add(new_t)
+    db.commit()
+    db.refresh(new_t)
+    return new_t
+
+@app.delete("/api/v1/admin/teachers/{teacher_id}")
+def delete_teacher(teacher_id: int, current_user: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
+    t = db.query(models.Teacher).filter(models.Teacher.id == teacher_id).first()
+    if t:
+        db.delete(t)
+        db.commit()
+    return {"status": "deleted"}
+
+@app.get("/api/v1/announcements", response_model=List[schemas.AnnouncementResponse])
+def get_announcements(db: Session = Depends(get_db)):
+    return db.query(models.Announcement).order_by(models.Announcement.created_at.desc()).all()
+
+@app.post("/api/v1/admin/announcements", response_model=schemas.AnnouncementResponse)
+def create_announcement(a_in: schemas.AnnouncementCreate, current_user: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
+    new_a = models.Announcement(**a_in.dict())
+    db.add(new_a)
+    db.commit()
+    db.refresh(new_a)
+    return new_a
+
+@app.delete("/api/v1/admin/announcements/{announcement_id}")
+def delete_announcement(announcement_id: int, current_user: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
+    a = db.query(models.Announcement).filter(models.Announcement.id == announcement_id).first()
+    if a:
+        db.delete(a)
+        db.commit()
+    return {"status": "deleted"}
+
+@app.get("/api/v1/faq", response_model=List[schemas.FaqItemResponse])
+def get_faq_items(db: Session = Depends(get_db)):
+    return db.query(models.FaqItem).order_by(models.FaqItem.order_index.asc()).all()
+
+@app.post("/api/v1/admin/faq", response_model=schemas.FaqItemResponse)
+def create_faq_item(f_in: schemas.FaqItemCreate, current_user: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
+    new_f = models.FaqItem(**f_in.dict())
+    db.add(new_f)
+    db.commit()
+    db.refresh(new_f)
+    return new_f
+
+@app.delete("/api/v1/admin/faq/{faq_id}")
+def delete_faq_item(faq_id: int, current_user: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
+    f = db.query(models.FaqItem).filter(models.FaqItem.id == faq_id).first()
+    if f:
+        db.delete(f)
+        db.commit()
+    return {"status": "deleted"}

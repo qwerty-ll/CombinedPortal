@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  ivitsh-backend:
+    build: .
+    container_name: ivitsh_fastapi_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - SECRET_KEY=ksu_ivitsh_prod_jwt_secret_2026
+      - DATABASE_URL=sqlite:///./portal.db
+      - GIGACHAT_CLIENT_ID=019e2c26-97a8-75cf-8d25-1caf90fcdd51
+      - GIGACHAT_SECRET=MDE5ZTJjMjYtOTdhOC03NWNmLThkMjUtMWNhZjkwZmNkZDUxOjFkODQ2YzZjLTgwNmEtNGIwZi1iZmQ2LTY0Zjg2NTAwMmU2Yg==
+    volumes:
+      - ./data:/app/data
