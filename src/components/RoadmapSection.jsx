@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { 
   Check, Lock, Hammer, Map, Bot, Brain, ClipboardList, 
-  Building2, BookOpen, Heart, Trophy, Sparkles 
+  Building2, BookOpen, Trophy, Sparkles 
 } from 'lucide-react';
 
 export const ROADMAP_STEPS = [
@@ -13,9 +13,8 @@ export const ROADMAP_STEPS = [
   { id: 4, label: 'Этап 5 · Чек-лист', title: 'Чек-лист первачка', icon: ClipboardList, desc: 'Отмечаешь важные дела первокурсника' },
   { id: 5, label: 'Этап 6 · Карта кампуса', title: 'Карта кампуса', icon: Building2, desc: 'Изучаешь планы этажей корпуса Б' },
   { id: 6, label: 'Этап 7 · Предметы', title: 'Все 24 предмета', icon: BookOpen, desc: 'Все 24 дисциплины 1 и 2 семестров' },
-  { id: 7, label: 'Этап 8 · Настроение', title: 'Тест на настроение', icon: Heart, desc: 'Тест эмоциональной адаптации' },
-  { id: 8, label: 'Этап 9 · Награды', title: 'Зачёт ачивок', icon: Trophy, desc: 'Получаешь зачёт ачивок адаптации' },
-  { id: 9, label: 'Этап 10 · Студ. жизнь', title: 'Студ. жизнь', icon: Sparkles, desc: 'Клубы, приметы и традиции ВИТШ' }
+  { id: 7, label: 'Этап 8 · Студ. жизнь', title: 'Студ. жизнь', icon: Sparkles, desc: 'Клубы, приметы и традиции ВИТШ' },
+  { id: 8, label: 'Этап 9 · Награды', title: 'Зачёт ачивок', icon: Trophy, desc: 'Получение диплома адаптации и ачивок' }
 ];
 
 export default function RoadmapSection({ activeStep, completedSteps, onStepClick }) {
@@ -24,7 +23,7 @@ export default function RoadmapSection({ activeStep, completedSteps, onStepClick
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
         <div>
           <h2 style={{ fontSize: '1.3rem', fontWeight: '800', margin: 0, color: 'var(--text)' }}>Путь адаптации</h2>
-          <p style={{ fontSize: '0.85rem', color: '#777', margin: '2px 0 0 0' }}>Пройди все 10 этапов вместе с ВИТШиком</p>
+          <p style={{ fontSize: '0.85rem', color: '#777', margin: '2px 0 0 0' }}>Пройди 9 главных этапов вместе с ВИТШиком</p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(0, 127, 255, 0.08)', padding: '6px 14px', borderRadius: '16px' }}>

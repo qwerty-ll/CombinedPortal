@@ -11,7 +11,6 @@ import { SUBJECTS } from '../data/subjectsData';
 import RoadmapSection, { ROADMAP_STEPS } from '../components/RoadmapSection';
 import { StepFoundation, StepRoadmap, StepChatbot } from '../components/StepIntroCards';
 import QuizModal from '../components/QuizModal';
-import EmotionalTestModal from '../components/EmotionalTestModal';
 import ChecklistModal from '../components/ChecklistModal';
 import FunLayerModal from '../components/FunLayerModal';
 import RewardsModal from '../components/RewardsModal';
@@ -53,7 +52,7 @@ const DisciplineCard = ({ subject }) => {
             background: `${accentColor}18`, 
             display: 'flex', 
             alignItems: 'center', 
-            justifyContent: 'center',
+            justify: 'center',
             fontSize: '1.3rem',
             flexShrink: 0 
           }}>
@@ -143,10 +142,10 @@ const FreshmanGuide = () => {
     } catch { return [0]; }
   });
 
-  const [activeStepModal, setActiveStepModal] = useState(null); // stepId 0..9 or null
+  const [activeStepModal, setActiveStepModal] = useState(null); // stepId 0..8 or null
   const [isRewardsOpen, setIsRewardsOpen] = useState(false);
 
-  const activeStep = Math.min(9, completedSteps.length);
+  const activeStep = Math.min(8, completedSteps.length);
 
   const handleStepClick = (stepId) => {
     if (stepId === 8) {
@@ -185,7 +184,7 @@ const FreshmanGuide = () => {
           <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1.2px', opacity: 0.85 }}>Высшая ИТ-Школа КГУ</span>
           <h1 style={{ fontSize: '2.2rem', fontWeight: '800', margin: '4px 0 0 0' }}>Путь первокурсника</h1>
           <p style={{ fontSize: '1rem', margin: '8px 0 0 0', opacity: 0.9, maxWidth: '540px' }}>
-            Пройди все 10 этапов адаптации вместе с ВИТШиком: изучи правила, проверь знания, найди кабинеты и открой награды!
+            Пройди все 9 этапов адаптации вместе с ВИТШиком: изучи правила, проверь знания, найди кабинеты и открой дипломы!
           </p>
         </div>
         <motion.img 
@@ -197,7 +196,7 @@ const FreshmanGuide = () => {
         />
       </div>
 
-      {/* 10-Step Roadmap Engine */}
+      {/* 9-Step Roadmap Engine */}
       <div style={{ marginBottom: '40px' }}>
         <RoadmapSection 
           activeStep={activeStep}
@@ -206,7 +205,7 @@ const FreshmanGuide = () => {
         />
       </div>
 
-      {/* Quick Links Section with Colorful Cards & Floating Background Emojis */}
+      {/* Quick Links Section */}
       <section id="level-links" style={{ marginBottom: '40px' }}>
         <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: '0 0 16px 0', color: 'var(--text)' }}>База ссылок и полезностей</h3>
         
@@ -336,7 +335,8 @@ const FreshmanGuide = () => {
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', 
-          gap: '14px' 
+          gap: '14px',
+          alignItems: 'start'
         }}>
           {SUBJECTS.filter(s => s.semester === selectedSemester).map(subject => (
             <DisciplineCard key={subject.id} subject={subject} />
@@ -433,11 +433,8 @@ const FreshmanGuide = () => {
                 </div>
               )}
               
-              {/* Step 8 */}
-              {activeStepModal === 7 && <EmotionalTestModal onComplete={() => { completeStep(7); }} />}
-              
-              {/* Step 10 */}
-              {activeStepModal === 9 && <FunLayerModal onComplete={() => { completeStep(9); setIsRewardsOpen(true); closeStepModal(); }} />}
+              {/* Step 8: Student Life */}
+              {activeStepModal === 7 && <FunLayerModal onComplete={() => { completeStep(7); completeStep(8); setIsRewardsOpen(true); closeStepModal(); }} />}
             </motion.div>
           </div>
         )}
