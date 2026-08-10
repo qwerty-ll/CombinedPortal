@@ -93,14 +93,18 @@ const Teachers = () => {
                     viewport={{ once: true }}
                     transition={{ duration: 0.2 }}
                   >
-                    <div className="teacher-photo-circle">
-                      <img 
-                        src={teacher.photo && (teacher.photo.startsWith('data:') || teacher.photo.startsWith('http://') || teacher.photo.startsWith('https://'))
-                          ? teacher.photo
-                          : `/img/teachers/${teacher.photo || 'profile.png'}`} 
-                        alt={teacher.name} 
-                        onError={(e) => { e.target.src = '/img/mascot.png'; }}
-                      />
+                    <div className="teacher-photo-circle" style={{ background: '#E0F2FE', color: '#0369A1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                      {teacher.photo && teacher.photo !== 'profile.png' ? (
+                        <img 
+                          src={teacher.photo.startsWith('data:') || teacher.photo.startsWith('http://') || teacher.photo.startsWith('https://')
+                            ? teacher.photo
+                            : `/img/teachers/${teacher.photo}`} 
+                          alt={teacher.name} 
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                      ) : (
+                        <UserIcon size={24} />
+                      )}
                     </div>
                     <div className="teacher-details-box">
                       <span className="teacher-department-label">ИВИТШ</span>
@@ -138,14 +142,18 @@ const Teachers = () => {
               <span className="modal-label" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>Консультации</span>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '20px' }}>
-                <div className="teacher-photo-circle" style={{ width: '60px', height: '60px', margin: 0 }}>
-                  <img 
-                    src={selectedTeacher.photo && (selectedTeacher.photo.startsWith('data:') || selectedTeacher.photo.startsWith('http://') || selectedTeacher.photo.startsWith('https://'))
-                      ? selectedTeacher.photo
-                      : `/img/teachers/${selectedTeacher.photo || 'profile.png'}`} 
-                    alt={selectedTeacher.name} 
-                    onError={(e) => { e.target.src = '/img/mascot.png'; }}
-                  />
+                <div className="teacher-photo-circle" style={{ width: '60px', height: '60px', margin: 0, background: '#E0F2FE', color: '#0369A1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                  {selectedTeacher.photo && selectedTeacher.photo !== 'profile.png' ? (
+                    <img 
+                      src={selectedTeacher.photo.startsWith('data:') || selectedTeacher.photo.startsWith('http://') || selectedTeacher.photo.startsWith('https://')
+                        ? selectedTeacher.photo
+                        : `/img/teachers/${selectedTeacher.photo}`} 
+                      alt={selectedTeacher.name} 
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                  ) : (
+                    <UserIcon size={30} />
+                  )}
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800' }}>{selectedTeacher.name}</h3>

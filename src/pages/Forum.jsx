@@ -234,12 +234,16 @@ const Forum = () => {
               >
                 <div className="post-top-row">
                   <div className="post-author-badge">
-                    <div className="post-author-avatar">
-                      <img 
-                        src={`/img/${q.author.photo}`} 
-                        alt="avatar" 
-                        onError={(e) => { e.target.src = '/img/profile.png'; }}
-                      />
+                    <div className="post-author-avatar" style={{ background: '#E0F2FE', color: '#0369A1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', overflow: 'hidden', flexShrink: 0 }}>
+                      {q.author.photoUrl || (q.author.photo && q.author.photo !== 'profile.png') ? (
+                        <img 
+                          src={q.author.photoUrl || `/img/${q.author.photo}`} 
+                          alt="avatar" 
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                      ) : (
+                        <User size={18} />
+                      )}
                     </div>
                     <div className="post-author-meta">
                       <h5>

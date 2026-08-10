@@ -337,7 +337,7 @@ const AdminPanel = () => {
                             : `/img/teachers/${teacherForm.photo}`} 
                           alt="Preview" 
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          onError={(e) => { e.target.src = '/img/profile.png'; }}
+                          onError={(e) => { e.target.style.display = 'none'; }}
                         />
                       </div>
                     )}

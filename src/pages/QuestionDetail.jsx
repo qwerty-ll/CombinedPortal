@@ -212,12 +212,16 @@ const QuestionDetail = () => {
       >
         <div className="post-top-row">
           <div className="post-author-badge">
-            <div className="post-author-avatar">
-              <img 
-                src={`/img/${question.author.photo}`} 
-                alt="avatar" 
-                onError={(e) => { e.target.src = '/img/profile.png'; }}
-              />
+            <div className="post-author-avatar" style={{ background: '#E0F2FE', color: '#0369A1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', overflow: 'hidden', flexShrink: 0 }}>
+              {question.author.photoUrl || (question.author.photo && question.author.photo !== 'profile.png') ? (
+                <img 
+                  src={question.author.photoUrl || `/img/${question.author.photo}`} 
+                  alt="avatar" 
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              ) : (
+                <User size={18} />
+              )}
             </div>
             <div className="post-author-meta">
               <h5>
@@ -280,12 +284,16 @@ const QuestionDetail = () => {
               
               <div className="post-top-row">
                 <div className="post-author-badge">
-                  <div className="post-author-avatar" style={{ width: '28px', height: '28px' }}>
-                    <img 
-                      src={`/img/${reply.author.photo}`} 
-                      alt="avatar" 
-                      onError={(e) => { e.target.src = '/img/profile.png'; }}
-                    />
+                  <div className="post-author-avatar" style={{ width: '28px', height: '28px', background: '#E0F2FE', color: '#0369A1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                    {reply.author.photoUrl || (reply.author.photo && reply.author.photo !== 'profile.png') ? (
+                      <img 
+                        src={reply.author.photoUrl || `/img/${reply.author.photo}`} 
+                        alt="avatar" 
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    ) : (
+                      <User size={14} />
+                    )}
                   </div>
                   <div className="post-author-meta">
                     <h5 style={{ fontSize: '0.85rem' }}>

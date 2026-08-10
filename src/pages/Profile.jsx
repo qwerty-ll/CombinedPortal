@@ -253,7 +253,7 @@ const Profile = () => {
 
           <div className="student-info-meta">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <h2>{user.fullName}</h2>
+              <h2>{/^\d{2}-[a-z0-9]+-\d+$/i.test((user.fullName || '').trim()) ? `Студент (${user.fullName.trim()})` : user.fullName}</h2>
               {user.sdoToken && (
                 <span style={{ background: '#E6F4EA', color: '#137333', fontSize: '0.75rem', padding: '3px 8px', borderRadius: '8px', fontWeight: '800' }}>
                   ✓ СДО KOSGOS

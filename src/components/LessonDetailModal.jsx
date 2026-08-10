@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Mail, MapPin } from 'lucide-react';
+import { X, Mail, MapPin, User } from 'lucide-react';
 
 const LessonDetailModal = ({ isOpen, onClose, lesson }) => {
   const navigate = useNavigate();
@@ -37,14 +37,18 @@ const LessonDetailModal = ({ isOpen, onClose, lesson }) => {
 
         {/* TEACHER CARD */}
         <div className="teacher-card modal-teacher">
-          <div className="teacher-avatar">
-            <img 
-              src={lesson.teacher.photo && (lesson.teacher.photo.startsWith('data:') || lesson.teacher.photo.startsWith('http://') || lesson.teacher.photo.startsWith('https://'))
-                ? lesson.teacher.photo
-                : `/img/teachers/${lesson.teacher.photo || 'profile.png'}`} 
-              alt={lesson.teacher.name} 
-              onError={(e) => { e.target.src = '/img/profile.png'; }}
-            />
+          <div className="teacher-avatar" style={{ background: '#E0F2FE', color: '#0369A1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            {lesson.teacher.photo && lesson.teacher.photo !== 'profile.png' ? (
+              <img 
+                src={lesson.teacher.photo.startsWith('data:') || lesson.teacher.photo.startsWith('http://') || lesson.teacher.photo.startsWith('https://')
+                  ? lesson.teacher.photo
+                  : `/img/teachers/${lesson.teacher.photo}`} 
+                alt={lesson.teacher.name} 
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            ) : (
+              <User size={24} />
+            )}
           </div>
           <div className="teacher-info">
             <h3>{lesson.teacher.name}</h3>

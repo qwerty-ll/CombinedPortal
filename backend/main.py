@@ -144,7 +144,17 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
     except Exception:
         info_data = {}
 
-    fullname = info_data.get("fullname") or info_data.get("username") or username
+    firstname = info_data.get("firstname", "").strip()
+    lastname = info_data.get("lastname", "").strip()
+    raw_fullname = info_data.get("fullname", "").strip()
+
+    if lastname and firstname:
+        fullname = f"{lastname} {firstname}"
+    elif raw_fullname and raw_fullname.lower() != username.lower():
+        fullname = raw_fullname
+    else:
+        fullname = username
+
     userid = info_data.get("userid")
     userpictureurl = info_data.get("userpictureurl")
 

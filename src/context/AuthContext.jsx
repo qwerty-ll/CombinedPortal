@@ -14,7 +14,7 @@ const PREDEFINED_USERS = {
     fullName: 'Администратор Портала',
     group: 'Администрация ИВИТШ',
     role: 'admin',
-    photo: 'profile.png',
+    photoUrl: '',
   },
   moderator: {
     id: 'mod-1',
@@ -22,15 +22,15 @@ const PREDEFINED_USERS = {
     fullName: 'Смирнов Алексей Владимирович',
     group: '24-ИСбо-1',
     role: 'moderator',
-    photo: 'profile.png',
+    photoUrl: '',
   },
   student: {
     id: 'stud-1',
     username: 'student',
     fullName: 'Иванов Иван Иванович',
-    group: '25-ИСбо-1',
+    group: '24-ИСбо-1',
     role: 'student',
-    photo: 'profile.png',
+    photoUrl: '',
   }
 };
 

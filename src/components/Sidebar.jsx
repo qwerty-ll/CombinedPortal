@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   ChevronRight, ChevronLeft, LayoutDashboard, Compass, 
-  MessageSquare, Map, UserSquare, HelpCircle, Users, Shield, LogIn, LogOut
+  MessageSquare, Map, UserSquare, HelpCircle, Users, Shield, LogIn, LogOut, User
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -71,11 +71,15 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen })
         <div className="sidebar-footer">
           {isLoggedIn ? (
             <div className="sidebar-user-mini" onClick={() => handleNavigation('/profile')}>
-              <div className="sidebar-user-avatar">
-                <img src={`/img/${user.photo || 'profile.png'}`} alt="avatar" onError={(e) => { e.target.src = '/img/profile.png'; }} />
+              <div className="sidebar-user-avatar" style={{ overflow: 'hidden', background: '#E0F2FE', color: '#0369A1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', flexShrink: 0 }}>
+                {user.photoUrl ? (
+                  <img src={user.photoUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                ) : (
+                  <User size={18} />
+                )}
               </div>
               <div className="sidebar-user-info">
-                <span className="sidebar-user-name">{user.fullName}</span>
+                <span className="sidebar-user-name">{/^\d{2}-[a-z0-9]+-\d+$/i.test((user.fullName || '').trim()) ? `Студент (${user.fullName.trim()})` : user.fullName}</span>
                 <span className="sidebar-user-role">
                   {user.role === 'admin' ? 'Администратор' : user.role === 'moderator' ? 'Модератор' : 'Студент'}
                 </span>
