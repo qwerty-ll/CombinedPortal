@@ -2,14 +2,28 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   CalendarDays, Search, Clock, MapPin, User, BookOpen, AlertCircle, 
   ChevronDown, GraduationCap, Building2, UserCheck, Calendar,
-  ChevronLeft, ChevronRight, SlidersHorizontal, ArrowRight, RotateCcw
+  ChevronLeft, ChevronRight, RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { scheduleApi } from '../services/api';
 
 const EIOS_DIRECT_URL = 'https://eios.kosgos.ru/api';
 
-// Helper to clean discipline titles (remove duplicate 'лек', 'лаб', 'пр' prefixes)
+// Automatically calculate academic year from date string (YYYY-MM-DD)
+const calculateAcademicYear = (dateStr) => {
+  if (!dateStr) return '2025-2026';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '2025-2026';
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1; // 1 to 12
+  if (month >= 9) {
+    return `${year}-${year + 1}`;
+  } else {
+    return `${year - 1}-${year}`;
+  }
+};
+
+// Clean discipline titles (remove leading 'лек ', 'лаб ', 'пр ')
 const cleanDisciplineTitle = (rawTitle) => {
   if (!rawTitle) return '';
   let clean = rawTitle.replace(/^(лек|лаб|пр)\s+/i, '').trim();
@@ -29,10 +43,8 @@ const getLessonTypeBadge = (disciplineName) => {
 
 const ScheduleWidget = () => {
   const [targetType, setTargetType] = useState('group'); // 'group' | 'teacher' | 'aud'
-  const [selectedYear, setSelectedYear] = useState('2025-2026');
-  const availableYears = ['2025-2026', '2024-2025', '2023-2024', '2026-2027'];
-
-  // Current selection state
+  
+  // Selected target object
   const [selectedId, setSelectedId] = useState(() => Number(localStorage.getItem('portal_sched_id')) || 8540);
   const [selectedName, setSelectedName] = useState(() => localStorage.getItem('portal_sched_name') || '24-ИСбо-1');
 
@@ -41,13 +53,14 @@ const ScheduleWidget = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // View Modes: 'day' (1 day) | 'week' (paginated week) | 'range' (custom date range)
+  // View Mode: 'day' (1 день) | 'week' (1 неделя)
   const [viewMode, setViewMode] = useState('day'); 
 
-  // Date State
-  const [singleDate, setSingleDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  // Selected date ISO string (default to today)
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+
+  // Derived Academic Year (AUTOMATIC, ZERO MANUAL SELECTION NEEDED)
+  const selectedYear = useMemo(() => calculateAcademicYear(selectedDate), [selectedDate]);
 
   // Catalog items & Lessons state
   const [catalogItems, setCatalogItems] = useState([]);
@@ -55,9 +68,6 @@ const ScheduleWidget = () => {
   const [rawLessons, setRawLessons] = useState([]);
   const [lessonsLoading, setLessonsLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  // Paginated Day Index inside Week View (0 = Monday, 5 = Saturday)
-  const [activeWeekDayIndex, setActiveWeekDayIndex] = useState(0);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -70,7 +80,7 @@ const ScheduleWidget = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 1. Fetch Catalog Items for selected type & year
+  // 1. Fetch Catalog Items for selected type & calculated year
   useEffect(() => {
     let isMounted = true;
     const loadCatalog = async () => {
@@ -168,12 +178,12 @@ const ScheduleWidget = () => {
 
       setRawLessons(raspData);
 
-      // Auto-set singleDate to first available date if today is empty
+      // Auto-set selectedDate to first available study date if current date has no lessons
       if (raspData.length > 0) {
-        const hasSingleDate = raspData.some(l => l.дата && l.дата.startsWith(singleDate));
-        if (!hasSingleDate) {
+        const hasToday = raspData.some(l => l.дата && l.дата.startsWith(selectedDate));
+        if (!hasToday) {
           const firstDate = raspData[0].дата ? raspData[0].дата.split('T')[0] : '';
-          if (firstDate) setSingleDate(firstDate);
+          if (firstDate) setSelectedDate(firstDate);
         }
       }
     } catch (err) {
@@ -204,46 +214,55 @@ const ScheduleWidget = () => {
     return result;
   }, [rawLessons]);
 
-  // Unique sorted dates available in schedule
-  const availableDatesSorted = useMemo(() => {
-    const set = new Set();
-    deduplicatedLessons.forEach(l => {
-      if (l.дата) set.add(l.дата.split('T')[0]);
+  // Get start & end dates for Monday to Saturday of the selectedDate's week
+  const weekStartEndDates = useMemo(() => {
+    const d = new Date(selectedDate);
+    const day = d.getDay(); // 0 is Sun
+    const diffToMon = day === 0 ? -6 : 1 - day;
+    const mon = new Date(d);
+    mon.setDate(d.getDate() + diffToMon);
+
+    const sat = new Date(mon);
+    sat.setDate(mon.getDate() + 5);
+
+    const monIso = mon.toISOString().split('T')[0];
+    const satIso = sat.toISOString().split('T')[0];
+
+    return { monIso, satIso, monObj: mon, satObj: sat };
+  }, [selectedDate]);
+
+  // Lessons filtered by view mode (Day or Week)
+  const modeLessons = useMemo(() => {
+    if (viewMode === 'day') {
+      return deduplicatedLessons.filter(l => l.дата && l.дата.startsWith(selectedDate));
+    }
+    // Week Mode: filter lessons between Monday and Saturday
+    return deduplicatedLessons.filter(l => {
+      if (!l.дата) return false;
+      const d = l.дата.split('T')[0];
+      return d >= weekStartEndDates.monIso && d <= weekStartEndDates.satIso;
     });
-    return Array.from(set).sort();
-  }, [deduplicatedLessons]);
+  }, [deduplicatedLessons, viewMode, selectedDate, weekStartEndDates]);
 
-  // Current active date string depending on view mode
-  const currentActiveDate = useMemo(() => {
-    if (viewMode === 'day') return singleDate;
-    if (viewMode === 'week') {
-      if (availableDatesSorted.length === 0) return singleDate;
-      const safeIndex = Math.min(activeWeekDayIndex, availableDatesSorted.length - 1);
-      return availableDatesSorted[safeIndex] || singleDate;
-    }
-    return singleDate;
-  }, [viewMode, singleDate, availableDatesSorted, activeWeekDayIndex]);
+  // Group modeLessons FIRST BY DATE, THEN BY TIME SLOT (Prevents date mixing!)
+  const groupedByDateAndSlot = useMemo(() => {
+    const dateMap = {};
 
-  // Filter lessons according to mode (day / week / range)
-  const displayedLessons = useMemo(() => {
-    if (viewMode === 'range' && startDate && endDate) {
-      return deduplicatedLessons.filter(l => {
-        if (!l.дата) return false;
-        const d = l.дата.split('T')[0];
-        return d >= startDate && d <= endDate;
-      });
-    }
-    // For single day or week page flip:
-    return deduplicatedLessons.filter(l => l.дата && l.дата.startsWith(currentActiveDate));
-  }, [deduplicatedLessons, viewMode, startDate, endDate, currentActiveDate]);
+    modeLessons.forEach(lesson => {
+      const dateKey = lesson.дата ? lesson.дата.split('T')[0] : 'неизвестно';
+      if (!dateMap[dateKey]) {
+        const dObj = new Date(dateKey);
+        const dayTitle = `${lesson.день_недели || dObj.toLocaleDateString('ru-RU', { weekday: 'long' })} (${dObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })})`;
+        dateMap[dateKey] = {
+          dateIso: dateKey,
+          dayTitle: dayTitle,
+          slotsMap: {}
+        };
+      }
 
-  // Group displayed lessons into Time Slots
-  const timeSlotGroups = useMemo(() => {
-    const map = {};
-    displayedLessons.forEach(lesson => {
       const timeKey = `${lesson.начало}-${lesson.конец}`;
-      if (!map[timeKey]) {
-        map[timeKey] = {
+      if (!dateMap[dateKey].slotsMap[timeKey]) {
+        dateMap[dateKey].slotsMap[timeKey] = {
           timeStart: lesson.начало,
           timeEnd: lesson.конец,
           lessonNum: lesson.номерЗанятия,
@@ -251,10 +270,29 @@ const ScheduleWidget = () => {
           items: []
         };
       }
-      map[timeKey].items.push(lesson);
+      dateMap[dateKey].slotsMap[timeKey].items.push(lesson);
     });
-    return Object.values(map).sort((a, b) => a.timeStart.localeCompare(b.timeStart));
-  }, [displayedLessons]);
+
+    // Convert to sorted list of date groups
+    return Object.values(dateMap).sort((a, b) => a.dateIso.localeCompare(b.dateIso)).map(dGroup => ({
+      ...dGroup,
+      slots: Object.values(dGroup.slotsMap).sort((a, b) => a.timeStart.localeCompare(b.timeStart))
+    }));
+  }, [modeLessons]);
+
+  // Day navigation helper: +/- days
+  const changeDateByDays = (daysDelta) => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + daysDelta);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+
+  // Week navigation helper: +/- weeks
+  const changeDateByWeeks = (weeksDelta) => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + (weeksDelta * 7));
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
 
   return (
     <div style={{
@@ -270,7 +308,7 @@ const ScheduleWidget = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '20px' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: '1.35rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text)' }}>
-            <CalendarDays size={24} style={{ color: 'var(--primary)' }} />
+            <CalendarDays size={22} style={{ color: 'var(--primary)' }} />
             Расписание КГУ
           </h3>
         </div>
@@ -337,11 +375,11 @@ const ScheduleWidget = () => {
         </div>
       </div>
 
-      {/* 2. UNIFIED SEARCH COMBOBOX & CUSTOM YEAR SELECT */}
+      {/* 2. UNIFIED SEARCH COMBOBOX */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px', position: 'relative' }} ref={dropdownRef}>
         
         {/* Search Combobox Input */}
-        <div style={{ position: 'relative', flex: '1 1 280px' }}>
+        <div style={{ position: 'relative', flex: '1 1 300px' }}>
           <div 
             onClick={() => setIsDropdownOpen(true)}
             style={{
@@ -414,7 +452,7 @@ const ScheduleWidget = () => {
             }}>
               {catalogLoading ? (
                 <div style={{ padding: '14px', textCenter: 'center', color: '#888', fontSize: '0.85rem' }}>
-                  Загрузка справочника...
+                  Загрузка данных...
                 </div>
               ) : filteredCatalog.length > 0 ? (
                 filteredCatalog.map(item => (
@@ -450,176 +488,94 @@ const ScheduleWidget = () => {
             </div>
           )}
         </div>
-
-        {/* Custom Styled Academic Year Select */}
-        <div style={{ position: 'relative', minWidth: '130px' }}>
-          <select 
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '10px 28px 10px 14px',
-              borderRadius: '14px',
-              border: '1px solid #DEE2E6',
-              background: '#F8F9FA',
-              fontSize: '0.88rem',
-              fontWeight: '750',
-              color: 'var(--text)',
-              outline: 'none',
-              cursor: 'pointer',
-              appearance: 'none',
-              WebkitAppearance: 'none'
-            }}
-          >
-            {availableYears.map(y => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-          <ChevronDown size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#666' }} />
-        </div>
       </div>
 
-      {/* 3. DUAL VIEW MODE TOOLBAR: DAY VIEW / PAGINATED WEEK / DATE RANGE */}
+      {/* 3. CLEAN TOOLBAR: MODE SWITCHER (ДЕНЬ / НЕДЕЛЯ) & DATE NAVIGATION */}
       <div style={{ background: '#F8F9FA', padding: '14px 18px', borderRadius: '18px', marginBottom: '20px', border: '1px solid #E9ECEF' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           
-          {/* Mode Tabs */}
+          {/* Mode Switcher */}
           <div style={{ display: 'flex', background: 'white', padding: '3px', borderRadius: '12px', border: '1px solid #DEE2E6' }}>
             <button 
               onClick={() => setViewMode('day')}
               style={{
-                padding: '6px 14px',
+                padding: '7px 16px',
                 borderRadius: '9px',
                 border: 'none',
                 background: viewMode === 'day' ? 'var(--primary)' : 'transparent',
                 color: viewMode === 'day' ? 'white' : '#555',
                 fontWeight: viewMode === 'day' ? '800' : '600',
-                fontSize: '0.84rem',
-                cursor: 'pointer'
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                transition: 'all 0.12s'
               }}
             >
-              📅 Выбор даты
+              📅 1 день
             </button>
             <button 
               onClick={() => setViewMode('week')}
               style={{
-                padding: '6px 14px',
+                padding: '7px 16px',
                 borderRadius: '9px',
                 border: 'none',
                 background: viewMode === 'week' ? 'var(--primary)' : 'transparent',
                 color: viewMode === 'week' ? 'white' : '#555',
                 fontWeight: viewMode === 'week' ? '800' : '600',
-                fontSize: '0.84rem',
-                cursor: 'pointer'
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                transition: 'all 0.12s'
               }}
             >
-              🗓️ Понедельно (листание)
-            </button>
-            <button 
-              onClick={() => setViewMode('range')}
-              style={{
-                padding: '6px 14px',
-                borderRadius: '9px',
-                border: 'none',
-                background: viewMode === 'range' ? 'var(--primary)' : 'transparent',
-                color: viewMode === 'range' ? 'white' : '#555',
-                fontWeight: viewMode === 'range' ? '800' : '600',
-                fontSize: '0.84rem',
-                cursor: 'pointer'
-              }}
-            >
-              📆 Диапазон дат
+              🗓️ За неделю
             </button>
           </div>
 
-          {/* Controls for Mode 1: Single Date */}
+          {/* Controls for Day Mode */}
           {viewMode === 'day' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#666' }}>Дата:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button 
+                onClick={() => changeDateByDays(-1)}
+                style={{ padding: '6px 12px', borderRadius: '10px', border: '1px solid #DEE2E6', background: 'white', fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                <ChevronLeft size={16} /> Вчера
+              </button>
+
               <input 
                 type="date"
-                value={singleDate}
-                onChange={(e) => setSingleDate(e.target.value)}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '10px',
-                  border: '1px solid #DEE2E6',
-                  background: 'white',
-                  fontSize: '0.85rem',
-                  fontWeight: '700',
-                  color: 'var(--text)',
-                  outline: 'none'
-                }}
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                style={{ padding: '6px 12px', borderRadius: '10px', border: '1px solid #DEE2E6', background: 'white', fontSize: '0.86rem', fontWeight: '800', outline: 'none' }}
               />
+
+              <button 
+                onClick={() => changeDateByDays(1)}
+                style={{ padding: '6px 12px', borderRadius: '10px', border: '1px solid #DEE2E6', background: 'white', fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                Завтра <ChevronRight size={16} />
+              </button>
             </div>
           )}
 
-          {/* Controls for Mode 2: Paginated Week (Next / Prev Day arrows) */}
-          {viewMode === 'week' && availableDatesSorted.length > 0 && (
+          {/* Controls for Week Mode */}
+          {viewMode === 'week' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <button 
-                onClick={() => setActiveWeekDayIndex(prev => Math.max(0, prev - 1))}
-                disabled={activeWeekDayIndex === 0}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #DEE2E6',
-                  background: activeWeekDayIndex === 0 ? '#F1F3F5' : 'white',
-                  color: activeWeekDayIndex === 0 ? '#AAA' : 'var(--text)',
-                  cursor: activeWeekDayIndex === 0 ? 'default' : 'pointer',
-                  fontWeight: '700',
-                  fontSize: '0.82rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
+                onClick={() => changeDateByWeeks(-1)}
+                style={{ padding: '6px 12px', borderRadius: '10px', border: '1px solid #DEE2E6', background: 'white', fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
               >
-                <ChevronLeft size={16} /> Назад
+                <ChevronLeft size={16} /> Пред. неделя
               </button>
 
-              <span style={{ fontSize: '0.88rem', fontWeight: '800', color: 'var(--primary)' }}>
-                День {activeWeekDayIndex + 1} из {availableDatesSorted.length}
+              <span style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--primary)' }}>
+                {new Date(weekStartEndDates.monIso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} — {new Date(weekStartEndDates.satIso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
               </span>
 
               <button 
-                onClick={() => setActiveWeekDayIndex(prev => Math.min(availableDatesSorted.length - 1, prev + 1))}
-                disabled={activeWeekDayIndex >= availableDatesSorted.length - 1}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #DEE2E6',
-                  background: activeWeekDayIndex >= availableDatesSorted.length - 1 ? '#F1F3F5' : 'white',
-                  color: activeWeekDayIndex >= availableDatesSorted.length - 1 ? '#AAA' : 'var(--text)',
-                  cursor: activeWeekDayIndex >= availableDatesSorted.length - 1 ? 'default' : 'pointer',
-                  fontWeight: '700',
-                  fontSize: '0.82rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
+                onClick={() => changeDateByWeeks(1)}
+                style={{ padding: '6px 12px', borderRadius: '10px', border: '1px solid #DEE2E6', background: 'white', fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
               >
-                Вперёд <ChevronRight size={16} />
+                След. неделя <ChevronRight size={16} />
               </button>
-            </div>
-          )}
-
-          {/* Controls for Mode 3: Custom Date Range (Start -> End) */}
-          {viewMode === 'range' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#666' }}>С:</span>
-              <input 
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #DEE2E6', background: 'white', fontSize: '0.82rem', fontWeight: '700' }}
-              />
-              <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#666' }}>По:</span>
-              <input 
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #DEE2E6', background: 'white', fontSize: '0.82rem', fontWeight: '700' }}
-              />
             </div>
           )}
         </div>
@@ -629,98 +585,101 @@ const ScheduleWidget = () => {
       {lessonsLoading ? (
         <div style={{ textAlign: 'center', padding: '45px 0', color: '#666' }}>
           <div className="spinner" style={{ margin: '0 auto 10px auto' }}></div>
-          <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>Загрузка пар для "{selectedName}"...</span>
+          <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>Загрузка расписания для "{selectedName}"...</span>
         </div>
       ) : error ? (
         <div style={{ textAlign: 'center', padding: '24px', background: '#FFF5F5', borderRadius: '16px', color: '#C53030', border: '1px solid #FEB2B2' }}>
           <AlertCircle size={32} style={{ marginBottom: '6px' }} />
           <h4 style={{ margin: '0 0 4px 0', fontSize: '0.98rem', fontWeight: '800' }}>{error}</h4>
         </div>
-      ) : timeSlotGroups.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ fontSize: '0.88rem', fontWeight: '800', color: 'var(--text)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            📅 {viewMode === 'range' && startDate && endDate 
-              ? `Занятия за период с ${new Date(startDate).toLocaleDateString('ru-RU')} по ${new Date(endDate).toLocaleDateString('ru-RU')}:`
-              : `Расписание на ${new Date(currentActiveDate).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}:`
-            }
-          </div>
+      ) : groupedByDateAndSlot.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {groupedByDateAndSlot.map((dGroup) => (
+            <div key={dGroup.dateIso}>
+              <h4 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: '800', color: 'var(--text)', borderBottom: '2px solid rgba(0,127,255,0.12)', paddingBottom: '6px' }}>
+                📅 {dGroup.dayTitle}
+              </h4>
 
-          {timeSlotGroups.map((slot, sIdx) => (
-            <motion.div 
-              key={sIdx}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              style={{
-                background: 'white',
-                borderLeft: `5px solid ${slot.color}`,
-                borderTop: '1px solid #F1F3F5',
-                borderRight: '1px solid #F1F3F5',
-                borderBottom: '1px solid #F1F3F5',
-                borderRadius: '16px',
-                padding: '16px 20px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-              }}
-            >
-              {/* Slot Time Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', borderBottom: '1px dashed #E9ECEF', paddingBottom: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ background: 'rgba(0,127,255,0.08)', padding: '4px 10px', borderRadius: '8px', fontWeight: '800', fontSize: '0.92rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Clock size={13} /> {slot.timeStart} - {slot.timeEnd}
-                  </div>
-                  <span style={{ fontSize: '0.8rem', color: '#888', fontWeight: '700' }}>{slot.lessonNum} пара</span>
-                </div>
-              </div>
-
-              {/* Slot Sub-Items */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {slot.items.map((item, iIdx) => {
-                  const typeBadge = getLessonTypeBadge(item.дисциплина);
-                  const cleanedTitle = cleanDisciplineTitle(item.дисциплина);
-                  return (
-                    <div key={item.код || iIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <span style={{ background: typeBadge.bg, color: typeBadge.color, padding: '2px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: '800' }}>
-                          {typeBadge.label}
-                        </span>
-                        {item.номерПодгруппы > 0 && (
-                          <span style={{ background: '#E3F2FD', color: '#0D47A1', padding: '2px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: '800' }}>
-                            {item.номерПодгруппы} п/г
-                          </span>
-                        )}
-                        <h5 style={{ margin: 0, fontSize: '0.98rem', fontWeight: '800', color: 'var(--text)', flex: 1, wordBreak: 'break-word', lineHeight: '1.35' }}>
-                          {cleanedTitle}
-                        </h5>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '18px', fontSize: '0.84rem', color: '#555', flexWrap: 'wrap', paddingLeft: '2px' }}>
-                        {item.преподаватель && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <User size={13} style={{ color: '#777' }} /> {item.преподаватель}
-                          </span>
-                        )}
-                        {item.аудитория && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '800', color: 'var(--primary)' }}>
-                            <MapPin size={13} /> Кабинет: {item.аудитория}
-                          </span>
-                        )}
-                        {item.группа && targetType !== 'group' && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <GraduationCap size={13} style={{ color: '#777' }} /> Группа: {item.группа}
-                          </span>
-                        )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {dGroup.slots.map((slot, sIdx) => (
+                  <motion.div 
+                    key={sIdx}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{
+                      background: 'white',
+                      borderLeft: `5px solid ${slot.color}`,
+                      borderTop: '1px solid #F1F3F5',
+                      borderRight: '1px solid #F1F3F5',
+                      borderBottom: '1px solid #F1F3F5',
+                      borderRadius: '16px',
+                      padding: '16px 20px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                    }}
+                  >
+                    {/* Slot Time Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', borderBottom: '1px dashed #E9ECEF', paddingBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ background: 'rgba(0,127,255,0.08)', padding: '4px 10px', borderRadius: '8px', fontWeight: '800', fontSize: '0.92rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Clock size={13} /> {slot.timeStart} - {slot.timeEnd}
+                        </div>
+                        <span style={{ fontSize: '0.8rem', color: '#888', fontWeight: '700' }}>{slot.lessonNum} пара</span>
                       </div>
                     </div>
-                  );
-                })}
+
+                    {/* Slot Sub-Items */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {slot.items.map((item, iIdx) => {
+                        const typeBadge = getLessonTypeBadge(item.дисциплина);
+                        const cleanedTitle = cleanDisciplineTitle(item.дисциплина);
+                        return (
+                          <div key={item.код || iIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span style={{ background: typeBadge.bg, color: typeBadge.color, padding: '2px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: '800' }}>
+                                {typeBadge.label}
+                              </span>
+                              {item.номерПодгруппы > 0 && (
+                                <span style={{ background: '#E3F2FD', color: '#0D47A1', padding: '2px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: '800' }}>
+                                  {item.номерПодгруппы} п/г
+                                </span>
+                              )}
+                              <h5 style={{ margin: 0, fontSize: '0.98rem', fontWeight: '800', color: 'var(--text)', flex: 1, wordBreak: 'break-word', lineHeight: '1.35' }}>
+                                {cleanedTitle}
+                              </h5>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '18px', fontSize: '0.84rem', color: '#555', flexWrap: 'wrap', paddingLeft: '2px' }}>
+                              {item.преподаватель && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <User size={13} style={{ color: '#777' }} /> {item.преподаватель}
+                                </span>
+                              )}
+                              {item.аудитория && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '800', color: 'var(--primary)' }}>
+                                  <MapPin size={13} /> Кабинет: {item.аудитория}
+                                </span>
+                              )}
+                              {item.группа && targetType !== 'group' && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <GraduationCap size={13} style={{ color: '#777' }} /> Группа: {item.группа}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                ))}
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       ) : (
         <div style={{ textAlign: 'center', padding: '36px 0', color: '#888' }}>
           <BookOpen size={38} strokeWidth={1.5} style={{ color: '#ccc', marginBottom: '8px' }} />
           <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', fontWeight: '800' }}>Занятий нет</h4>
-          <p style={{ margin: 0, fontSize: '0.85rem' }}>На выбранный день или диапазон пары не запланированы</p>
+          <p style={{ margin: 0, fontSize: '0.85rem' }}>На выбранный день или неделю пары не запланированы</p>
         </div>
       )}
     </div>
