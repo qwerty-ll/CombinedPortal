@@ -28,6 +28,7 @@ class UserResponse(BaseModel):
     group_number: Optional[str] = None
     email: Optional[str] = None
     sdo_token: Optional[str] = None
+    userpictureurl: Optional[str] = None
     courses: Optional[List[dict]] = None
     created_at: datetime
 

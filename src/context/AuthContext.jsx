@@ -85,9 +85,9 @@ export const AuthProvider = ({ children }) => {
           id: res.user.id,
           username: res.user.username,
           fullName: res.user.full_name,
-          group: res.user.group_number || groupInput.trim() || '25-ИСбо-1',
+          group: res.user.group_number || groupInput.trim() || '24-ИСбо-1',
           role: res.user.role || 'student',
-          photo: 'profile.png',
+          photoUrl: res.user.userpictureurl || '',
           sdoToken: res.user.sdo_token,
           courses: res.user.courses || [],
           createdAt: new Date().toISOString()
@@ -110,9 +110,9 @@ export const AuthProvider = ({ children }) => {
     const newUser = {
       id: Date.now().toString(),
       fullName: loginInput.trim(),
-      group: groupInput.trim() || '25-ИСбо-1',
+      group: groupInput.trim() || '24-ИСбо-1',
       role: 'student',
-      photo: 'profile.png',
+      photoUrl: '',
       createdAt: new Date().toISOString()
     };
     setUser(newUser);
@@ -121,6 +121,18 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem('portal_jwt_token');
+  };
+
+  // Update group or avatar locally
+  const updateUserProfile = (data = {}) => {
+    if (user) {
+      setUser({
+        ...user,
+        ...(data.group !== undefined ? { group: data.group } : {}),
+        ...(data.photoUrl !== undefined ? { photoUrl: data.photoUrl } : {})
+      });
+    }
   };
 
   // Change role (for demo purposes)
@@ -144,7 +156,8 @@ export const AuthProvider = ({ children }) => {
       canModerate,
       login,
       logout,
-      setRole
+      setRole,
+      updateUserProfile
     }}>
       {children}
     </AuthContext.Provider>

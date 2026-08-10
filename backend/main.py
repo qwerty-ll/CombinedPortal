@@ -146,9 +146,12 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
 
     fullname = info_data.get("fullname") or info_data.get("username") or username
     userid = info_data.get("userid")
+    userpictureurl = info_data.get("userpictureurl")
 
     # 3. Query user courses if userid is available (core_enrol_get_users_courses)
     courses_list = []
+    detected_group = sdo_req.group_number.strip() if sdo_req.group_number else ""
+
     if userid:
         course_params = {
             "wstoken": wstoken,
@@ -169,8 +172,23 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
                     }
                     for c in course_json
                 ]
+                # Auto-detect group pattern like 24-ИСбо-1 or 25-ИСбо-1 from course names if not provided
+                if not detected_group:
+                    import re
+                    for c in course_json:
+                        match = re.search(r'\b(\d{2}-[А-Яа-яA-Za-z]+-\d+)\b', c.get("fullname", "") + " " + c.get("shortname", ""))
+                        if match:
+                            detected_group = match.group(1)
+                            break
         except Exception:
             courses_list = []
+
+    if not detected_group:
+        detected_group = "24-ИСбо-1"
+
+    # Determine assigned role (admin logins or student)
+    ADMIN_USERNAMES = {"admin", "smirnovmakar", "moderator"}
+    assigned_role = "admin" if username.lower() in ADMIN_USERNAMES else "student"
 
     # 4. Sync with local database User record
     db_user = db.query(models.User).filter(models.User.username == username).first()
@@ -179,9 +197,9 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
         db_user = models.User(
             username=username,
             full_name=fullname,
-            group_number=sdo_req.group_number or "25-ИСбо-1",
+            group_number=detected_group,
             hashed_password=hashed_pw,
-            role="student"
+            role=assigned_role
         )
         db.add(db_user)
         db.commit()
@@ -189,7 +207,11 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
     else:
         if fullname and db_user.full_name != fullname:
             db_user.full_name = fullname
-            db.commit()
+        if detected_group and db_user.group_number != detected_group:
+            db_user.group_number = detected_group
+        if username.lower() in ADMIN_USERNAMES:
+            db_user.role = "admin"
+        db.commit()
 
     # 5. Create local access token & return payload with SDO attributes
     jwt_token = auth.create_access_token(data={"sub": db_user.username})
@@ -202,6 +224,7 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
         group_number=db_user.group_number,
         email=db_user.email,
         sdo_token=wstoken,
+        userpictureurl=userpictureurl,
         courses=courses_list,
         created_at=db_user.created_at
     )
