@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 // --- GigaChat Credentials ---
 const CLIENT_ID = process.env.GIGACHAT_CLIENT_ID || "019e2c26-97a8-75cf-8d25-1caf90fcdd51";
-const SECRET = process.env.GIGACHAT_SECRET || "MDE5ZTJjMjYtOTdhOC03NWNmLThkMjUtMWNhZjkwZmNkZDUxOjFkODQ2YzZjLTgwNmEtNGIwZi1iZmQ2LTY0Zjg2NTAwMmU2Yg==";
+const SECRET = process.env.GIGACHAT_SECRET || "MDE5ZTJjMjYtOTdhOC03NWNmLThkMjUtMWNhZjkwZmNkZDUxOjFkODQ2ZjZjLTgwNmEtNGIwZi1iZmQ2LTY0Zjg2NTAwMmU2Yg==";
 
 const OAUTH_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth";
 const CHAT_URL = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions";
@@ -14,7 +14,7 @@ let tokenCache = {
   expiresAt: 0,
 };
 
-// --- Custom HTTPS request helper (bypasses Sberbank self-signed SSL certificate errors) ---
+// Custom HTTPS request helper (bypasses Sberbank self-signed SSL certificate errors)
 function makeRequest(urlStr, headers, body) {
   const parsedUrl = new URL(urlStr);
   const options = {
@@ -26,7 +26,7 @@ function makeRequest(urlStr, headers, body) {
       ...headers,
       "Content-Length": Buffer.byteLength(body),
     },
-    rejectUnauthorized: false, // Critical for Sberbank certificates
+    rejectUnauthorized: false,
   };
 
   return new Promise((resolve, reject) => {
@@ -52,7 +52,7 @@ function makeRequest(urlStr, headers, body) {
   });
 }
 
-// --- OAuth Access Token Fetcher ---
+// OAuth Access Token Fetcher
 async function getAccessToken() {
   const now = Date.now() / 1000;
   if (tokenCache.accessToken && now < tokenCache.expiresAt - 60) {
@@ -76,55 +76,77 @@ async function getAccessToken() {
   }
 }
 
-// --- IVITSH KSU Knowledge Base Chunks ---
+// IVITSH KSU Knowledge Base Chunks
 const KNOWLEDGE_CHUNKS = [
   {
+    topic: "дирекция и корпус б",
+    keywords: ["дирекц", "деканат", "209", "корпус б", "ивановск", "где находить", "кабинет", "администр", "часы работ"],
     header: "Общая информация и дирекция ИВИТШ",
-    content: "Дирекция Высшей ИТ-школы (ИВИТШ) КГУ находится в Корпусе Б на 2 этаже, кабинет Б-209. Работает с Пн по Пт с 9:00 до 17:00 (перерыв 12:00-13:00). Вся ИТ-школа находится в Корпусе Б по адресу ул. Ивановская, 24а."
+    content: "Дирекция Высшей ИТ-школы (ИВИТШ) КГУ находится в Корпусе Б на 2 этаже, кабинет Б-209. Работает с Пн по Пт с 9:00 до 17:00 (перерыв 12:00-13:00). Адрес Корпуса Б: ул. Ивановская, 24а [IMG:209.png]."
   },
   {
-    header: "Стипендии и поддержка",
-    content: "Академическая стипендия: 3000 руб за сессию на «хорошо» и «отлично», 4500 руб за отличную сессию. Повышенная стипендия (ПГАС) — от 5000 до 10000 руб за достижения в науке, спорте, творчестве. Подача документов в Б-209. Социальная стипендия — 2980 руб."
+    topic: "стипендии",
+    keywords: ["стипенд", "деньги", "пгас", "академическ", "социальн", "выплат", "повышенн", "сколько платят"],
+    header: "Стипендии и финансовая поддержка",
+    content: "Академическая стипендия: 3000 руб за сессию на «4» и «5», 4500 руб за отличную сессию («5»). Повышенная стипендия (ПГАС) — от 5000 до 10000 руб за успехи в науке, спорте и творчестве. Социальная стипендия — 2980 руб."
   },
   {
+    topic: "объединения и клубы",
+    keywords: ["клуб", "объединен", "викт", "медиа", "идея", "мафи", "программирован", "nexthub", "играй", "кружок", "досуг"],
     header: "Студенческие объединения ИВИТШ",
-    content: "ВИТШ-медиа (рук. Макар Смирнов), ИДЕЯ (рук. Ирина Горева @KrisBeet), Спортивное программирование (рук. Глеб Лебедев @xeGalaxy), Учёба без границ (рук. Артём Копьёв), NextHub (рук. Денислав Чеботарев), Играй (рук. Василиса Никитина), Кибербезопасность (@SNEWYEWRS), Спортивная мафия (рук. Владислав Смирнов)."
+    content: "ВИТШ-медиа (рук. Макар Смирнов), ИДЕЯ (рук. Ирина Горева @KrisBeet), Спортивное программирование (рук. Глеб Лебедев @xeGalaxy), NextHub (рук. Денислав Чеботарев), Играй (рук. Василиса Никитина), Кибербезопасность (@SNEWYEWRS), Спортивная мафия (рук. Владислав Смирнов)."
   },
   {
+    topic: "аудитории и коворкинг",
+    keywords: ["аудитор", "кабинет", "101", "102", "104", "107", "108", "201", "202", "203", "204", "206", "207", "208", "209", "301", "302", "303", "304", "306", "307", "308", "309", "310", "312", "313", "401", "403", "406", "407", "408", "409", "коворкинг", "этаж", "преподавательск"],
     header: "Аудитории и Коворкинг",
-    content: "Все аудитории ИВИТШ (101-409) находятся в Корпусе Б. 100-е аудитории — 1 этаж [IMG:101.png]. 200-е — 2 этаж (включая Б-209) [IMG:209.png]. 300-е — 3 этаж [IMG:301.png]. 400-е — 4 этаж [IMG:401.png]. Коворкинг ВИТШ находится на 4 этаже Корпуса Б [IMG:coworking.png]. Преподавательская в 208/209 [IMG:teachers.png]."
+    content: "Все аудитории ИВИТШ (101-409) находятся в Корпусе Б (ул. Ивановская, 24а). 100-е аудитории — 1 этаж. 200-е — 2 этаж (включая Б-209) [IMG:209.png]. 300-е — 3 этаж. 400-е — 4 этаж. Коворкинг ВИТШ находится на 4 этаже Корпуса Б [IMG:coworking.png]. Преподавательская в 208/209 [IMG:teachers.png]."
   },
   {
-    header: "Сервисы и ссылки КГУ",
-    content: "СДО КГУ (обучение и тесты): https://sdo.kosgos.ru. ЭИОС (портфолио, расписание, зачетка): https://eios.kosgos.ru. Учебный план: sdo/plan. Официальный сайт КГУ: https://kosgos.ru."
-  },
-  {
+    topic: "еда и столовые",
+    keywords: ["кушать", "поесть", "еда", "столовая", "обед", "кофе", "магазин", "шаурма", "голоден", "перекус"],
     header: "Где поесть рядом с Корпусом Б",
-    content: "Жуй да Ешь (столовая от 100р, ул. Советская 42/1), Шаурмастер44 (шаурма от 140р, ул. Советская 61/39), Еда-кафе (от 150р, ул. Лермонтова 3/1), Coffee Like (кофе, Советская 26/1), магазины Пятерочка (Советская 47) и Высшая лига."
+    content: "Рядом с Корпусом Б можно покушать: столовая «Жуй да Ешь» (от 100р, ул. Советская 42/1), Шаурмастер44 (шаурма от 140р, ул. Советская 61/39), «Еда-кафе» (от 150р, ул. Лермонтова 3/1), Coffee Like (Советская 26/1), магазины Пятерочка (Советская 47) и Высшая лига."
+  },
+  {
+    topic: "словарь и адаптация",
+    keywords: ["староста", "куратор", "тьютор", "профорг", "культорг", "лекция", "лабораторн", "семинар", "дифзачет", "сдо", "еиос", "зачетка", "расписан"],
+    header: "Словарь и понятия учебы",
+    content: "Староста: студент-лидер группы. Куратор: преподаватель-наставник. Тьютор: старшекурсник-помощник. Профорг: защита прав, матпомощь. СДО: платформа с тестами (sdo.kosgos.ru). ЭИОС: расписание и портфолио (eios.kosgos.ru)."
   }
 ];
 
-// Smart RAG Matcher
-function getRelevantChunks(query) {
-  const words = new Set(query.toLowerCase().match(/[а-яА-ЯёЁa-zA-Z0-9]+/g) || []);
-  const scored = [];
+// Strict RAG Relevance Evaluator
+function evaluateQuery(query) {
+  const qLower = query.toLowerCase().trim();
+  const qWords = qLower.match(/[а-яА-ЯёЁa-zA-Z0-9]{2,}/g) || [];
+
+  let bestMatch = null;
+  let maxScore = 0;
 
   for (const chunk of KNOWLEDGE_CHUNKS) {
     let score = 0;
-    const text = (chunk.header + " " + chunk.content).toLowerCase();
-    for (const w of words) {
-      if (w.length < 2) continue;
-      if (text.includes(w)) score += 1;
-      if (chunk.header.toLowerCase().includes(w)) score += 3;
+
+    // Check explicit keywords
+    for (const kw of chunk.keywords) {
+      if (qLower.includes(kw)) {
+        score += 8;
+      }
     }
-    if (score > 0) scored.push({ score, chunk });
+
+    // Check content words
+    for (const w of qWords) {
+      if (w.length < 3) continue;
+      if (chunk.content.toLowerCase().includes(w)) score += 2;
+    }
+
+    if (score > maxScore) {
+      maxScore = score;
+      bestMatch = chunk;
+    }
   }
 
-  scored.sort((a, b) => b.score - a.score);
-  const top = scored.slice(0, 2).map(s => s.chunk);
-
-  if (top.length === 0) return KNOWLEDGE_CHUNKS[0].content;
-  return top.map(c => `=== ${c.header} ===\n${c.content}`).join("\n\n");
+  return { score: maxScore, chunk: bestMatch };
 }
 
 // ES Module Serverless Handler for Vercel
@@ -152,42 +174,43 @@ export default async function handler(req, res) {
     const userMsg = ((body && body.message) || "").trim();
 
     if (!userMsg) {
-      return res.status(400).json({ reply: "Пожалуйста, введите сообщение." });
+      return res.status(400).json({ reply: "Пожалуйста, введите вопрос." });
     }
 
-    // Smart RAG Context
-    const relevantContext = getRelevantChunks(userMsg);
+    // Strict Relevance Check
+    const { score, chunk } = evaluateQuery(userMsg);
 
-    const systemPrompt = `Ты — ВИТШик, дружелюбный, добрый и умный цифровой маскот Высшей ИТ-школы (ИВИТШ) КГУ. Твоя задача — давать грамотные, ухоженные, вежливые и естественные ответы студентам.
-
-СТРОЖАЙШИЕ ПРАВИЛА ОБЩЕНИЯ:
-1. ОТВЕЧАЙ ЕСТЕСТВЕННЫМ И ЖИВЫМ ЯЗЫКОМ, как заботливый друг. Категорически ЗАПРЕЩЕНО просто цитировать заголовки '###' или сухой текст словарной статьи! Встраивай знания в приятные развёрнутые предложения.
-2. ИСПОЛЬЗУЙ ТОЛЬКО БАЗУ ЗНАНИЙ НИЖЕ. Если просят решить задачу по программированию, написать код или спрашивают про сторонние вузы/фильмы/спорт — вежливо откажи фразой: 'Я помогаю только с вопросами ИВИТШ КГУ и не обсуждаю сторонние темы! 😸'
-3. ЕСЛИ ИНФОРМАЦИИ НЕТ В БАЗЕ ЗНАНИЙ — отвечай: 'К сожалению, у меня в базе знаний нет информации об этом. Задай мне другой вопрос об ИВИТШ! 🐾'
-4. ВСТАВЛЯЙ ТЕГ [IMG:filename.png] на отдельной строке, если спрашиваешь или отвечаешь про кабинеты (например [IMG:209.png] для дирекции или [IMG:coworking.png] для коворкинга).
-
-База знаний для ответа:
-${relevantContext}`;
-
-    const messages = [{ role: "system", content: systemPrompt }];
-
-    // Limit history to last 4 turns for token economy
-    const history = (body && body.history) || [];
-    const recentHistory = history.slice(-4);
-    for (const turn of recentHistory) {
-      if (turn.role === "user" || turn.role === "assistant") {
-        messages.push({ role: turn.role, content: turn.content });
-      }
+    // If query is OFF-TOPIC or irrelevant to KSU / IVITSH knowledge base
+    if (score < 4 || !chunk) {
+      return res.status(200).json({ 
+        reply: "Я — цифровой маскот ВИТШик и отвечаю исключительно на вопросы про Высшую ИТ-Школу КГУ, аудитории, расписание, стипендии, клубы и учебу! 😸 Задай мне вопрос по университету!" 
+      });
     }
-    messages.push({ role: "user", content: userMsg });
 
-    // Fetch OAuth Token & Query GigaChat API
+    // Prepare GigaChat prompt strictly bounded by relevant chunk
+    const systemPrompt = `Ты — маскот ВИТШик. Отвечай СТРОГО И ИСКЛЮЧИТЕЛЬНО на основе предоставленного текста ниже.
+
+ПРАВИЛА:
+1. ОТВЕЧАЙ ЕСТЕСТВЕННО И ДРУЖЕЛЮБНО (1-3 коротких предложения).
+2. ЗАПРЕЩЕНО добавлять любые факты, отсутствующие в тексте ниже.
+3. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО писать технические теги вида [SMILEY_...], [EMOJI_...] или вымышленные сведения.
+4. ЕСЛИ СПРАШИВАЮТ про аудиторию или коворкинг, сохрани тег изображения [IMG:...].
+
+Текст для ответа:
+${chunk.content}`;
+
+    const messages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMsg }
+    ];
+
+    // Query GigaChat API
     const token = await getAccessToken();
     const chatPayload = {
       model: "GigaChat",
       messages: messages,
-      temperature: 0.4,
-      max_tokens: 350
+      temperature: 0.1, // Minimal temperature for absolute factual fidelity
+      max_tokens: 250
     };
 
     const chatHeaders = {
@@ -198,12 +221,28 @@ ${relevantContext}`;
     const chatResponse = await makeRequest(CHAT_URL, chatHeaders, JSON.stringify(chatPayload));
     let reply = chatResponse.choices?.[0]?.message?.content || "";
 
-    // Clean up high unicode emojis
-    reply = reply.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "");
+    // Clean up unwanted Sberbank smiley tags and unicode ranges
+    reply = reply
+      .replace(/\[SMILEY_.*?\]/gi, "")
+      .replace(/\[EMOJI_.*?\]/gi, "")
+      .replace(/\[TAG_.*?\]/gi, "")
+      .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "")
+      .trim();
 
-    return res.status(200).json({ reply: reply.trim() });
+    if (!reply) {
+      reply = chunk.content;
+    }
+
+    return res.status(200).json({ reply });
   } catch (e) {
     console.error("GigaChat API Error:", e.message);
-    return res.status(500).json({ error: e.message });
+    // Strict fallback if API fails
+    const { chunk } = evaluateQuery(userMsg);
+    if (chunk) {
+      return res.status(200).json({ reply: chunk.content });
+    }
+    return res.status(200).json({ 
+      reply: "Я отвечаю только на вопросы об ИВИТШ КГУ (аудитории 101-409, дирекция Б-209, стипендии и клубы)! 😸" 
+    });
   }
 }

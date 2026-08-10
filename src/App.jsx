@@ -248,7 +248,12 @@ function App() {
 
                   // Parse [IMG:...] tags in bot message
                   const imgMatch = msg.text.match(/\[IMG:(.*?)\]/);
-                  const cleanText = msg.text.replace(/\[IMG:(.*?)\]/g, '').trim();
+                  const cleanText = msg.text
+                    .replace(/\[IMG:(.*?)\]/g, '')
+                    .replace(/\[SMILEY_.*?\]/gi, '')
+                    .replace(/\[EMOJI_.*?\]/gi, '')
+                    .replace(/\[TAG_.*?\]/gi, '')
+                    .trim();
                   const imgPath = imgMatch ? mapImageNameToPath(imgMatch[1]) : '';
 
                   // Rich Markdown & Link Formatter
