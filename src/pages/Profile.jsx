@@ -11,6 +11,7 @@ const Profile = () => {
   // Login form states
   const [loginForm, setLoginForm] = useState({ fullName: '', group: '', password: '' });
   const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Load stats from localStorage
   const [onboardingCompleted, setOnboardingCompleted] = useState(0);
@@ -45,28 +46,37 @@ const Profile = () => {
     } catch (e) { console.error(e); }
   }, [user]);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError('');
+    setIsLoggingIn(true);
     
     if (!loginForm.fullName.trim()) {
-      setLoginError('Введите логин или ФИО');
+      setLoginError('Введите логин СДО КГУ');
+      setIsLoggingIn(false);
       return;
     }
 
-    const res = login(loginForm.fullName, loginForm.group, loginForm.password);
-    if (res && res.error) {
-      setLoginError(res.error);
-      return;
-    }
+    try {
+      const res = await login(loginForm.fullName, loginForm.group, loginForm.password);
+      if (res && res.error) {
+        setLoginError(res.error);
+        setIsLoggingIn(false);
+        return;
+      }
 
-    toast.show(`Вы вошли как ${res.fullName}`, 'success');
-    setLoginForm({ fullName: '', group: '', password: '' });
+      toast.show(`Вы вошли через СДО как ${res.fullName}`, 'success');
+      setLoginForm({ fullName: '', group: '', password: '' });
+    } catch (err) {
+      setLoginError(err.message || 'Ошибка подключения к СДО КГУ');
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   const handleLogout = () => {
     logout();
-    toast.show('Вы вышли из аккаунта', 'info');
+    toast.show('Вы вышли из аккаунта СДО', 'info');
   };
 
   const handleRoleChange = (newRole) => {
@@ -93,7 +103,7 @@ const Profile = () => {
     }
   };
 
-  // --- NOT LOGGED IN: SHOW LOGIN FORM ---
+  // --- NOT LOGGED IN: SHOW SDO KGU LOGIN FORM ---
   if (!isLoggedIn) {
     return (
       <div className="container">
@@ -107,22 +117,23 @@ const Profile = () => {
           animate={{ opacity: 1, y: 0 }}
         >
           <div className="login-card-header">
-            <div className="login-icon-box">
-              <LogIn size={32} />
+            <div className="login-icon-box" style={{ background: 'rgba(0,127,255,0.1)', color: 'var(--primary)' }}>
+              <GraduationCap size={32} />
             </div>
-            <h2>Вход на портал</h2>
-            <p>Авторизуйтесь для доступа к форуму и личному кабинету</p>
+            <h2>Вход через СДО КГУ</h2>
+            <p>Авторизация через единый сервис sdo.kosgos.ru</p>
           </div>
 
           <form onSubmit={handleLogin} className="login-form">
             <div className="login-field">
-              <label>Логин или ФИО</label>
+              <label>Логин СДО КГУ</label>
               <input 
                 type="text"
-                placeholder="student, admin или Иванов Иван"
+                placeholder="Логин в sdo.kosgos.ru (напр. student)"
                 value={loginForm.fullName}
                 onChange={e => setLoginForm({ ...loginForm, fullName: e.target.value })}
                 required
+                disabled={isLoggingIn}
               />
             </div>
             <div className="login-field">
@@ -132,22 +143,30 @@ const Profile = () => {
                 placeholder="25-ИСбо-1"
                 value={loginForm.group}
                 onChange={e => setLoginForm({ ...loginForm, group: e.target.value })}
+                disabled={isLoggingIn}
               />
             </div>
             <div className="login-field">
-              <label>Пароль</label>
+              <label>Пароль СДО КГУ</label>
               <input 
                 type="password"
                 placeholder="••••••••"
                 value={loginForm.password}
                 onChange={e => setLoginForm({ ...loginForm, password: e.target.value })}
+                disabled={isLoggingIn}
               />
             </div>
 
             {loginError && <div className="login-error">{loginError}</div>}
 
-            <button type="submit" className="btn-auth login-submit">
-              <Lock size={16} /> Войти
+            <button type="submit" className="btn-auth login-submit" disabled={isLoggingIn}>
+              {isLoggingIn ? (
+                <>Проверка в СДО КГУ...</>
+              ) : (
+                <>
+                  <Lock size={16} /> Войти через СДО
+                </>
+              )}
             </button>
           </form>
         </motion.div>
@@ -178,16 +197,63 @@ const Profile = () => {
             />
           </div>
           <div className="student-info-meta">
-            <h2>{user.fullName}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <h2>{user.fullName}</h2>
+              {user.sdoToken && (
+                <span style={{ background: '#E6F4EA', color: '#137333', fontSize: '0.75rem', padding: '3px 8px', borderRadius: '8px', fontWeight: '800' }}>
+                  ✓ СДО KOSGOS
+                </span>
+              )}
+            </div>
             <span className="student-group-tag">{user.group}</span>
             <p>
-              {user.role === 'admin' ? 'Администратор' : user.role === 'moderator' ? 'Модератор' : 'Студент'}
+              {user.role === 'admin' ? 'Администратор' : user.role === 'moderator' ? 'Модератор' : 'Студент ИВИТШ'}
             </p>
             <button onClick={handleLogout} className="profile-logout-btn">
-              <LogOut size={14} /> Выйти
+              <LogOut size={14} /> Выйти из СДО
             </button>
           </div>
         </motion.section>
+
+        {/* SDO COURSES (IF ENROLLED) */}
+        {user.courses && user.courses.length > 0 && (
+          <motion.section 
+            className="curator-profile-section"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <GraduationCap size={20} style={{ color: 'var(--primary)' }} />
+              <h3 style={{ margin: 0 }}>Мои дисциплины в СДО КГУ</h3>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {user.courses.map((course) => (
+                <div 
+                  key={course.id} 
+                  style={{
+                    background: '#F8F9FA',
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    border: '1px solid #E9ECEF',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <div>
+                    <strong style={{ fontSize: '0.92rem', color: 'var(--text)' }}>{course.fullname}</strong>
+                    <div style={{ fontSize: '0.78rem', color: '#777' }}>{course.shortname}</div>
+                  </div>
+                  {course.progress !== undefined && (
+                    <span style={{ background: 'rgba(0,127,255,0.1)', color: 'var(--primary)', fontWeight: '800', fontSize: '0.8rem', padding: '4px 8px', borderRadius: '8px' }}>
+                      {course.progress}%
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </motion.section>
+        )}
 
         {/* ROLE SWITCHER (for demo) */}
         <motion.section 

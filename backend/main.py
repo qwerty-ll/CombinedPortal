@@ -102,6 +102,112 @@ def login(user_in: schemas.UserLogin, db: Session = Depends(get_db)):
     token = auth.create_access_token(data={"sub": db_user.username})
     return schemas.TokenResponse(access_token=token, user=db_user)
 
+@app.post("/api/v1/auth/sdo-login", response_model=schemas.TokenResponse)
+def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
+    username = sdo_req.username.strip()
+    password = sdo_req.password.strip()
+
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Логин и пароль обязательны для входа через СДО")
+
+    # 1. Query Moodle Mobile token from sdo.kosgos.ru
+    token_url = "https://sdo.kosgos.ru/login/token.php"
+    token_params = {
+        "username": username,
+        "password": password,
+        "service": "moodle_mobile_app"
+    }
+
+    try:
+        token_resp = requests.get(token_url, params=token_params, timeout=12, verify=False)
+        token_data = token_resp.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Ошибка соединения с сервером СДО КГУ: {str(e)}")
+
+    if "error" in token_data or "token" not in token_data:
+        err_msg = token_data.get("error", "Неверный логин или пароль СДО")
+        raise HTTPException(status_code=400, detail=err_msg)
+
+    wstoken = token_data["token"]
+
+    # 2. Query user profile info (core_webservice_get_site_info)
+    rest_url = "https://sdo.kosgos.ru/webservice/rest/server.php"
+    info_params = {
+        "wstoken": wstoken,
+        "moodlewsrestformat": "json",
+        "wsfunction": "core_webservice_get_site_info"
+    }
+
+    try:
+        info_resp = requests.post(rest_url, data=info_params, timeout=12, verify=False)
+        info_data = info_resp.json()
+    except Exception:
+        info_data = {}
+
+    fullname = info_data.get("fullname") or info_data.get("username") or username
+    userid = info_data.get("userid")
+
+    # 3. Query user courses if userid is available (core_enrol_get_users_courses)
+    courses_list = []
+    if userid:
+        course_params = {
+            "wstoken": wstoken,
+            "moodlewsrestformat": "json",
+            "wsfunction": "core_enrol_get_users_courses",
+            "userid": userid
+        }
+        try:
+            course_resp = requests.post(rest_url, data=course_params, timeout=12, verify=False)
+            course_json = course_resp.json()
+            if isinstance(course_json, list):
+                courses_list = [
+                    {
+                        "id": c.get("id"),
+                        "fullname": c.get("fullname"),
+                        "shortname": c.get("shortname"),
+                        "progress": c.get("progress", 0)
+                    }
+                    for c in course_json
+                ]
+        except Exception:
+            courses_list = []
+
+    # 4. Sync with local database User record
+    db_user = db.query(models.User).filter(models.User.username == username).first()
+    if not db_user:
+        hashed_pw = auth.get_password_hash(password)
+        db_user = models.User(
+            username=username,
+            full_name=fullname,
+            group_number=sdo_req.group_number or "25-ИСбо-1",
+            hashed_password=hashed_pw,
+            role="student"
+        )
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+    else:
+        if fullname and db_user.full_name != fullname:
+            db_user.full_name = fullname
+            db.commit()
+
+    # 5. Create local access token & return payload with SDO attributes
+    jwt_token = auth.create_access_token(data={"sub": db_user.username})
+
+    user_resp = schemas.UserResponse(
+        id=db_user.id,
+        username=db_user.username,
+        full_name=db_user.full_name,
+        role=db_user.role,
+        group_number=db_user.group_number,
+        email=db_user.email,
+        sdo_token=wstoken,
+        courses=courses_list,
+        created_at=db_user.created_at
+    )
+
+    return schemas.TokenResponse(access_token=jwt_token, user=user_resp)
+
 @app.get("/api/v1/auth/me", response_model=schemas.UserResponse)
 def get_me(current_user: models.User = Depends(auth.require_current_user)):
     return current_user

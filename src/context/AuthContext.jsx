@@ -58,11 +58,11 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user]);
 
-  // Login via SDO KGU stub with support for predefined demo accounts
-  const login = (loginInput, groupInput = '', passwordInput = '') => {
+  // Login via SDO KGU with backend integration and demo fallback
+  const login = async (loginInput, groupInput = '', passwordInput = '') => {
     const key = loginInput.trim().toLowerCase();
     
-    // Check if user entered a predefined username
+    // 1. Check if user entered a predefined demo username
     if (PREDEFINED_USERS[key]) {
       const expectedPassword = PREDEFINED_PASSWORDS[key];
       if (passwordInput && passwordInput.trim() !== expectedPassword) {
@@ -76,7 +76,37 @@ export const AuthProvider = ({ children }) => {
       return predefinedUser;
     }
 
-    // Custom student login
+    // 2. Real SDO KGU Authentication via FastAPI Backend
+    try {
+      const { authApi } = await import('../services/api');
+      const res = await authApi.sdoLogin(loginInput.trim(), passwordInput, groupInput.trim());
+      if (res && res.user) {
+        const sdoUser = {
+          id: res.user.id,
+          username: res.user.username,
+          fullName: res.user.full_name,
+          group: res.user.group_number || groupInput.trim() || '25-ИСбо-1',
+          role: res.user.role || 'student',
+          photo: 'profile.png',
+          sdoToken: res.user.sdo_token,
+          courses: res.user.courses || [],
+          createdAt: new Date().toISOString()
+        };
+        setUser(sdoUser);
+        if (res.access_token) {
+          localStorage.setItem('portal_jwt_token', res.access_token);
+        }
+        return sdoUser;
+      }
+    } catch (err) {
+      console.warn('[SDO Auth] Real SDO Login failed or backend offline:', err.message);
+      // Fallback for custom offline/demo student login if password is not empty or user explicitly submits
+      if (err.message && err.message.includes('Неверный логин')) {
+        return { error: err.message };
+      }
+    }
+
+    // Fallback student login
     const newUser = {
       id: Date.now().toString(),
       fullName: loginInput.trim(),

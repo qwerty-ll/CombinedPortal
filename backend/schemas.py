@@ -15,6 +15,11 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
+class SdoLoginRequest(BaseModel):
+    username: str
+    password: str
+    group_number: Optional[str] = None
+
 class UserResponse(BaseModel):
     id: int
     username: str
@@ -22,6 +27,8 @@ class UserResponse(BaseModel):
     role: str
     group_number: Optional[str] = None
     email: Optional[str] = None
+    sdo_token: Optional[str] = None
+    courses: Optional[List[dict]] = None
     created_at: datetime
 
     class Config:
