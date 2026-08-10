@@ -1,17 +1,22 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   CalendarDays, Search, Clock, MapPin, User, BookOpen, AlertCircle, 
-  ChevronDown, GraduationCap, Building2, UserCheck, Calendar
+  ChevronDown, GraduationCap, Building2, UserCheck, Calendar,
+  ChevronLeft, ChevronRight, Check
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { scheduleApi } from '../services/api';
 
 const EIOS_DIRECT_URL = 'https://eios.kosgos.ru/api';
 
-// Helper to clean discipline titles (remove duplicate 'лек', 'лаб', 'пр' prefixes)
+// Clean discipline titles (remove leading 'лек ', 'лаб ', 'пр ')
 const cleanDisciplineTitle = (rawTitle) => {
   if (!rawTitle) return '';
-  return rawTitle.replace(/^(лек|лаб|пр)\s+/i, '').trim();
+  // Remove leading prefixes like 'лек ', 'лаб ', 'пр '
+  let clean = rawTitle.replace(/^(лек|лаб|пр)\s+/i, '').trim();
+  // Remove subgroup suffix if present to group base title
+  clean = clean.replace(/,\s*п\/г\s*\d+$/i, '').trim();
+  return clean;
 };
 
 // Helper for lesson type badge
@@ -43,14 +48,12 @@ const ScheduleWidget = () => {
   const [catalogLoading, setCatalogLoading] = useState(false);
 
   // Lessons data state
-  const [lessons, setLessons] = useState([]);
+  const [rawLessons, setRawLessons] = useState([]);
   const [lessonsLoading, setLessonsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Single Day Navigation State
-  const todayDayNum = new Date().getDay() === 0 ? 1 : new Date().getDay(); // 1 = Mon, 6 = Sat
-  const [activeDayNumber, setActiveDayNumber] = useState(todayDayNum > 6 ? 1 : todayDayNum);
-  const [selectedCustomDate, setSelectedCustomDate] = useState(''); // 'YYYY-MM-DD'
+  // Date Selection State (ISO Date string: 'YYYY-MM-DD')
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -137,7 +140,7 @@ const ScheduleWidget = () => {
   }, [catalogItems, searchQuery]);
 
   // 2. Fetch Lessons Schedule
-  const fetchSchedule = async (id, name, dateParam = '') => {
+  const fetchSchedule = async (id, name) => {
     if (!id) return;
     setLessonsLoading(true);
     setError(null);
@@ -150,22 +153,30 @@ const ScheduleWidget = () => {
       try {
         const res = await scheduleApi.getSchedule(
           targetType === 'group' ? id : null,
-          selectedYear,
-          dateParam
+          selectedYear
         );
         raspData = res?.data?.rasp || [];
       } catch (e) {
-        let url = `${EIOS_DIRECT_URL}/Rasp?${paramKey}=${id}&year=${encodeURIComponent(selectedYear)}`;
-        if (dateParam) url += `&sdate=${encodeURIComponent(dateParam)}`;
-        const res = await fetch(url);
+        const res = await fetch(`${EIOS_DIRECT_URL}/Rasp?${paramKey}=${id}&year=${encodeURIComponent(selectedYear)}`);
         const json = await res.json();
         raspData = json?.data?.rasp || [];
       }
 
-      setLessons(raspData);
+      setRawLessons(raspData);
+
+      // If no lessons for current selectedDate, find nearest available date with lessons
+      if (raspData.length > 0) {
+        const hasToday = raspData.some(l => l.дата && l.дата.startsWith(selectedDate));
+        if (!hasToday) {
+          const firstAvailableDate = raspData[0].дата ? raspData[0].дата.split('T')[0] : '';
+          if (firstAvailableDate) {
+            setSelectedDate(firstAvailableDate);
+          }
+        }
+      }
     } catch (err) {
       setError('Не удалось загрузить расписание.');
-      setLessons([]);
+      setRawLessons([]);
     } finally {
       setLessonsLoading(false);
     }
@@ -173,25 +184,36 @@ const ScheduleWidget = () => {
 
   useEffect(() => {
     if (selectedId && selectedName) {
-      fetchSchedule(selectedId, selectedName, selectedCustomDate);
+      fetchSchedule(selectedId, selectedName);
     }
-  }, [selectedId, selectedYear, targetType, selectedCustomDate]);
+  }, [selectedId, selectedYear, targetType]);
 
-  // Filter lessons STRICTLY FOR THE SINGLE SELECTED DAY
-  const rawDayLessons = useMemo(() => {
-    if (selectedCustomDate) {
-      return lessons.filter(l => l.дата && l.дата.startsWith(selectedCustomDate));
-    }
-    return lessons.filter(l => l.деньНедели === activeDayNumber);
-  }, [lessons, activeDayNumber, selectedCustomDate]);
+  // 3. Deduplicate raw EIOS API lessons
+  const deduplicatedLessons = useMemo(() => {
+    const seen = new Set();
+    const result = [];
+    (rawLessons || []).forEach(item => {
+      const key = `${item.код || ''}_${item.дата}_${item.начало}_${item.конец}_${item.дисциплина}_${item.преподаватель}_${item.аудитория}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(item);
+      }
+    });
+    return result;
+  }, [rawLessons]);
 
-  // Group lessons by TIME SLOT for compact, elegant card layout
-  const groupedTimeSlots = useMemo(() => {
-    const slotsMap = {};
-    rawDayLessons.forEach(lesson => {
-      const slotKey = `${lesson.начало}-${lesson.конец}`;
-      if (!slotsMap[slotKey]) {
-        slotsMap[slotKey] = {
+  // Filter lessons strictly for selectedDate
+  const dayLessons = useMemo(() => {
+    return deduplicatedLessons.filter(l => l.дата && l.дата.startsWith(selectedDate));
+  }, [deduplicatedLessons, selectedDate]);
+
+  // Group lessons for selectedDate into Time Slots
+  const timeSlotGroups = useMemo(() => {
+    const map = {};
+    dayLessons.forEach(lesson => {
+      const timeKey = `${lesson.начало}-${lesson.конец}`;
+      if (!map[timeKey]) {
+        map[timeKey] = {
           timeStart: lesson.начало,
           timeEnd: lesson.конец,
           lessonNum: lesson.номерЗанятия,
@@ -199,21 +221,28 @@ const ScheduleWidget = () => {
           items: []
         };
       }
-      slotsMap[slotKey].items.push(lesson);
+      map[timeKey].items.push(lesson);
     });
+    return Object.values(map).sort((a, b) => a.timeStart.localeCompare(b.timeStart));
+  }, [dayLessons]);
 
-    // Sort slots by time
-    return Object.values(slotsMap).sort((a, b) => a.timeStart.localeCompare(b.timeStart));
-  }, [rawDayLessons]);
-
-  const daysOfWeekTabs = [
-    { id: 1, name: 'Понедельник', short: 'Пн' },
-    { id: 2, name: 'Вторник', short: 'Вт' },
-    { id: 3, name: 'Среда', short: 'Ср' },
-    { id: 4, name: 'Четверг', short: 'Чт' },
-    { id: 5, name: 'Пятница', short: 'Пт' },
-    { id: 6, name: 'Суббота', short: 'Сб' },
-  ];
+  // Extract unique dates available in schedule for quick Date Strip Navigation
+  const availableDatesList = useMemo(() => {
+    const datesMap = new Map();
+    deduplicatedLessons.forEach(l => {
+      if (l.дата) {
+        const dStr = l.дата.split('T')[0];
+        if (!datesMap.has(dStr)) {
+          const dObj = new Date(dStr);
+          const dayName = dObj.toLocaleDateString('ru-RU', { weekday: 'short' });
+          const dayNum = dObj.getDate();
+          const monthName = dObj.toLocaleDateString('ru-RU', { month: 'short' });
+          datesMap.set(dStr, { iso: dStr, label: `${dayName}, ${dayNum} ${monthName}`, dayName, dayNum, monthName });
+        }
+      }
+    });
+    return Array.from(datesMap.values()).slice(0, 14); // show top 14 available dates
+  }, [deduplicatedLessons]);
 
   return (
     <div style={{
@@ -296,7 +325,7 @@ const ScheduleWidget = () => {
         </div>
       </div>
 
-      {/* 2. UNIFIED SEARCH INPUT & CUSTOM YEAR SELECT */}
+      {/* 2. UNIFIED SEARCH COMBOBOX & ACADEMIC YEAR SELECT */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px', position: 'relative' }} ref={dropdownRef}>
         
         {/* Search Combobox Input */}
@@ -438,44 +467,18 @@ const ScheduleWidget = () => {
         </div>
       </div>
 
-      {/* 3. CLEAN SINGLE-DAY NAVIGATION BAR */}
-      <div style={{ background: '#F8F9FA', padding: '12px', borderRadius: '16px', marginBottom: '20px', border: '1px solid #E9ECEF' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-          
-          {/* Day Tabs (Пн - Сб) */}
-          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', flex: '1 1 auto' }}>
-            {daysOfWeekTabs.map(tab => (
-              <button 
-                key={tab.id}
-                onClick={() => {
-                  setActiveDayNumber(tab.id);
-                  setSelectedCustomDate('');
-                }}
-                style={{
-                  padding: '7px 14px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: activeDayNumber === tab.id && !selectedCustomDate ? 'var(--primary)' : 'white',
-                  color: activeDayNumber === tab.id && !selectedCustomDate ? 'white' : '#555',
-                  fontWeight: activeDayNumber === tab.id && !selectedCustomDate ? '800' : '600',
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  boxShadow: activeDayNumber === tab.id && !selectedCustomDate ? '0 3px 10px rgba(0,127,255,0.2)' : 'none',
-                  transition: 'all 0.12s'
-                }}
-              >
-                {tab.short}
-              </button>
-            ))}
-          </div>
+      {/* 3. DATE STRIP NAVIGATION BAR */}
+      <div style={{ background: '#F8F9FA', padding: '14px', borderRadius: '16px', marginBottom: '20px', border: '1px solid #E9ECEF' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
+          <span style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Calendar size={16} style={{ color: 'var(--primary)' }} /> Выбор даты:
+          </span>
 
-          {/* Optional Specific Date Picker */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.78rem', color: '#666', fontWeight: '700' }}>Конкретная дата:</span>
             <input 
               type="date"
-              value={selectedCustomDate}
-              onChange={(e) => setSelectedCustomDate(e.target.value)}
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
               style={{
                 padding: '5px 10px',
                 borderRadius: '8px',
@@ -483,28 +486,39 @@ const ScheduleWidget = () => {
                 background: 'white',
                 fontSize: '0.82rem',
                 fontWeight: '700',
+                color: 'var(--text)',
                 outline: 'none'
               }}
             />
-            {selectedCustomDate && (
-              <button 
-                onClick={() => setSelectedCustomDate('')}
-                style={{
-                  padding: '5px 10px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: '#FFE0E0',
-                  color: '#C53030',
-                  fontSize: '0.78rem',
-                  fontWeight: '700',
-                  cursor: 'pointer'
-                }}
-              >
-                Сброс
-              </button>
-            )}
           </div>
         </div>
+
+        {/* Available Dates Pill Bar */}
+        {availableDatesList.length > 0 && (
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+            {availableDatesList.map(d => (
+              <button 
+                key={d.iso}
+                onClick={() => setSelectedDate(d.iso)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '10px',
+                  border: selectedDate === d.iso ? 'none' : '1px solid #DEE2E6',
+                  background: selectedDate === d.iso ? 'var(--primary)' : 'white',
+                  color: selectedDate === d.iso ? 'white' : '#555',
+                  fontWeight: selectedDate === d.iso ? '800' : '600',
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  boxShadow: selectedDate === d.iso ? '0 3px 10px rgba(0,127,255,0.2)' : 'none',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.12s'
+                }}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 4. COMPACT TIME-SLOT CARDS DISPLAY */}
@@ -518,13 +532,13 @@ const ScheduleWidget = () => {
           <AlertCircle size={32} style={{ marginBottom: '6px' }} />
           <h4 style={{ margin: '0 0 4px 0', fontSize: '0.98rem', fontWeight: '800' }}>{error}</h4>
         </div>
-      ) : groupedTimeSlots.length > 0 ? (
+      ) : timeSlotGroups.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: '800', color: '#666', marginBottom: '2px' }}>
-            📅 {selectedCustomDate ? `Расписание на ${new Date(selectedCustomDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}` : `Занятия на ${daysOfWeekTabs.find(d => d.id === activeDayNumber)?.name}:`}
+          <div style={{ fontSize: '0.88rem', fontWeight: '800', color: 'var(--text)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            📅 Расписание на {selectedDate ? new Date(selectedDate).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'выбранный день'}:
           </div>
 
-          {groupedTimeSlots.map((slot, sIdx) => (
+          {timeSlotGroups.map((slot, sIdx) => (
             <motion.div 
               key={sIdx}
               initial={{ opacity: 0, y: 6 }}
