@@ -144,18 +144,33 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
     except Exception:
         info_data = {}
 
-    firstname = info_data.get("firstname", "").strip()
-    lastname = info_data.get("lastname", "").strip()
-    raw_fullname = info_data.get("fullname", "").strip()
+    fullname = info_data.get("fullname", "").strip() or info_data.get("username", "").strip() or username
+    userid = info_data.get("userid")
+    userpictureurl = info_data.get("userpictureurl", "")
 
-    if lastname and firstname:
-        fullname = f"{lastname} {firstname}"
-    elif raw_fullname and raw_fullname.lower() != username.lower():
-        fullname = raw_fullname
-    else:
-        fullname = username
+    # Query detailed Moodle user profile if userid is available (core_user_get_users_by_field)
+    if userid:
+        try:
+            u_params = {
+                "wstoken": wstoken,
+                "moodlewsrestformat": "json",
+                "wsfunction": "core_user_get_users_by_field",
+                "field": "id",
+                "values[0]": userid
+            }
+            u_resp = requests.post(rest_url, data=u_params, timeout=8, verify=False)
+            u_json = u_resp.json()
+            if isinstance(u_json, list) and len(u_json) > 0:
+                u_item = u_json[0]
+                u_fn = u_item.get("fullname") or f"{u_item.get('lastname', '')} {u_item.get('firstname', '')}".strip()
+                if u_fn and u_fn.lower() != username.lower():
+                    fullname = u_fn
+                if u_item.get("profileimageurl"):
+                    userpictureurl = u_item.get("profileimageurl")
+        except Exception:
+            pass
 
-    # Try querying EIOS API (https://eios.kosgos.ru/api/tokenauth) for exact FIO
+    # Query EIOS API (https://eios.kosgos.ru/api/tokenauth) for dynamic EIOS profile data
     try:
         eios_resp = requests.post(
             "https://eios.kosgos.ru/api/tokenauth",
@@ -167,13 +182,10 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
         if eios_json.get("state") == 1 and eios_json.get("data"):
             user_obj = eios_json["data"].get("user", {})
             eios_fio = user_obj.get("fullName") or user_obj.get("userFIO") or user_obj.get("shortFIO")
-            if eios_fio:
+            if eios_fio and eios_fio.lower() != username.lower():
                 fullname = eios_fio
     except Exception:
         pass
-
-    userid = info_data.get("userid")
-    userpictureurl = info_data.get("userpictureurl")
 
     # 3. Query user courses if userid is available (core_enrol_get_users_courses)
     courses_list = []

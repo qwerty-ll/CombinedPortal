@@ -12,7 +12,7 @@ const Profile = () => {
   const toast = useToast();
 
   // Login form states
-  const [loginForm, setLoginForm] = useState({ fullName: '', group: '', password: '' });
+  const [loginForm, setLoginForm] = useState({ username: '', group: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
@@ -55,14 +55,14 @@ const Profile = () => {
     setLoginError('');
     setIsLoggingIn(true);
     
-    if (!loginForm.fullName.trim()) {
+    if (!loginForm.username.trim()) {
       setLoginError('Введите логин СДО КГУ');
       setIsLoggingIn(false);
       return;
     }
 
     try {
-      const res = await login(loginForm.fullName, loginForm.group, loginForm.password);
+      const res = await login(loginForm.username, loginForm.group, loginForm.password);
       if (res && res.error) {
         setLoginError(res.error);
         setIsLoggingIn(false);
@@ -70,7 +70,7 @@ const Profile = () => {
       }
 
       toast.show(`Вы вошли через СДО как ${res.fullName}`, 'success');
-      setLoginForm({ fullName: '', group: '', password: '' });
+      setLoginForm({ username: '', group: '', password: '' });
     } catch (err) {
       setLoginError(err.message || 'Ошибка подключения к СДО КГУ');
     } finally {
@@ -145,8 +145,8 @@ const Profile = () => {
               <input 
                 type="text"
                 placeholder="Логин в sdo.kosgos.ru (напр. student)"
-                value={loginForm.fullName}
-                onChange={e => setLoginForm({ ...loginForm, fullName: e.target.value })}
+                value={loginForm.username}
+                onChange={e => setLoginForm({ ...loginForm, username: e.target.value })}
                 required
                 disabled={isLoggingIn}
               />

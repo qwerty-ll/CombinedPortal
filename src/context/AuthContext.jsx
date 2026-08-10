@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }) => {
   // Login via SDO KGU with backend integration and demo fallback
   const login = async (loginInput, groupInput = '', passwordInput = '') => {
     const key = loginInput.trim().toLowerCase();
-    
+
     // 1. Check if user entered a predefined demo username
     if (PREDEFINED_USERS[key]) {
       const expectedPassword = PREDEFINED_PASSWORDS[key];
@@ -109,7 +109,8 @@ export const AuthProvider = ({ children }) => {
     // Fallback student login
     const newUser = {
       id: Date.now().toString(),
-      fullName: loginInput.trim(),
+      username: loginInput.trim(),
+      fullName: 'Студент ИВИТШ',
       group: groupInput.trim() || '24-ИСбо-1',
       role: 'student',
       photoUrl: '',
