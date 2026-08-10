@@ -1,13 +1,28 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   CalendarDays, Search, Clock, MapPin, User, BookOpen, AlertCircle, 
-  ChevronDown, GraduationCap, Building2, UserCheck, Calendar,
-  ChevronLeft, ChevronRight
+  ChevronDown, GraduationCap, Building2, UserCheck, Calendar
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { scheduleApi } from '../services/api';
 
 const EIOS_DIRECT_URL = 'https://eios.kosgos.ru/api';
+
+// Helper to clean discipline titles (remove duplicate 'лек', 'лаб', 'пр' prefixes)
+const cleanDisciplineTitle = (rawTitle) => {
+  if (!rawTitle) return '';
+  return rawTitle.replace(/^(лек|лаб|пр)\s+/i, '').trim();
+};
+
+// Helper for lesson type badge
+const getLessonTypeBadge = (disciplineName) => {
+  const lower = (disciplineName || '').toLowerCase();
+  if (lower.startsWith('лек') || lower.includes(' лек ')) return { label: 'Лекция', bg: '#E6F4EA', color: '#137333' };
+  if (lower.startsWith('лаб') || lower.includes(' лаб ')) return { label: 'Лабораторная', bg: '#F3E8FF', color: '#7E22CE' };
+  if (lower.startsWith('пр') || lower.includes(' пр ')) return { label: 'Практическое', bg: '#FEF3C7', color: '#B45309' };
+  if (lower.includes('экз') || lower.includes('зач')) return { label: 'Аттестация', bg: '#FEE2E2', color: '#B91C1C' };
+  return { label: 'Занятие', bg: '#E0F2FE', color: '#0369A1' };
+};
 
 const ScheduleWidget = () => {
   const [targetType, setTargetType] = useState('group'); // 'group' | 'teacher' | 'aud'
@@ -32,7 +47,7 @@ const ScheduleWidget = () => {
   const [lessonsLoading, setLessonsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Single Day Navigation State (Default to today's day of week or Monday)
+  // Single Day Navigation State
   const todayDayNum = new Date().getDay() === 0 ? 1 : new Date().getDay(); // 1 = Mon, 6 = Sat
   const [activeDayNumber, setActiveDayNumber] = useState(todayDayNum > 6 ? 1 : todayDayNum);
   const [selectedCustomDate, setSelectedCustomDate] = useState(''); // 'YYYY-MM-DD'
@@ -163,22 +178,33 @@ const ScheduleWidget = () => {
   }, [selectedId, selectedYear, targetType, selectedCustomDate]);
 
   // Filter lessons STRICTLY FOR THE SINGLE SELECTED DAY
-  const dayLessons = useMemo(() => {
+  const rawDayLessons = useMemo(() => {
     if (selectedCustomDate) {
       return lessons.filter(l => l.дата && l.дата.startsWith(selectedCustomDate));
     }
     return lessons.filter(l => l.деньНедели === activeDayNumber);
   }, [lessons, activeDayNumber, selectedCustomDate]);
 
-  // Helper for lesson type badge
-  const getLessonTypeBadge = (disciplineName) => {
-    const lower = (disciplineName || '').toLowerCase();
-    if (lower.includes('лек')) return { label: 'Лекция', bg: '#E6F4EA', color: '#137333' };
-    if (lower.includes('лаб')) return { label: 'Лабораторная', bg: '#F3E8FF', color: '#7E22CE' };
-    if (lower.includes('пр')) return { label: 'Практическое', bg: '#FEF3C7', color: '#B45309' };
-    if (lower.includes('экз') || lower.includes('зач')) return { label: 'Аттестация', bg: '#FEE2E2', color: '#B91C1C' };
-    return { label: 'Занятие', bg: '#E0F2FE', color: '#0369A1' };
-  };
+  // Group lessons by TIME SLOT for compact, elegant card layout
+  const groupedTimeSlots = useMemo(() => {
+    const slotsMap = {};
+    rawDayLessons.forEach(lesson => {
+      const slotKey = `${lesson.начало}-${lesson.конец}`;
+      if (!slotsMap[slotKey]) {
+        slotsMap[slotKey] = {
+          timeStart: lesson.начало,
+          timeEnd: lesson.конец,
+          lessonNum: lesson.номерЗанятия,
+          color: lesson.цвет || 'var(--primary)',
+          items: []
+        };
+      }
+      slotsMap[slotKey].items.push(lesson);
+    });
+
+    // Sort slots by time
+    return Object.values(slotsMap).sort((a, b) => a.timeStart.localeCompare(b.timeStart));
+  }, [rawDayLessons]);
 
   const daysOfWeekTabs = [
     { id: 1, name: 'Понедельник', short: 'Пн' },
@@ -199,7 +225,7 @@ const ScheduleWidget = () => {
       maxWidth: '100%',
       margin: '0 auto'
     }}>
-      {/* 1. COMPACT TOP BAR: TITLE & TYPE SWITCHER */}
+      {/* 1. TOP BAR: TITLE & TYPE SWITCHER */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '20px' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text)' }}>
@@ -270,7 +296,7 @@ const ScheduleWidget = () => {
         </div>
       </div>
 
-      {/* 2. UNIFIED SEARCH INPUT & CUSTOM YEAR STYLED SELECT */}
+      {/* 2. UNIFIED SEARCH INPUT & CUSTOM YEAR SELECT */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px', position: 'relative' }} ref={dropdownRef}>
         
         {/* Search Combobox Input */}
@@ -385,13 +411,13 @@ const ScheduleWidget = () => {
         </div>
 
         {/* Custom Styled Academic Year Select */}
-        <div style={{ position: 'relative', width: '150px' }}>
+        <div style={{ position: 'relative', minWidth: '130px' }}>
           <select 
             value={selectedYear}
             onChange={(e) => setSelectedYear(e.target.value)}
             style={{
               width: '100%',
-              padding: '10px 30px 10px 14px',
+              padding: '10px 28px 10px 14px',
               borderRadius: '14px',
               border: '1px solid #DEE2E6',
               background: '#F8F9FA',
@@ -445,7 +471,7 @@ const ScheduleWidget = () => {
 
           {/* Optional Specific Date Picker */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.78rem', color: '#666', fontWeight: '700' }}>Дата:</span>
+            <span style={{ fontSize: '0.78rem', color: '#666', fontWeight: '700' }}>Конкретная дата:</span>
             <input 
               type="date"
               value={selectedCustomDate}
@@ -481,7 +507,7 @@ const ScheduleWidget = () => {
         </div>
       </div>
 
-      {/* 4. COMPACT SINGLE-DAY LESSON CARDS DISPLAY */}
+      {/* 4. COMPACT TIME-SLOT CARDS DISPLAY */}
       {lessonsLoading ? (
         <div style={{ textAlign: 'center', padding: '45px 0', color: '#666' }}>
           <div className="spinner" style={{ margin: '0 auto 10px auto' }}></div>
@@ -492,75 +518,82 @@ const ScheduleWidget = () => {
           <AlertCircle size={32} style={{ marginBottom: '6px' }} />
           <h4 style={{ margin: '0 0 4px 0', fontSize: '0.98rem', fontWeight: '800' }}>{error}</h4>
         </div>
-      ) : dayLessons.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: '800', color: '#666', marginBottom: '4px' }}>
+      ) : groupedTimeSlots.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: '800', color: '#666', marginBottom: '2px' }}>
             📅 {selectedCustomDate ? `Расписание на ${new Date(selectedCustomDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}` : `Занятия на ${daysOfWeekTabs.find(d => d.id === activeDayNumber)?.name}:`}
           </div>
 
-          {dayLessons.map((lesson, idx) => {
-            const typeBadge = getLessonTypeBadge(lesson.дисциплина);
-            return (
-              <motion.div 
-                key={lesson.код || idx}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                style={{
-                  background: 'white',
-                  borderLeft: `5px solid ${lesson.цвет || 'var(--primary)'}`,
-                  borderTop: '1px solid #F1F3F5',
-                  borderRight: '1px solid #F1F3F5',
-                  borderBottom: '1px solid #F1F3F5',
-                  borderRadius: '14px',
-                  padding: '14px 18px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '12px'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                  <div style={{ background: 'rgba(0,127,255,0.08)', padding: '10px 14px', borderRadius: '12px', minWidth: '100px', textAlign: 'center' }}>
-                    <div style={{ fontWeight: '800', fontSize: '0.92rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                      <Clock size={13} /> {lesson.начало} - {lesson.конец}
-                    </div>
-                    <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: '700', marginTop: '2px', display: 'block' }}>{lesson.номерЗанятия} пара</span>
+          {groupedTimeSlots.map((slot, sIdx) => (
+            <motion.div 
+              key={sIdx}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                background: 'white',
+                borderLeft: `5px solid ${slot.color}`,
+                borderTop: '1px solid #F1F3F5',
+                borderRight: '1px solid #F1F3F5',
+                borderBottom: '1px solid #F1F3F5',
+                borderRadius: '16px',
+                padding: '16px 20px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+              }}
+            >
+              {/* Slot Time Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', borderBottom: '1px dashed #E9ECEF', paddingBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ background: 'rgba(0,127,255,0.08)', padding: '4px 10px', borderRadius: '8px', fontWeight: '800', fontSize: '0.92rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Clock size={13} /> {slot.timeStart} - {slot.timeEnd}
                   </div>
-
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                      <span style={{ background: typeBadge.bg, color: typeBadge.color, padding: '2px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: '800' }}>
-                        {typeBadge.label}
-                      </span>
-                      {lesson.номерПодгруппы > 0 && (
-                        <span style={{ background: '#E3F2FD', color: '#0D47A1', padding: '2px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: '800' }}>
-                          {lesson.номерПодгруппы} п/г
-                        </span>
-                      )}
-                    </div>
-
-                    <h5 style={{ margin: '0 0 4px 0', fontSize: '0.98rem', fontWeight: '800', color: 'var(--text)' }}>
-                      {lesson.дисциплина}
-                    </h5>
-
-                    <div style={{ display: 'flex', gap: '16px', fontSize: '0.85rem', color: '#555', flexWrap: 'wrap' }}>
-                      {lesson.преподаватель && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <User size={14} style={{ color: '#777' }} /> {lesson.преподаватель}
-                        </span>
-                      )}
-                      {lesson.аудитория && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '800', color: 'var(--primary)' }}>
-                          <MapPin size={14} /> Кабинет: {lesson.аудитория}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  <span style={{ fontSize: '0.8rem', color: '#888', fontWeight: '700' }}>{slot.lessonNum} пара</span>
                 </div>
-              </motion.div>
-            );
-          })}
+              </div>
+
+              {/* Slot Sub-Items (Clean list of subgroups or single item) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {slot.items.map((item, iIdx) => {
+                  const typeBadge = getLessonTypeBadge(item.дисциплина);
+                  const cleanedTitle = cleanDisciplineTitle(item.дисциплина);
+                  return (
+                    <div key={item.код || iIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ background: typeBadge.bg, color: typeBadge.color, padding: '2px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: '800' }}>
+                          {typeBadge.label}
+                        </span>
+                        {item.номерПодгруппы > 0 && (
+                          <span style={{ background: '#E3F2FD', color: '#0D47A1', padding: '2px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: '800' }}>
+                            {item.номерПодгруппы} п/г
+                          </span>
+                        )}
+                        <h5 style={{ margin: 0, fontSize: '0.98rem', fontWeight: '800', color: 'var(--text)', flex: 1, wordBreak: 'break-word', lineHeight: '1.35' }}>
+                          {cleanedTitle}
+                        </h5>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '18px', fontSize: '0.84rem', color: '#555', flexWrap: 'wrap', paddingLeft: '2px' }}>
+                        {item.преподаватель && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <User size={13} style={{ color: '#777' }} /> {item.преподаватель}
+                          </span>
+                        )}
+                        {item.аудитория && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '800', color: 'var(--primary)' }}>
+                            <MapPin size={13} /> Кабинет: {item.аудитория}
+                          </span>
+                        )}
+                        {item.группа && targetType !== 'group' && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <GraduationCap size={13} style={{ color: '#777' }} /> Группа: {item.группа}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          ))}
         </div>
       ) : (
         <div style={{ textAlign: 'center', padding: '36px 0', color: '#888' }}>
