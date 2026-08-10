@@ -155,6 +155,23 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
     else:
         fullname = username
 
+    # Try querying EIOS API (https://eios.kosgos.ru/api/tokenauth) for exact FIO
+    try:
+        eios_resp = requests.post(
+            "https://eios.kosgos.ru/api/tokenauth",
+            json={"userName": username, "password": password},
+            timeout=6,
+            verify=False
+        )
+        eios_json = eios_resp.json()
+        if eios_json.get("state") == 1 and eios_json.get("data"):
+            user_obj = eios_json["data"].get("user", {})
+            eios_fio = user_obj.get("fullName") or user_obj.get("userFIO") or user_obj.get("shortFIO")
+            if eios_fio:
+                fullname = eios_fio
+    except Exception:
+        pass
+
     userid = info_data.get("userid")
     userpictureurl = info_data.get("userpictureurl")
 

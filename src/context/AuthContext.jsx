@@ -124,11 +124,12 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('portal_jwt_token');
   };
 
-  // Update group or avatar locally
+  // Update fullName, group or avatar locally
   const updateUserProfile = (data = {}) => {
     if (user) {
       setUser({
         ...user,
+        ...(data.fullName !== undefined ? { fullName: data.fullName } : {}),
         ...(data.group !== undefined ? { group: data.group } : {}),
         ...(data.photoUrl !== undefined ? { photoUrl: data.photoUrl } : {})
       });
