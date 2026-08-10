@@ -467,58 +467,30 @@ const ScheduleWidget = () => {
         </div>
       </div>
 
-      {/* 3. DATE STRIP NAVIGATION BAR */}
-      <div style={{ background: '#F8F9FA', padding: '14px', borderRadius: '16px', marginBottom: '20px', border: '1px solid #E9ECEF' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
-          <span style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Calendar size={16} style={{ color: 'var(--primary)' }} /> Выбор даты:
-          </span>
+      {/* 3. DATE SELECTION TOOLBAR */}
+      <div style={{ background: '#F8F9FA', padding: '12px 18px', borderRadius: '16px', marginBottom: '20px', border: '1px solid #E9ECEF', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+        <span style={{ fontSize: '0.88rem', fontWeight: '800', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Calendar size={18} style={{ color: 'var(--primary)' }} /> Выбор конкретной даты:
+        </span>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input 
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              style={{
-                padding: '5px 10px',
-                borderRadius: '8px',
-                border: '1px solid #DEE2E6',
-                background: 'white',
-                fontSize: '0.82rem',
-                fontWeight: '700',
-                color: 'var(--text)',
-                outline: 'none'
-              }}
-            />
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <input 
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            style={{
+              padding: '8px 14px',
+              borderRadius: '10px',
+              border: '1px solid #DEE2E6',
+              background: 'white',
+              fontSize: '0.88rem',
+              fontWeight: '700',
+              color: 'var(--text)',
+              outline: 'none',
+              cursor: 'pointer'
+            }}
+          />
         </div>
-
-        {/* Available Dates Pill Bar */}
-        {availableDatesList.length > 0 && (
-          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-            {availableDatesList.map(d => (
-              <button 
-                key={d.iso}
-                onClick={() => setSelectedDate(d.iso)}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '10px',
-                  border: selectedDate === d.iso ? 'none' : '1px solid #DEE2E6',
-                  background: selectedDate === d.iso ? 'var(--primary)' : 'white',
-                  color: selectedDate === d.iso ? 'white' : '#555',
-                  fontWeight: selectedDate === d.iso ? '800' : '600',
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  boxShadow: selectedDate === d.iso ? '0 3px 10px rgba(0,127,255,0.2)' : 'none',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.12s'
-                }}
-              >
-                {d.label}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* 4. COMPACT TIME-SLOT CARDS DISPLAY */}
