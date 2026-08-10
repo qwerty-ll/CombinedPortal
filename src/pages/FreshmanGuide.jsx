@@ -16,11 +16,24 @@ import ChecklistModal from '../components/ChecklistModal';
 import FunLayerModal from '../components/FunLayerModal';
 import RewardsModal from '../components/RewardsModal';
 
-// Disciplines Accordion Item
-const DisciplineItem = ({ subject }) => {
+// Disciplines Card Component (Styled for 2-column grid with color accents)
+const DisciplineCard = ({ subject }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const accentColor = subject.color || '#007AFF';
+
   return (
-    <div style={{ marginBottom: '10px' }}>
+    <motion.div 
+      whileHover={{ y: -2 }}
+      style={{ 
+        background: 'white', 
+        borderRadius: '16px', 
+        border: `1px solid ${isOpen ? accentColor : '#E9ECEF'}`,
+        boxShadow: isOpen ? `0 8px 24px ${accentColor}22` : '0 4px 12px rgba(0,0,0,0.03)',
+        overflow: 'hidden',
+        transition: 'all 0.25s ease',
+        borderLeft: `4px solid ${accentColor}`
+      }}
+    >
       <div 
         onClick={() => setIsOpen(!isOpen)} 
         style={{ 
@@ -28,26 +41,51 @@ const DisciplineItem = ({ subject }) => {
           justify: 'space-between', 
           alignItems: 'center', 
           cursor: 'pointer', 
-          padding: '14px 18px', 
-          background: 'white', 
-          border: '1px solid #e9ecef', 
-          borderRadius: isOpen ? '14px 14px 0 0' : '14px',
-          transition: 'all 0.2s'
+          padding: '16px 18px',
+          background: isOpen ? `${accentColor}08` : 'white'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '1.2rem' }}>{subject.emoji}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ 
+            width: '42px', 
+            height: '42px', 
+            borderRadius: '12px', 
+            background: `${accentColor}18`, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            fontSize: '1.3rem',
+            flexShrink: 0 
+          }}>
+            {subject.emoji}
+          </div>
           <div>
-            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '800' }}>{subject.name}</h4>
-            <span style={{ fontSize: '0.78rem', color: '#888' }}>
-              {subject.type}{subject.extraType ? ` + ${subject.extraType}` : ''} • {subject.hours} ч. • {subject.credits} з.е.
-            </span>
+            <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: '800', color: 'var(--text)', lineHeight: '1.3' }}>
+              {subject.name}
+            </h4>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+              <span style={{ 
+                fontSize: '0.72rem', 
+                fontWeight: '700', 
+                padding: '2px 8px', 
+                borderRadius: '6px', 
+                background: subject.type === 'Экзамен' ? '#FF3B3015' : '#34C75915',
+                color: subject.type === 'Экзамен' ? '#FF3B30' : '#34C759'
+              }}>
+                {subject.type}{subject.extraType ? ` + ${subject.extraType}` : ''}
+              </span>
+              <span style={{ fontSize: '0.75rem', color: '#888' }}>
+                • {subject.hours} ч. • {subject.credits} з.е.
+              </span>
+            </div>
           </div>
         </div>
-        <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.3 }}>
+
+        <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.3 }} style={{ color: accentColor, flexShrink: 0, marginLeft: '8px' }}>
           <ChevronDown size={18}/>
         </motion.div>
       </div>
+
       <AnimatePresence>
         {isOpen && (
           <motion.div 
@@ -57,29 +95,38 @@ const DisciplineItem = ({ subject }) => {
             transition={{ duration: 0.25 }}
             style={{ 
               padding: '16px 18px', 
-              background: 'rgba(0,127,255,0.03)', 
-              borderRadius: '0 0 14px 14px', 
-              border: '1px solid rgba(0,127,255,0.15)', 
-              borderTop: 'none' 
+              background: '#F8F9FA', 
+              borderTop: '1px solid #E9ECEF'
             }}
           >
-            <p style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#333', lineHeight: '1.5' }}>{subject.description}</p>
+            <p style={{ margin: '0 0 12px 0', fontSize: '0.88rem', color: '#444', lineHeight: '1.5' }}>
+              {subject.description}
+            </p>
             
             {subject.mascotHack && (
-              <div style={{ background: '#E8F4FF', padding: '10px 14px', borderRadius: '10px', fontSize: '0.85rem', color: 'var(--primary)', fontWeight: '600', marginBottom: '8px' }}>
-                💡 {subject.mascotHack}
+              <div style={{ 
+                background: `${accentColor}12`, 
+                border: `1px solid ${accentColor}30`, 
+                padding: '10px 14px', 
+                borderRadius: '12px', 
+                fontSize: '0.84rem', 
+                color: accentColor, 
+                fontWeight: '600', 
+                marginBottom: '8px' 
+              }}>
+                🐱 <strong>Хак ВИТШика:</strong> {subject.mascotHack}
               </div>
             )}
             
             {subject.seniorAdvice && (
-              <div style={{ fontSize: '0.82rem', color: '#666', fontStyle: 'italic' }}>
+              <div style={{ fontSize: '0.82rem', color: '#666', fontStyle: 'italic', background: 'white', padding: '10px 14px', borderRadius: '12px', border: '1px solid #eee' }}>
                 💬 <strong>Совет старшекурсника:</strong> {subject.seniorAdvice}
               </div>
             )}
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 };
 
@@ -121,8 +168,16 @@ const FreshmanGuide = () => {
     setActiveStepModal(null);
   };
 
+  const tabColors = {
+    access: '#007FFF',
+    study: '#673AB7',
+    school: '#00BCD4',
+    life: '#D32F2F',
+    support: '#009688'
+  };
+
   return (
-    <div className="freshman-guide-page" style={{ padding: '30px 20px', maxWidth: '1000px', margin: '0 auto' }}>
+    <div className="freshman-guide-page" style={{ padding: '30px 20px', maxWidth: '1080px', margin: '0 auto' }}>
       
       {/* Header Banner */}
       <div style={{ background: 'linear-gradient(135deg, #007AFF 0%, #5856D6 100%)', borderRadius: '24px', padding: '30px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', flexWrap: 'wrap', gap: '20px', boxShadow: '0 10px 30px rgba(0,127,255,0.25)' }}>
@@ -151,11 +206,23 @@ const FreshmanGuide = () => {
         />
       </div>
 
-      {/* Quick Links Section */}
+      {/* Quick Links Section with Colorful Cards & Floating Background Emojis */}
       <section id="level-links" style={{ marginBottom: '40px' }}>
         <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: '0 0 16px 0', color: 'var(--text)' }}>База ссылок и полезностей</h3>
-        <div className={`level-card links-card theme-${activeTab}`}>
-          <div className="tabs-header-innovative">
+        
+        <div style={{ background: 'white', borderRadius: '24px', padding: '24px', border: `1px solid ${tabColors[activeTab]}30`, boxShadow: `0 10px 30px ${tabColors[activeTab]}15`, position: 'relative', overflow: 'hidden', transition: 'all 0.3s' }}>
+          
+          {/* Animated Background Emojis */}
+          <div className="card-bg-icons">
+             {activeTab === 'access' && "⚡ 📋 📅 🔑".split(' ').map((e,i) => <span key={i} className="bg-emoji">{e}</span>)}
+             {activeTab === 'study' && "📚 🎓 📝 🔬".split(' ').map((e,i) => <span key={i} className="bg-emoji">{e}</span>)}
+             {activeTab === 'school' && "💻 👨‍💻 🤖 🚀".split(' ').map((e,i) => <span key={i} className="bg-emoji">{e}</span>)}
+             {activeTab === 'life' && "🍕 🎸 🏀 🎭".split(' ').map((e,i) => <span key={i} className="bg-emoji">{e}</span>)}
+             {activeTab === 'support' && "🆘 🛡️ 🚑 💬".split(' ').map((e,i) => <span key={i} className="bg-emoji">{e}</span>)}
+          </div>
+
+          {/* Navigation Tabs */}
+          <div className="tabs-header-innovative" style={{ marginBottom: '20px' }}>
             {[
               { id: 'access', label: 'Быстрый доступ', icon: <Zap size={16}/>, color: '#007FFF' },
               { id: 'study', label: 'Учеба и расписание', icon: <GraduationCap size={16}/>, color: '#673AB7' },
@@ -180,10 +247,10 @@ const FreshmanGuide = () => {
               <motion.ul 
                 key={activeTab}
                 className="game-links-innovative"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.25 }}
               >
                 {activeTab === 'access' && (
                   <>
@@ -195,16 +262,16 @@ const FreshmanGuide = () => {
                 )}
                 {activeTab === 'study' && (
                   <>
-                    <li><a href="https://lib.kosgos.ru" target="_blank" rel="noopener noreferrer">Библиотека ВУЗа</a></li>
-                    <li><a href="https://eios.kosgos.ru" target="_blank" rel="noopener noreferrer">Электронные курсы</a></li>
-                    <li><a href="https://science.kosgos.ru" target="_blank" rel="noopener noreferrer">Научные работы</a></li>
+                    <li><a href="https://lib.kosgos.ru" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Библиотека ВУЗа</a></li>
+                    <li><a href="https://eios.kosgos.ru" target="_blank" rel="noopener noreferrer"><Zap size={16}/> Электронные курсы</a></li>
+                    <li><a href="https://science.kosgos.ru" target="_blank" rel="noopener noreferrer"><Sparkles size={16}/> Научные работы</a></li>
                   </>
                 )}
                 {activeTab === 'school' && (
                   <>
-                    <li><a href="https://kosgos.ru/svedeniya-ob-organizatsii/struktura-i-organy-upravleniya/instituty/institut-vysshaya-it-shkola.html" target="_blank" rel="noopener noreferrer">О дирекции ИВИТШ (Б-209)</a></li>
-                    <li><a href="https://t.me/ivitsh_chat" target="_blank" rel="noopener noreferrer">Telegram чат ИВИТШ</a></li>
-                    <li><a href="https://vk.com/ivitsh" target="_blank" rel="noopener noreferrer">Группа VK ИВИТШ</a></li>
+                    <li><a href="https://kosgos.ru/svedeniya-ob-organizatsii/struktura-i-organy-upravleniya/instituty/institut-vysshaya-it-shkola.html" target="_blank" rel="noopener noreferrer"><Users size={16}/> Дирекция ИВИТШ (Б-209)</a></li>
+                    <li><a href="https://t.me/ivitsh_chat" target="_blank" rel="noopener noreferrer"><Send size={16}/> Telegram чат ИВИТШ</a></li>
+                    <li><a href="https://vk.com/ivitsh" target="_blank" rel="noopener noreferrer"><Heart size={16}/> Группа VK ИВИТШ</a></li>
                   </>
                 )}
                 {activeTab === 'life' && (
@@ -217,10 +284,10 @@ const FreshmanGuide = () => {
                 )}
                 {activeTab === 'support' && (
                   <>
-                    <li><a href="https://kosgos.ru/studentam/stipendii/" target="_blank" rel="noopener noreferrer"><GraduationCap size={16} /> Стипендии и материальная помощь</a></li>
+                    <li><a href="https://kosgos.ru/studentam/stipendii/" target="_blank" rel="noopener noreferrer"><GraduationCap size={16} /> Стипендии и выплаты</a></li>
                     <li><a href="https://kosgos.ru/studentam/obshchezhitiya/" target="_blank" rel="noopener noreferrer"><LifeBuoy size={16} /> Общежития и заселение</a></li>
-                    <li><a href="https://kosgos.ru/studentam/psikhologicheskaya-pomoshch/" target="_blank" rel="noopener noreferrer"><Heart size={16} /> Психологическая поддержка</a></li>
-                    <li><a href="https://kosgos.ru/kontakty/" target="_blank" rel="noopener noreferrer"><Sparkles size={16} /> Контакты приёмной комиссии</a></li>
+                    <li><a href="https://kosgos.ru/studentam/psikhologicheskaya-pomoshch/" target="_blank" rel="noopener noreferrer"><Heart size={16} /> Психологическая помощь</a></li>
+                    <li><a href="https://kosgos.ru/kontakty/" target="_blank" rel="noopener noreferrer"><Sparkles size={16} /> Приёмная комиссия</a></li>
                   </>
                 )}
               </motion.ul>
@@ -229,28 +296,34 @@ const FreshmanGuide = () => {
         </div>
       </section>
 
-      {/* ALL 24 SUBJECTS CATALOG */}
+      {/* ALL 24 SUBJECTS CATALOG IN BEAUTIFUL 2-COLUMN GRID */}
       <section id="level-disciplines">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: 0, color: 'var(--text)' }}>
-            Дисциплины ИВИТШ КГУ ({SUBJECTS.filter(s => s.semester === selectedSemester).length})
-          </h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: 0, color: 'var(--text)' }}>
+              Дисциплины ИВИТШ КГУ ({SUBJECTS.filter(s => s.semester === selectedSemester).length})
+            </h3>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: '#777' }}>
+              Нажми на дисциплину, чтобы увидеть советы и хаки ВИТШика
+            </p>
+          </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', background: 'white', padding: '4px', borderRadius: '12px', border: '1px solid #e9ecef' }}>
             {[1, 2].map(sem => (
               <button 
                 key={sem} 
-                className={`floor-tab ${selectedSemester === sem ? 'active' : ''}`}
                 onClick={() => setSelectedSemester(sem)}
                 style={{
-                  padding: '6px 14px',
-                  borderRadius: '8px',
-                  border: '1px solid #dee2e6',
-                  background: selectedSemester === sem ? 'var(--primary)' : 'white',
+                  padding: '8px 16px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: selectedSemester === sem ? 'var(--primary)' : 'transparent',
                   color: selectedSemester === sem ? 'white' : '#666',
-                  fontWeight: '600',
+                  fontWeight: '700',
                   fontSize: '0.85rem',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: selectedSemester === sem ? '0 4px 12px rgba(0,127,255,0.25)' : 'none'
                 }}
               >
                 {sem}-й семестр
@@ -259,9 +332,14 @@ const FreshmanGuide = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {/* 2-Column Responsive Grid */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', 
+          gap: '14px' 
+        }}>
           {SUBJECTS.filter(s => s.semester === selectedSemester).map(subject => (
-            <DisciplineItem key={subject.id} subject={subject} />
+            <DisciplineCard key={subject.id} subject={subject} />
           ))}
         </div>
       </section>
