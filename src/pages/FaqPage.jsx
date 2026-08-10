@@ -3,29 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronDown, Info, MessageCircle, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const INITIAL_FAQS = [
-  {
-    id: 1,
-    question: 'Где находится Дирекция Высшей ИТ-Школы (ИВИТШ)?',
-    answer: 'Дирекция ИВИТШ КГУ расположена в <strong>Корпусе Б</strong> по адресу ул. Ивановская, 24а, кабинет <strong>Б-209</strong> на 2 этаже. График работы: Пн–Пт с 9:00 до 17:00 (перерыв 12:00–13:00).'
-  },
-  {
-    id: 2,
-    question: 'Как узнать свои академические стипендии и выплатные нормы?',
-    answer: 'Академическая стипендия составляет 3000 руб за сессию на «4» и «5», и 4500 руб за сессию только на «5». Повышенная академическая стипендия (ПГАС) составляет от 5000 до 10000 руб. Заявления принимаются в кабинете Б-209.'
-  },
-  {
-    id: 3,
-    question: 'Где находится Коворкинг ИВИТШ?',
-    answer: 'Коворкинг Высшей ИТ-школы находится на <strong>4-м этаже Корпуса Б</strong>. Там можно поработать за ноутбуком, обсудить командные проекты и подключиться к Wi-Fi.'
-  },
-  {
-    id: 4,
-    question: 'Какое расписание занятий у моей группы?',
-    answer: 'Расписание занятий обновляется в системе ЭИОС КГУ по адресу <a href="https://eios.kosgos.ru/WebApp/#/Rasp/Group/8540" target="_blank" rel="noopener noreferrer">eios.kosgos.ru</a>.'
-  }
-];
-
 const FAQItem = ({ question, answer, isOpen, onClick }) => (
   <div className={`faq-accordion-item ${isOpen ? 'active' : ''}`}>
     <button className="faq-accordion-trigger" onClick={onClick}>
@@ -52,12 +29,12 @@ const FaqPage = () => {
   const navigate = useNavigate();
   const [openIndex, setOpenIndex] = useState(null);
 
-  // Read FAQ from localStorage (or fallback to INITIAL_FAQS)
+  // Read FAQ from localStorage (dynamic data only)
   const faqItems = (() => {
     try {
       const saved = localStorage.getItem('portal_faq');
-      return (saved && JSON.parse(saved).length > 0) ? JSON.parse(saved) : INITIAL_FAQS;
-    } catch { return INITIAL_FAQS; }
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   })();
 
   return (
@@ -67,17 +44,25 @@ const FaqPage = () => {
       </div>
 
       {/* ACCORDIONS */}
-      <div className="faq-accordions-group">
-        {faqItems.map((item, idx) => (
-          <FAQItem 
-            key={item.id || idx}
-            question={item.question}
-            answer={item.answer}
-            isOpen={openIndex === idx}
-            onClick={() => setOpenIndex(openIndex === idx ? null : idx)}
-          />
-        ))}
-      </div>
+      {faqItems.length > 0 ? (
+        <div className="faq-accordions-group">
+          {faqItems.map((item, idx) => (
+            <FAQItem 
+              key={item.id || idx}
+              question={item.question}
+              answer={item.answer}
+              isOpen={openIndex === idx}
+              onClick={() => setOpenIndex(openIndex === idx ? null : idx)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="empty-state-card" style={{ background: 'white', borderRadius: '24px', padding: '50px 20px', textAlign: 'center', border: '1px solid #e9ecef', marginBottom: '30px' }}>
+          <HelpCircle size={48} strokeWidth={1.5} style={{ color: '#aaa', marginBottom: '12px' }} />
+          <h4 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: '800' }}>Список частых вопросов пуст</h4>
+          <p style={{ margin: 0, fontSize: '0.88rem', color: '#777' }}>Администратор может добавить вопросы через панель управления</p>
+        </div>
+      )}
 
       {/* FOOTER HELPER */}
       <div className="faq-help-box">

@@ -2,63 +2,16 @@ import React, { useState } from 'react';
 import { Search, Mail, Users as UsersIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const INITIAL_TEACHERS = [
-  {
-    id: 1,
-    name: 'Киприн Сергей Сергеевич',
-    department: 'Дирекция ИВИТШ КГУ',
-    role: 'Директор ИВИТШ, кандидат технических наук',
-    email: 's_kiprin@ksu.edu.ru',
-    office: 'Б-209',
-    hours: 'Пн-Пт 9:00 - 17:00 (перерыв 12:00-13:00)',
-    courses: 'Введение в специальность, Информационные системы',
-    photo: ''
-  },
-  {
-    id: 2,
-    name: 'Денисов Артем Андреевич',
-    department: 'Дирекция ИВИТШ КГУ',
-    role: 'Заместитель директора по учебной работе',
-    email: 'a_denisov@ksu.edu.ru',
-    office: 'Б-209',
-    hours: 'Пн-Пт 10:00 - 16:00',
-    courses: 'Алгоритмизация и программирование',
-    photo: ''
-  },
-  {
-    id: 3,
-    name: 'Лебедев Глеб Дмитриевич',
-    department: 'Кафедра ИТ и Программирования',
-    role: 'Старший преподаватель, рук. Спортивного программирования',
-    email: 'g_lebedev@ksu.edu.ru',
-    office: 'Б-306',
-    hours: 'Вт, Чт 14:00 - 17:00',
-    courses: 'Структуры данных и алгоритмы, Спортивное программирование',
-    photo: ''
-  },
-  {
-    id: 4,
-    name: 'Горева Ирина Николаевна',
-    department: 'Кафедра ИТ и Программирования',
-    role: 'Доцент, куратор направления «ИДЕЯ»',
-    email: 'i_goreva@ksu.edu.ru',
-    office: 'Б-308',
-    hours: 'Ср, Пт 11:00 - 15:00',
-    courses: 'Веб-дизайн и UI/UX, Компьютерная графика',
-    photo: ''
-  }
-];
-
 const Teachers = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState(null);
 
-  // Read teachers from localStorage (or fallback to INITIAL_TEACHERS)
+  // Read teachers from localStorage (dynamic data only)
   const teachersList = (() => {
     try {
       const saved = localStorage.getItem('portal_teachers');
-      return (saved && JSON.parse(saved).length > 0) ? JSON.parse(saved) : INITIAL_TEACHERS;
-    } catch { return INITIAL_TEACHERS; }
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   })();
 
   const filteredTeachers = teachersList.filter(teacher => 
@@ -99,21 +52,29 @@ const Teachers = () => {
       </div>
 
       {/* SEARCH BOX */}
-      <div className="forum-search-bar">
-        <div className="search-input-wrapper">
-          <Search size={18} className="search-icon-inside" />
-          <input 
-            type="text" 
-            placeholder="Поиск преподавателя по ФИО, предмету..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+      {teachersList.length > 0 && (
+        <div className="forum-search-bar">
+          <div className="search-input-wrapper">
+            <Search size={18} className="search-icon-inside" />
+            <input 
+              type="text" 
+              placeholder="Поиск преподавателя по ФИО, предмету..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* DEPARTMENTS CONTAINER */}
       <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '35px' }}>
-        {Object.keys(groupedTeachers).length > 0 ? (
+        {teachersList.length === 0 ? (
+          <div className="empty-state-card" style={{ background: 'white', borderRadius: '24px', padding: '50px 20px', textAlign: 'center', border: '1px solid #e9ecef' }}>
+            <UsersIcon size={48} strokeWidth={1.5} style={{ color: '#aaa', marginBottom: '12px' }} />
+            <h4 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: '800' }}>Преподаватели ещё не добавлены</h4>
+            <p style={{ margin: 0, fontSize: '0.88rem', color: '#777' }}>Администратор может добавить преподавателей через панель управления</p>
+          </div>
+        ) : Object.keys(groupedTeachers).length > 0 ? (
           Object.keys(groupedTeachers).map(deptName => (
             <div key={deptName}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: '800', marginBottom: '15px', color: 'var(--text)', borderBottom: '2px solid rgba(0, 127, 255, 0.1)', paddingBottom: '8px' }}>
