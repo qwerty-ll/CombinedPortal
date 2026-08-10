@@ -383,7 +383,7 @@ EIOS_BASE_URL = "https://eios.kosgos.ru/api"
 @app.get("/api/v1/schedule/years")
 def get_eios_years():
     try:
-        resp = requests.get(f"{EIOS_BASE_URL}/Rasp/ListYears", timeout=10)
+        resp = requests.get(f"{EIOS_BASE_URL}/Rasp/ListYears", timeout=10, verify=False)
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
@@ -392,7 +392,7 @@ def get_eios_years():
 @app.get("/api/v1/schedule/groups")
 def get_eios_groups(year: str = Query("2025-2026")):
     try:
-        resp = requests.get(f"{EIOS_BASE_URL}/raspGrouplist", params={"year": year}, timeout=10)
+        resp = requests.get(f"{EIOS_BASE_URL}/raspGrouplist", params={"year": year}, timeout=10, verify=False)
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
@@ -401,7 +401,7 @@ def get_eios_groups(year: str = Query("2025-2026")):
 @app.get("/api/v1/schedule/teachers")
 def get_eios_teachers(year: str = Query("2025-2026")):
     try:
-        resp = requests.get(f"{EIOS_BASE_URL}/raspTeacherlist", params={"year": year}, timeout=10)
+        resp = requests.get(f"{EIOS_BASE_URL}/raspTeacherlist", params={"year": year}, timeout=10, verify=False)
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
@@ -410,7 +410,7 @@ def get_eios_teachers(year: str = Query("2025-2026")):
 @app.get("/api/v1/schedule/auditories")
 def get_eios_auditories(year: str = Query("2025-2026")):
     try:
-        resp = requests.get(f"{EIOS_BASE_URL}/raspAudlist", params={"year": year}, timeout=10)
+        resp = requests.get(f"{EIOS_BASE_URL}/raspAudlist", params={"year": year}, timeout=10, verify=False)
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
@@ -431,7 +431,7 @@ def get_eios_rasp(
         if idAud: params["idAud"] = idAud
         if sdate: params["sdate"] = sdate
         
-        resp = requests.get(f"{EIOS_BASE_URL}/Rasp", params=params, timeout=15)
+        resp = requests.get(f"{EIOS_BASE_URL}/Rasp", params=params, timeout=15, verify=False)
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
