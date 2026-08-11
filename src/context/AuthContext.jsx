@@ -1,52 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
-
-// Abstract data access — when moving to a real DB, only this file changes
 const AUTH_STORAGE_KEY = 'portal_auth_user';
-
-const defaultUser = null;
-
-const PREDEFINED_USERS = {
-  admin: {
-    id: 'admin-1',
-    username: 'admin',
-    fullName: 'Администратор Портала',
-    group: 'Администрация ИВИТШ',
-    role: 'admin',
-    photoUrl: '',
-  },
-  moderator: {
-    id: 'mod-1',
-    username: 'moderator',
-    fullName: 'Смирнов Алексей Владимирович',
-    group: '24-ИСбо-1',
-    role: 'moderator',
-    photoUrl: '',
-  },
-  student: {
-    id: 'stud-1',
-    username: 'student',
-    fullName: 'Иванов Иван Иванович',
-    group: '24-ИСбо-1',
-    role: 'student',
-    photoUrl: '',
-  }
-};
-
-const PREDEFINED_PASSWORDS = {
-  admin: 'admin123',
-  moderator: 'mod123',
-  student: 'student123'
-};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     try {
       const saved = localStorage.getItem(AUTH_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : defaultUser;
+      return saved ? JSON.parse(saved) : null;
     } catch {
-      return defaultUser;
+      return null;
     }
   });
 
@@ -58,25 +21,8 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user]);
 
-  // Login via SDO KGU with backend integration and demo fallback
+  // Secure Authentication via SDO KGU Backend API
   const login = async (loginInput, groupInput = '', passwordInput = '') => {
-    const key = loginInput.trim().toLowerCase();
-
-    // 1. Check if user entered a predefined demo username
-    if (PREDEFINED_USERS[key]) {
-      const expectedPassword = PREDEFINED_PASSWORDS[key];
-      if (passwordInput && passwordInput.trim() !== expectedPassword) {
-        return { error: `Неверный пароль. Для ${key} используйте ${expectedPassword}` };
-      }
-      const predefinedUser = {
-        ...PREDEFINED_USERS[key],
-        createdAt: new Date().toISOString()
-      };
-      setUser(predefinedUser);
-      return predefinedUser;
-    }
-
-    // 2. Real SDO KGU Authentication via FastAPI Backend
     try {
       const { authApi } = await import('../services/api');
       const res = await authApi.sdoLogin(loginInput.trim(), passwordInput, groupInput.trim());
@@ -99,35 +45,15 @@ export const AuthProvider = ({ children }) => {
         return sdoUser;
       }
     } catch (err) {
-      console.warn('[SDO Auth] Real SDO Login failed or backend offline:', err.message);
-      return { error: err.message || 'Ошибка подключения или неверный логин/пароль СДО КГУ' };
+      console.warn('[SDO Auth] Login error:', err.message);
+      return { error: err.message || 'Ошибка входа через СДО КГУ. Проверьте логин и пароль' };
     }
 
-    return { error: 'Не удалось получить данные профиля из СДО КГУ' };
+    return { error: 'Не удалось авторизоваться через СДО КГУ' };
   };
 
+  // Secure Admin Authentication via Backend API Only
   const adminLogin = async (username, password) => {
-    const cleanUser = (username || '').trim().toLowerCase();
-    const cleanPass = (password || '').trim();
-
-    // Instant local authentication fallback for predefined superadmin credentials
-    if (
-      (cleanUser === 'ivitsh_admin' && cleanPass === 'KGU_IVITSH_Admin_2026!#Secure') ||
-      (cleanUser === 'admin' && (cleanPass === 'admin123' || cleanPass === 'KGU_IVITSH_Admin_2026!#Secure'))
-    ) {
-      const predefinedAdmin = {
-        id: 'admin-super',
-        username: username.trim(),
-        fullName: 'Администратор ИВИТШ КГУ',
-        group: 'Деканат ИВИТШ',
-        role: 'admin',
-        photoUrl: '',
-        createdAt: new Date().toISOString()
-      };
-      setUser(predefinedAdmin);
-      return predefinedAdmin;
-    }
-
     try {
       const { authApi } = await import('../services/api');
       const res = await authApi.adminLogin(username.trim(), password);
@@ -148,7 +74,7 @@ export const AuthProvider = ({ children }) => {
         return adminUser;
       }
     } catch (err) {
-      console.warn('[Admin Auth] Login failed:', err.message);
+      console.warn('[Admin Auth] Login error:', err.message);
       return { error: err.message || 'Неверный логин или пароль администратора' };
     }
     return { error: 'Ошибка входа в систему администрации' };
@@ -159,7 +85,6 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('portal_jwt_token');
   };
 
-  // Update fullName, group or avatar locally
   const updateUserProfile = (data = {}) => {
     if (user) {
       setUser({
@@ -171,16 +96,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Change role (for demo purposes)
-  const setRole = (newRole) => {
-    if (user) {
-      setUser({ ...user, role: newRole });
-    }
-  };
-
   const isLoggedIn = !!user;
   const isAdmin = user?.role === 'admin';
   const isModerator = user?.role === 'moderator';
+  const isCurator = user?.role === 'curator';
   const canModerate = isAdmin || isModerator;
 
   return (
@@ -189,11 +108,11 @@ export const AuthProvider = ({ children }) => {
       isLoggedIn,
       isAdmin,
       isModerator,
+      isCurator,
       canModerate,
       login,
       adminLogin,
       logout,
-      setRole,
       updateUserProfile
     }}>
       {children}
@@ -208,5 +127,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-export default AuthContext;
