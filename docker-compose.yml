@@ -17,7 +17,7 @@ services:
     volumes:
       - sqlite_data:/app/backend_data
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
 
   # Nginx Web Server & Reverse Proxy
   nginx:

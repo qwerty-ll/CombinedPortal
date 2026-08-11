@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown, Info, MessageCircle, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import DOMPurify from 'dompurify';
 
 const FAQItem = ({ question, answer, isOpen, onClick }) => (
   <div className={`faq-accordion-item ${isOpen ? 'active' : ''}`}>
@@ -18,7 +19,7 @@ const FAQItem = ({ question, answer, isOpen, onClick }) => (
           exit={{ height: 0, opacity: 0 }}
           transition={{ duration: 0.25 }}
         >
-          <div dangerouslySetInnerHTML={{ __html: answer }} />
+          <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(answer || '') }} />
         </motion.div>
       )}
     </AnimatePresence>

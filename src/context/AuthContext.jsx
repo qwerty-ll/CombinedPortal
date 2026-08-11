@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }) => {
           group: res.user.group_number || groupInput.trim() || '24-ИСбо-1',
           role: res.user.role || 'student',
           photoUrl: res.user.userpictureurl || '',
-          sdoToken: res.user.sdo_token,
+          isSdoAuth: true,
           courses: res.user.courses || [],
           createdAt: new Date().toISOString()
         };

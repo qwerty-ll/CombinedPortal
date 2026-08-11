@@ -12,11 +12,18 @@ from dotenv import load_dotenv
 from database import get_db
 import models
 
+import secrets
+
 load_dotenv()
 
-SECRET_KEY = os.getenv("SECRET_KEY", "ksu_ivitsh_super_secret_jwt_key_2026")
+raw_secret = os.getenv("SECRET_KEY")
+if not raw_secret:
+    print("[SECURITY WARNING] SECRET_KEY not set in environment. Generating dynamic 256-bit secret key for JWT tokens.")
+    raw_secret = secrets.token_urlsafe(32)
+
+SECRET_KEY = raw_secret
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "43200"))
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)

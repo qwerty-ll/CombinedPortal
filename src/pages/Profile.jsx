@@ -95,6 +95,13 @@ const Profile = () => {
     const file = e.target.files[0];
     if (!file) return;
 
+    const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!file.type || !allowedMimeTypes.includes(file.type.toLowerCase())) {
+      toast.show('Ошибка формата! Разрешены только изображения PNG, JPEG, JPG и WebP', 'warning');
+      e.target.value = '';
+      return;
+    }
+
     if (file.size > 2 * 1024 * 1024) {
       toast.show('Файл слишком большой! Максимальный размер 2МБ', 'warning');
       return;
@@ -296,7 +303,7 @@ const Profile = () => {
           <div className="student-info-meta">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <h2>{user.fullName}</h2>
-              {user.sdoToken && (
+              {user.isSdoAuth && (
                 <span style={{ background: '#E6F4EA', color: '#137333', fontSize: '0.75rem', padding: '3px 8px', borderRadius: '8px', fontWeight: '800' }}>
                   ✓ СДО KOSGOS
                 </span>

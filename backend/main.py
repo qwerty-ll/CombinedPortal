@@ -24,20 +24,23 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS setup for Vite frontend (localhost:5173 / localhost:3000 / Vercel domains)
-origins = [
+# SSL certificate verification toggle (enabled by default for production security)
+VERIFY_SSL = os.getenv("VERIFY_SSL", "true").lower() == "true"
+
+# CORS setup for Vite frontend & allowed origins
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()] if allowed_origins_env else [
     "http://localhost:5173",
     "http://localhost:3000",
     "http://127.0.0.1:5173",
-    "https://combined-portal-freshman.vercel.app",
-    "*"
+    "https://combined-portal-freshman.vercel.app"
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -74,7 +77,13 @@ def read_root():
 
 @app.post("/api/v1/auth/register", response_model=schemas.TokenResponse)
 def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(models.User).filter(models.User.username == user_in.username).first()
+    username_clean = user_in.username.strip()
+    if not username_clean or len(username_clean) < 3:
+        raise HTTPException(status_code=400, detail="Логин должен содержать минимум 3 символа")
+    if not user_in.password or len(user_in.password) < 6:
+        raise HTTPException(status_code=400, detail="Пароль должен быть длиной не менее 6 символов")
+
+    db_user = db.query(models.User).filter(models.User.username == username_clean).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Пользователь с таким логином уже существует")
 
@@ -184,7 +193,7 @@ async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_
         "service": "moodle_mobile_app"
     }
 
-    async with httpx.AsyncClient(verify=False, timeout=12.0) as client:
+    async with httpx.AsyncClient(verify=VERIFY_SSL, timeout=12.0) as client:
         try:
             token_resp = await client.get(token_url, params=token_params)
             token_data = token_resp.json()
@@ -310,10 +319,6 @@ async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_
     if not detected_group:
         detected_group = department_name or "24-ИСбо-1"
 
-    # Determine assigned role (admin logins or student)
-    ADMIN_USERNAMES = {"admin", "smirnovmakar", "moderator"}
-    assigned_role = "admin" if username.lower() in ADMIN_USERNAMES else "student"
-
     # 4. Sync with local database User record
     db_user = db.query(models.User).filter(models.User.username == username).first()
     if not db_user:
@@ -323,7 +328,7 @@ async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_
             full_name=fullname,
             group_number=detected_group,
             hashed_password=hashed_pw,
-            role=assigned_role
+            role="student"
         )
         db.add(db_user)
         db.commit()
@@ -333,8 +338,6 @@ async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_
             db_user.full_name = fullname
         if detected_group and db_user.group_number != detected_group:
             db_user.group_number = detected_group
-        if username.lower() in ADMIN_USERNAMES:
-            db_user.role = "admin"
         db.commit()
 
     # 5. Create local access token & return payload with SDO attributes
@@ -374,9 +377,10 @@ def get_forum_questions(
     if category and category != "Все":
         query = query.filter(models.ForumQuestion.category == category)
     if search:
+        safe_search = search.replace("%", "\\%").replace("_", "\\_")
         query = query.filter(
-            (models.ForumQuestion.title.ilike(f"%{search}%")) | 
-            (models.ForumQuestion.content.ilike(f"%{search}%"))
+            (models.ForumQuestion.title.ilike(f"%{safe_search}%")) | 
+            (models.ForumQuestion.content.ilike(f"%{safe_search}%"))
         )
 
     questions = query.order_by(models.ForumQuestion.is_pinned.desc(), models.ForumQuestion.created_at.desc()).all()
@@ -662,7 +666,7 @@ EIOS_BASE_URL = "https://eios.kosgos.ru/api"
 @app.get("/api/v1/schedule/years")
 def get_eios_years():
     try:
-        resp = requests.get(f"{EIOS_BASE_URL}/Rasp/ListYears", timeout=10, verify=False)
+        resp = requests.get(f"{EIOS_BASE_URL}/Rasp/ListYears", timeout=10, verify=VERIFY_SSL)
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
@@ -671,29 +675,29 @@ def get_eios_years():
 @app.get("/api/v1/schedule/groups")
 def get_eios_groups(year: str = Query("2025-2026")):
     try:
-        resp = requests.get(f"{EIOS_BASE_URL}/raspGrouplist", params={"year": year}, timeout=10, verify=False)
+        resp = requests.get(f"{EIOS_BASE_URL}/raspGrouplist", params={"year": year}, timeout=10, verify=VERIFY_SSL)
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
-        return {"data": [], "error": str(e)}
+        return {"data": [], "error": "Не удалось загрузить список групп ЭИОС"}
 
 @app.get("/api/v1/schedule/teachers")
 def get_eios_teachers(year: str = Query("2025-2026")):
     try:
-        resp = requests.get(f"{EIOS_BASE_URL}/raspTeacherlist", params={"year": year}, timeout=10, verify=False)
+        resp = requests.get(f"{EIOS_BASE_URL}/raspTeacherlist", params={"year": year}, timeout=10, verify=VERIFY_SSL)
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
-        return {"data": [], "error": str(e)}
+        return {"data": [], "error": "Не удалось загрузить список преподавателей ЭИОС"}
 
 @app.get("/api/v1/schedule/auditories")
 def get_eios_auditories(year: str = Query("2025-2026")):
     try:
-        resp = requests.get(f"{EIOS_BASE_URL}/raspAudlist", params={"year": year}, timeout=10, verify=False)
+        resp = requests.get(f"{EIOS_BASE_URL}/raspAudlist", params={"year": year}, timeout=10, verify=VERIFY_SSL)
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
-        return {"data": [], "error": str(e)}
+        return {"data": [], "error": "Не удалось загрузить список аудиторий ЭИОС"}
 
 @app.get("/api/v1/schedule/rasp")
 def get_eios_rasp(
@@ -710,11 +714,11 @@ def get_eios_rasp(
         if idAud: params["idAud"] = idAud
         if sdate: params["sdate"] = sdate
         
-        resp = requests.get(f"{EIOS_BASE_URL}/Rasp", params=params, timeout=15, verify=False)
+        resp = requests.get(f"{EIOS_BASE_URL}/Rasp", params=params, timeout=15, verify=VERIFY_SSL)
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
-        return {"data": {"rasp": []}, "error": str(e)}
+        return {"data": {"rasp": []}, "error": "Не удалось загрузить расписание ЭИОС"}
 
 # Serve static frontend build if folder exists (Production Docker Container)
 from fastapi.staticfiles import StaticFiles
@@ -730,7 +734,12 @@ if os.path.exists(static_dir):
     async def serve_spa(full_path: str):
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="API route not found")
-        file_path = os.path.join(static_dir, full_path)
-        if os.path.exists(file_path) and os.path.isfile(file_path):
-            return FileResponse(file_path)
+        
+        safe_base = os.path.abspath(static_dir)
+        requested_path = os.path.abspath(os.path.join(static_dir, full_path))
+        if not requested_path.startswith(safe_base):
+            raise HTTPException(status_code=403, detail="Доступ запрещен")
+
+        if os.path.exists(requested_path) and os.path.isfile(requested_path):
+            return FileResponse(requested_path)
         return FileResponse(os.path.join(static_dir, "index.html"))

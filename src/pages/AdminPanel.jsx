@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import DOMPurify from 'dompurify';
 import {
   BellRing, Users, HelpCircle, MessageSquare, Plus, Pencil, Trash2, X, Save, Shield, UserCheck
 } from 'lucide-react';
@@ -104,6 +105,20 @@ const AdminPanel = () => {
   const handlePhotoUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!file.type || !allowedMimeTypes.includes(file.type.toLowerCase())) {
+      toast.show('Ошибка формата! Разрешены только форматы PNG, JPEG, JPG и WebP', 'warning');
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.show('Размер файла не должен превышать 2МБ!', 'warning');
+      e.target.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onloadend = () => {
       setTeacherForm(prev => ({ ...prev, photo: reader.result }));
@@ -422,7 +437,7 @@ const AdminPanel = () => {
                 <div key={f.id} className="admin-item-row">
                   <div className="admin-item-info">
                     <h4>{f.question}</h4>
-                    <p dangerouslySetInnerHTML={{ __html: f.answer.length > 120 ? f.answer.slice(0, 120) + '...' : f.answer }} />
+                    <p dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(f.answer.length > 120 ? f.answer.slice(0, 120) + '...' : f.answer) }} />
                   </div>
                   <div className="admin-item-actions">
                     <button onClick={() => handleEditFaq(f)} title="Редактировать"><Pencil size={16} /></button>

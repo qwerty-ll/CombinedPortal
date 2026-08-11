@@ -12,10 +12,12 @@ import models
 
 load_dotenv()
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+VERIFY_SSL = os.getenv("VERIFY_SSL", "true").lower() == "true"
+if not VERIFY_SSL:
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID", "019e2c26-97a8-75cf-8d25-1caf90fcdd51")
-SECRET = os.getenv("GIGACHAT_SECRET", "MDE5ZTJjMjYtOTdhOC03NWNmLThkMjUtMWNhZjkwZmNkZDUxOjFkODQ2YzZjLTgwNmEtNGIwZi1iZmQ2LTY0Zjg2NTAwMmU2Yg==")
+CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID", "")
+SECRET = os.getenv("GIGACHAT_SECRET", "")
 
 OAUTH_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
 CHAT_URL = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
@@ -40,7 +42,7 @@ def get_access_token(force_refresh: bool = False) -> str:
     payload = {"scope": "GIGACHAT_API_PERS"}
 
     try:
-        resp = requests.post(OAUTH_URL, headers=headers, data=payload, verify=False, timeout=10)
+        resp = requests.post(OAUTH_URL, headers=headers, data=payload, verify=VERIFY_SSL, timeout=10)
         resp.raise_for_status()
         data = resp.json()
         token_cache["access_token"] = data["access_token"]
@@ -208,14 +210,14 @@ def generate_chatbot_reply(user_message: str, history: list, db: Session) -> str
             "temperature": 0.1,
             "max_tokens": 250
         }
-        resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=False, timeout=15)
+        resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=VERIFY_SSL, timeout=15)
         
         # If token expired or key changed, force refresh once
         if resp.status_code in (401, 402):
             token_cache["access_token"] = ""
             token = get_access_token(force_refresh=True)
             headers["Authorization"] = f"Bearer {token}"
-            resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=False, timeout=15)
+            resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=VERIFY_SSL, timeout=15)
 
         resp.raise_for_status()
         reply = resp.json()["choices"][0]["message"]["content"]

@@ -2,8 +2,8 @@ import https from 'https';
 import crypto from 'crypto';
 
 // --- GigaChat Credentials ---
-const CLIENT_ID = process.env.GIGACHAT_CLIENT_ID || "019e2c26-97a8-75cf-8d25-1caf90fcdd51";
-const SECRET = process.env.GIGACHAT_SECRET || "MDE5ZTJjMjYtOTdhOC03NWNmLThkMjUtMWNhZjkwZmNkZDUxOjFkODQ2ZjZjLTgwNmEtNGIwZi1iZmQ2LTY0Zjg2NTAwMmU2Yg==";
+const CLIENT_ID = process.env.GIGACHAT_CLIENT_ID || "";
+const SECRET = process.env.GIGACHAT_SECRET || "";
 
 const OAUTH_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth";
 const CHAT_URL = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions";
@@ -26,7 +26,7 @@ function makeRequest(urlStr, headers, body) {
       ...headers,
       "Content-Length": Buffer.byteLength(body),
     },
-    rejectUnauthorized: false,
+    rejectUnauthorized: process.env.VERIFY_SSL === 'false' ? false : true,
   };
 
   return new Promise((resolve, reject) => {
@@ -151,11 +151,21 @@ function evaluateQuery(query) {
 
 // ES Module Serverless Handler for Vercel
 export default async function handler(req, res) {
-  // CORS Headers
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+  // Dynamic CORS Headers
+  const origin = req.headers.origin;
+  const allowedOrigins = process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    : ['http://localhost:5173', 'http://localhost:3000', 'https://combined-portal-freshman.vercel.app'];
+
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigins[0] || '*');
+  }
+
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
