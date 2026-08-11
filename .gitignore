@@ -1,43 +1,86 @@
-# Dependencies
-node_modules
-.pnpm-store
+# ==========================================
+# 1. DEPENDENCIES & VIRTUAL ENVS
+# ==========================================
+node_modules/
+.pnpm-store/
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
 
-# Production builds
-dist
-dist-ssr
-build
+# ==========================================
+# 2. DATABASES & LOCAL STORAGE (CLEAN DB HANDOFF)
+# ==========================================
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+backend/portal.db*
+backend_data/
+sqlite_data/
 
-# Logs
-logs
+# ==========================================
+# 3. BUILD ARTIFACTS & OUTPUTS
+# ==========================================
+dist/
+dist-ssr/
+build/
+*.egg-info/
+.eggs/
+
+# ==========================================
+# 4. ENVIRONMENT & SECRETS
+# ==========================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+
+# ==========================================
+# 5. LOGS & TEMPORARY FILES
+# ==========================================
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+*.tmp
+*.temp
 
-# Local env files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Editor & OS files
+# ==========================================
+# 6. IDE & SYSTEM FILES
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-*.tmp
 
-# Hosting / Deployment
-.vercel
-
-# Testing & Cache
-coverage
-.cache
+# ==========================================
+# 7. DEPLOYMENT & VERCEL
+# ==========================================
+.vercel/
+.cache/
+coverage/
