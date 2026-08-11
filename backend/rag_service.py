@@ -25,13 +25,15 @@ token_cache = {
     "expires_at": 0
 }
 
-def get_access_token() -> str:
+def get_access_token(force_refresh: bool = False) -> str:
     now = time.time()
-    if token_cache["access_token"] and now < token_cache["expires_at"] - 60:
+    secret = os.getenv("GIGACHAT_SECRET", SECRET)
+    
+    if not force_refresh and token_cache["access_token"] and now < token_cache["expires_at"] - 60:
         return token_cache["access_token"]
 
     headers = {
-        "Authorization": f"Basic {SECRET}",
+        "Authorization": f"Basic {secret}",
         "RqUID": str(uuid.uuid4()),
         "Content-Type": "application/x-www-form-urlencoded",
     }
@@ -46,6 +48,8 @@ def get_access_token() -> str:
         token_cache["expires_at"] = (exp_ms / 1000) if exp_ms else (now + 1800)
         return token_cache["access_token"]
     except Exception as e:
+        token_cache["access_token"] = ""
+        token_cache["expires_at"] = 0
         raise RuntimeError(f"GigaChat Auth Failed: {e}")
 
 KNOWLEDGE_CHUNKS = [
@@ -177,6 +181,14 @@ def generate_chatbot_reply(user_message: str, history: list, db: Session) -> str
             "max_tokens": 250
         }
         resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=False, timeout=15)
+        
+        # If token expired or key changed, force refresh once
+        if resp.status_code in (401, 402):
+            token_cache["access_token"] = ""
+            token = get_access_token(force_refresh=True)
+            headers["Authorization"] = f"Bearer {token}"
+            resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=False, timeout=15)
+
         resp.raise_for_status()
         reply = resp.json()["choices"][0]["message"]["content"]
 
@@ -187,5 +199,5 @@ def generate_chatbot_reply(user_message: str, history: list, db: Session) -> str
 
         return reply if reply else chunk["content"]
     except Exception as e:
-        print("GigaChat Error:", e)
+        print("GigaChat API Notice (using local RAG fallback):", e)
         return chunk["content"]
