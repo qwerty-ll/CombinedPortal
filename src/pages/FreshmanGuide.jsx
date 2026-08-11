@@ -182,10 +182,10 @@ const FreshmanGuide = () => {
   };
 
   return (
-    <div className="freshman-guide-page" style={{ padding: '30px 20px', maxWidth: '1080px', margin: '0 auto' }}>
+    <div className="freshman-guide-page">
       
       {/* Header Banner */}
-      <div style={{ background: 'linear-gradient(135deg, #007AFF 0%, #5856D6 100%)', borderRadius: '24px', padding: '30px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', flexWrap: 'wrap', gap: '20px', boxShadow: '0 10px 30px rgba(0,127,255,0.25)' }}>
+      <div className="freshman-hero-banner">
         <div>
           <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1.2px', opacity: 0.85 }}>Высшая ИТ-Школа КГУ</span>
           <h1 style={{ fontSize: '2.2rem', fontWeight: '800', margin: '4px 0 0 0' }}>Путь первокурсника</h1>
@@ -338,14 +338,7 @@ const FreshmanGuide = () => {
         </div>
 
         {/* 2-Column Responsive Grid */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', 
-          gap: '12px',
-          alignItems: 'start',
-          width: '100%',
-          boxSizing: 'border-box'
-        }}>
+        <div className="disciplines-grid-container">
           {SUBJECTS.filter(s => s.semester === selectedSemester).map(subject => (
             <DisciplineCard key={subject.id} subject={subject} />
           ))}
