@@ -75,6 +75,10 @@ KNOWLEDGE_CHUNKS = [
     }
 ]
 
+def evaluate_query(query: str):
+    q_lower = query.lower().strip()
+    q_words = re.findall(r"\w{2,}", q_lower)
+
     # 1. Exact match for classroom numbers (101-409)
     room_match = re.search(r"\b(101|102|104|107|108|201|202|203|204|206|207|208|209|301|302|303|304|306|307|308|309|310|312|313|401|403|406|407|408|409)\b", q_lower)
     if room_match:
