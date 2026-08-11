@@ -339,24 +339,6 @@ const Profile = () => {
 
         {/* ADAPTATION MINI-GAMES */}
         <MiniGamesSection />
-
-        {/* RESET PROGRESS */}
-        <motion.section 
-          className="curator-profile-section"
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-          style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}
-        >
-          <h3>Сброс локальных данных</h3>
-          <p style={{ fontSize: '0.9rem', color: '#666', margin: 0 }}>
-            Вы можете сбросить сохраненные чек-листы первокурсника и очистить временные данные приложения.
-          </p>
-          <button onClick={handleResetApp} className="btn-auth" style={{ alignSelf: 'flex-start', background: '#E74C3C', color: 'white' }}>
-            Сбросить данные приложения
-          </button>
-        </motion.section>
-
       </div>
     </div>
   );
