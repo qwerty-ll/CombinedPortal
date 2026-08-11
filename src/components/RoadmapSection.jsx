@@ -68,7 +68,7 @@ export default function RoadmapSection({ activeStep, completedSteps, onStepClick
                 transition: 'all 0.2s'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
                 <div style={{
                   width: '40px',
                   height: '40px',
@@ -84,11 +84,11 @@ export default function RoadmapSection({ activeStep, completedSteps, onStepClick
                   {isCompleted ? <Check size={18} strokeWidth={3} /> : isLocked ? <Lock size={16} /> : <StepIcon size={18} />}
                 </div>
 
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: '800', color: isLocked ? '#999' : 'var(--text)' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '800', color: isLocked ? '#999' : 'var(--text)', wordBreak: 'break-word' }}>
                     {step.label}
                   </h4>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: isCompleted ? 'var(--primary)' : isActive ? 'var(--primary)' : '#888' }}>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: isCompleted ? 'var(--primary)' : isActive ? 'var(--primary)' : '#888', wordBreak: 'break-word' }}>
                     {isCompleted ? '✓ Пройдено' : isActive ? 'Текущий этап (нажмите для прохождения)' : step.desc}
                   </p>
                 </div>

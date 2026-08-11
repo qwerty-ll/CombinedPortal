@@ -340,9 +340,11 @@ const FreshmanGuide = () => {
         {/* 2-Column Responsive Grid */}
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', 
-          gap: '14px',
-          alignItems: 'start'
+          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', 
+          gap: '12px',
+          alignItems: 'start',
+          width: '100%',
+          boxSizing: 'border-box'
         }}>
           {SUBJECTS.filter(s => s.semester === selectedSemester).map(subject => (
             <DisciplineCard key={subject.id} subject={subject} />

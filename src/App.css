@@ -4513,10 +4513,27 @@ mark {
     scrollbar-width: none !important;
   }
 
-  .quick-links-grid, .links-grid {
+  .quick-links-grid, .links-grid, .game-links-innovative {
     grid-template-columns: 1fr !important;
     width: 100% !important;
     box-sizing: border-box !important;
+  }
+
+  .links-content-innovative {
+    padding: 16px 12px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+  }
+
+  .tabs-header-innovative {
+    padding: 0 4px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .tab-btn-innovative {
+    padding: 10px 14px !important;
+    font-size: 0.8rem !important;
   }
 
   .login-card, .curator-profile-section {
@@ -4538,5 +4555,6 @@ mark {
     justify-content: flex-start !important;
   }
 }
+
 
 
