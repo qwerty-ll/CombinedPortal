@@ -147,6 +147,7 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
     fullname = info_data.get("fullname", "").strip() or info_data.get("username", "").strip() or username
     userid = info_data.get("userid")
     userpictureurl = info_data.get("userpictureurl", "")
+    department_name = ""
 
     # Query detailed Moodle user profile if userid is available (core_user_get_users_by_field)
     if userid:
@@ -167,6 +168,8 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
                     fullname = u_fn
                 if u_item.get("profileimageurl"):
                     userpictureurl = u_item.get("profileimageurl")
+                if u_item.get("department"):
+                    department_name = u_item.get("department")
         except Exception:
             pass
 
@@ -246,7 +249,7 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
             courses_list = []
 
     if not detected_group:
-        detected_group = "24-ИСбо-1"
+        detected_group = department_name or "24-ИСбо-1"
 
     # Determine assigned role (admin logins or student)
     ADMIN_USERNAMES = {"admin", "smirnovmakar", "moderator"}

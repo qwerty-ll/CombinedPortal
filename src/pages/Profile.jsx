@@ -263,45 +263,7 @@ const Profile = () => {
           </div>
         </motion.section>
 
-        {/* SDO COURSES (IF ENROLLED) */}
-        {user.courses && user.courses.length > 0 && (
-          <motion.section 
-            className="curator-profile-section"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <GraduationCap size={20} style={{ color: 'var(--primary)' }} />
-              <h3 style={{ margin: 0 }}>Мои дисциплины в СДО КГУ</h3>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {user.courses.map((course) => (
-                <div 
-                  key={course.id} 
-                  style={{
-                    background: '#F8F9FA',
-                    padding: '12px 16px',
-                    borderRadius: '12px',
-                    border: '1px solid #E9ECEF',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}
-                >
-                  <div>
-                    <strong style={{ fontSize: '0.92rem', color: 'var(--text)' }}>{course.fullname}</strong>
-                    <div style={{ fontSize: '0.78rem', color: '#777' }}>{course.shortname}</div>
-                  </div>
-                  {course.progress !== undefined && (
-                    <span style={{ background: 'rgba(0,127,255,0.1)', color: 'var(--primary)', fontWeight: '800', fontSize: '0.8rem', padding: '4px 8px', borderRadius: '8px' }}>
-                      {course.progress}%
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </motion.section>
-        )}
+
 
         {/* REAL STATISTICS */}
         <motion.section 

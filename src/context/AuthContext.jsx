@@ -100,24 +100,10 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (err) {
       console.warn('[SDO Auth] Real SDO Login failed or backend offline:', err.message);
-      // Fallback for custom offline/demo student login if password is not empty or user explicitly submits
-      if (err.message && err.message.includes('Неверный логин')) {
-        return { error: err.message };
-      }
+      return { error: err.message || 'Ошибка подключения или неверный логин/пароль СДО КГУ' };
     }
 
-    // Fallback student login
-    const newUser = {
-      id: Date.now().toString(),
-      username: loginInput.trim(),
-      fullName: 'Студент ИВИТШ',
-      group: groupInput.trim() || '24-ИСбо-1',
-      role: 'student',
-      photoUrl: '',
-      createdAt: new Date().toISOString()
-    };
-    setUser(newUser);
-    return newUser;
+    return { error: 'Не удалось получить данные профиля из СДО КГУ' };
   };
 
   const logout = () => {
