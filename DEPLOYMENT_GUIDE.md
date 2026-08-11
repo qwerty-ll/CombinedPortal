@@ -1,36 +1,32 @@
-# 🚀 Руководство по Деплою Портала ИВИТШ КГУ на Виртуальную Машину (VM / VDS)
+# 🚀 Руководство по Легковесному Деплою Портала ИВИТШ КГУ на Виртуальную Машину (Standalone / Offline DB)
 
-Настоящее руководство предназначено для системных администраторов ИВИТШ КГУ и описывает процесс переноса, разворачивания и интеграции Портала на виртуальном сервере под управлением Linux (Ubuntu / Debian / CentOS).
+Данное руководство описывает **полностью автономный запуск** портала на любой виртуальной машине Linux без необходимости устанавливать или подключать внешние СУБД (PostgreSQL / MySQL). 
+
+Вся система работает локально «из коробки» благодаря высокопроизводительному файловому движку **SQLite в режиме WAL (Write-Ahead Logging)**.
 
 ---
 
-## 📋 1. Системные Требования к ВМ
+## 📋 1. Системные Требования
 
-- **ОС**: Ubuntu 22.04 LTS / Debian 12 (рекомендуется)
-- **CPU**: 2 ядра
-- **RAM**: от 4 ГБ
-- **Диск**: от 20 ГБ SSD
+- **ОС**: Ubuntu 20.04+ / Debian 11+ / CentOS
+- **CPU**: 1-2 ядра
+- **RAM**: от 2 ГБ
+- **Диск**: от 10 ГБ SSD
 - **Установленное ПО**: `docker`, `docker-compose-plugin`, `git`
 
 ---
 
 ## 🛠️ 2. Шаг 1: Перенос проекта на сервер
 
-### Вариант А: Через Git (Рекомендуется)
-Подключитесь к виртуальной машине по SSH и склонируйте репозиторий:
+### Вариант А: Через Git
 ```bash
 git clone https://github.com/qwerty-ll/CombinedPortal.git /opt/ivitsh-portal
 cd /opt/ivitsh-portal
 ```
 
-### Вариант Б: Перенос архивом ZIP
-Если на сервере нет доступа к GitHub:
-1. Заархивируйте папку проекта на компьютере.
-2. Скопируйте архив на сервер через SCP:
-   ```bash
-   scp CombinedPortal.zip user@YOUR_SERVER_IP:/opt/
-   ```
-3. Распакуйте на сервере:
+### Вариант Б: Перенос ZIP-архивом (если нет интернета/гита)
+1. Скопируйте ZIP архив проекта на сервер через SFTP.
+2. Распакуйте:
    ```bash
    cd /opt && unzip CombinedPortal.zip -d ivitsh-portal
    cd ivitsh-portal
@@ -38,19 +34,14 @@ cd /opt/ivitsh-portal
 
 ---
 
-## ⚡ 3. Шаг 2: Настройка переменных окружения
+## ⚡ 3. Шаг 2: Переменные Окружения (`.env`)
 
-В корневой директории создайте файл `.env`:
-```bash
-cp backend/.env .env 2>/dev/null || touch .env
-```
-
-Отредактируйте `.env`:
+Создайте файл `.env` (или оставьте значения по умолчанию):
 ```env
-# База данных PostgreSQL (контейнер db разворачивается автоматически)
-DATABASE_URL=postgresql://ivitsh_user:KguPortalSecure2026Password!@db:5432/portal_db
+# Локальная база данных SQLite (файл создается автоматически на диске)
+DATABASE_URL=sqlite:///./portal.db
 
-# JWT Секретный ключ (сгенерируйте случайную строку)
+# JWT Секретный ключ авторизации
 SECRET_KEY=ksu_ivitsh_production_jwt_super_secret_key_2026_secure
 ALGORITHM=HS256
 
@@ -61,57 +52,33 @@ GIGACHAT_SECRET=MDE5ZTJjMjYtOTdhOC03NWNmLThkMjUtMWNhZjkwZmNkZDUxOjFkODQ2YzZjLTgw
 
 ---
 
-## 🐳 4. Шаг 3: Запуск проекта одной командой (Docker Compose)
+## 🐳 4. Шаг 3: Запуск 1 командой (Docker Compose)
 
-Выполните сборку и запуск всех сервисов (PostgreSQL, FastAPI Backend, React Frontend и Nginx):
+Запустите контейнеры приложения и веб-сервера:
 ```bash
 docker compose up -d --build
 ```
 
-Проверьте статус запущенных контейнеров:
+Проверьте статус:
 ```bash
 docker compose ps
 ```
-Должны отображаться 3 активных контейнера:
-- `ivitsh_portal_db` (PostgreSQL 16)
-- `ivitsh_portal_backend` (FastAPI)
+Должны работать 2 легких контейнера:
+- `ivitsh_portal_backend` (FastAPI + SQLite WAL mode)
 - `ivitsh_portal_nginx` (Nginx на порту 80)
 
 ---
 
-## 🔒 5. Шаг 4: Настройка SSL сертификата (HTTPS)
+## 🔒 5. Особенности локальной базы данных SQLite (WAL mode)
 
-Для подключения домена (например, `freshman.kosgos.ru`) установите бесплатный SSL-сертификат Let's Encrypt через Certbot:
-
-```bash
-sudo apt update
-sudo apt install certbot python3-certbot-nginx -y
-sudo certbot --nginx -d freshman.kosgos.ru
-```
-Certbot автоматически обновит `nginx.conf` и настроит перенаправление с HTTP на HTTPS.
+- **Нулевая сложность**: Не нужно создавать пользователей БД, логины или пароли к СУБД.
+- **Высокое параллельное чтение**: Включен режим `PRAGMA journal_mode=WAL;`, который позволяет параллельно читать и записывать данные без блокировки файлов.
+- **Резервное копирование**: Для бекапа всей базы данных достаточно просто скопировать файл `portal.db`.
 
 ---
 
-## 🔑 6. Учетные Записи По Умолчанию
+## 🔑 6. Данные по умолчанию
 
 - **Суперадминистратор**: `ivitsh_admin` / `KGU_IVITSH_Admin_2026!#Secure`
-- **Логин тестового студента СДО**: `24-isbo-085` / `Register21-SDO@`
-- **Swagger Документация API**: `http://YOUR_SERVER_IP/docs`
-
----
-
-## 📊 7. Полезные Команды для Обслуживания
-
-- **Просмотр логов бэкенда**:
-  ```bash
-  docker compose logs -f backend
-  ```
-- **Перезапуск сервисов**:
-  ```bash
-  docker compose restart
-  ```
-- **Обновление проекта из Git**:
-  ```bash
-  git pull
-  docker compose up -d --build
-  ```
+- **Тестовый студент СДО**: `24-isbo-085` / `Register21-SDO@`
+- **Документация API**: `http://IP_ВАШЕЙ_ВМ/docs`
