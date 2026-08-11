@@ -1,141 +1,142 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Award, Heart, Sparkles, CheckCircle2, RefreshCw, ChevronRight, Zap, Target, Star } from 'lucide-react';
+import { Sparkles, Coins, Scroll, Heart, RefreshCw, Trophy, Smile } from 'lucide-react';
 
-const QUIZ_QUESTIONS = [
-  {
-    id: 1,
-    question: "Кто такой староста группы ИВИТШ?",
-    options: [
-      "Студент, выбранный группой для связи с администрацией и преподавателями",
-      "Преподаватель, который ведёт основную дисциплину",
-      "Сотрудник профсоюзной организации",
-      "Наставник со старшего курса"
-    ],
-    correctIndex: 0,
-    explanation: "Староста представляет интересы группы, взаимодействует с дирекцией ИВИТШ и помогает решать организационные вопросы."
-  },
-  {
-    id: 2,
-    question: "К кому обратиться, если нужна помощь с адаптацией или сложным предметом?",
-    options: ["К культоргу", "К тьютору/наставнику", "К профоргу", "К охране"],
-    correctIndex: 1,
-    explanation: "Тьютор — студент старших курсов, который помогает первачкам освоиться в вузе и справиться с учебой."
-  },
-  {
-    id: 3,
-    question: "Что необходимо для получения повышенной академической стипендии ИВИТШ?",
-    options: [
-      "Только сдать сессию на 'отлично' и 'хорошо' без задолженностей",
-      "Активное участие в научной, спортивной или общественной жизни + успешная сессия",
-      "Быть старостой группы",
-      "Иметь пропуск в корпус Б"
-    ],
-    correctIndex: 1,
-    explanation: "Повышенная стипендия назначается за особые достижения в науке, творчестве, спорте и учебе."
-  },
-  {
-    id: 4,
-    question: "Где посмотреть расписание и учебный план ИВИТШ КГУ?",
-    options: [
-      "В ЭИОС и портале КГУ (eios.kosgos.ru)",
-      "Только в студенческом чате",
-      "На доске объявлений у входа",
-      "Спросить у прохожих"
-    ],
-    correctIndex: 0,
-    explanation: "ЭИОС и личный кабинет содержат актуальное расписание занятий и сессий."
-  }
+const PREDICTIONS = [
+  "Завтрашняя лекция пройдет на одном дыхании, а конспект получится идеальным! 📝",
+  "Тебе улыбнется удача на первой же лабораторной работе! ⚡",
+  "Староста пришлет тебе самые важные ответы перед тестом! 🤫",
+  "Ты найдешь лучшего друга на своем направлении в ИВИТШ! 🤝",
+  "Твой проект на хакатоне займет 1 место и удивит всех! 🏆",
+  "Преподаватель поставит автоматом за зачет за отличную активность! 🌟",
+  "В коворкинге тебя ждет самое удобное кресло и вкусный кофе! ☕",
+  "Сессия пролетит легко, если верить в себя и дружить с ВИТШиком! 🐱"
 ];
 
-const EMOTIONAL_QUESTIONS = [
-  {
-    id: 1,
-    text: "Как вы чувствуете себя перед началом первой недели занятий?",
-    options: [
-      { text: "Полный энергии и азарта! 🔥", score: 3 },
-      { text: "Немного волнуюсь, но интересно 🙂", score: 2 },
-      { text: "Немного растерян и переживаю 😟", score: 1 }
-    ]
-  },
-  {
-    id: 2,
-    text: "Насколько комфортно вам в новом коллективе одногруппников?",
-    options: [
-      { text: "Уже со всеми познакомился! 🤝", score: 3 },
-      { text: "Общаюсь с несколькими ребятами 💬", score: 2 },
-      { text: "Пока стесняюсь заговорить первым 🙈", score: 1 }
-    ]
-  },
-  {
-    id: 3,
-    text: "Понятна ли вам система баллов и ориентирование в корпусе Б?",
-    options: [
-      { text: "Всё понял и нашел кабинеты! 🧭", score: 3 },
-      { text: "Ориентируюсь с картой в приложении 🗺️", score: 2 },
-      { text: "Всё еще ищу 209 и 101 кабинеты 😅", score: 1 }
-    ]
-  }
-];
-
-const REWARDS = [
-  { id: 1, title: 'Первачок ИВИТШ', icon: '🚀', desc: 'Успешная авторизация на Портале', unlocked: true },
-  { id: 2, title: 'Знаток Корпуса Б', icon: '📍', desc: 'Изучил карту корпусов и аудиторий', unlocked: true },
-  { id: 3, title: 'Мастер Адаптации', icon: '🧠', desc: 'Пройден тест и викторина первачка', unlocked: false },
-  { id: 4, title: 'Активный Форумчанин', icon: '💬', desc: 'Создал первый вопрос в студенческом форуме', unlocked: false }
+const SUPERSTITIONS = [
+  { emoji: "🪙", text: "Положи монетку под пятку перед сессией — к удаче на экзамене." },
+  { emoji: "🥠", text: "Не закрывай зачётку сразу после первой оценки — удача улетит!" },
+  { emoji: "📜", text: "Кричи «Халява, приди!» в окно в ночь перед экзаменом." },
+  { emoji: "🐱", text: "Погладь ВИТШика в Личном кабинете перед зачетом — он принесет 100 баллов!" },
+  { emoji: "📝", text: "Пиши шпаргалки от руки — даже если не пронесешь, память зафиксирует всё." }
 ];
 
 export default function MiniGamesSection() {
-  const [activeTab, setActiveTab] = useState('quiz'); // 'quiz' | 'test' | 'rewards'
+  const [activeTab, setActiveTab] = useState('petting'); // 'petting' | 'cookie' | 'coin' | 'khalyava' | 'superstition'
 
-  // Quiz state
-  const [quizIndex, setQuizIndex] = useState(0);
-  const [selectedOpt, setSelectedOpt] = useState(null);
-  const [quizScore, setQuizScore] = useState(0);
-  const [quizFinished, setQuizFinished] = useState(false);
+  // 1. PETTING MASCOT CLICKER STATE
+  const [pets, setPets] = useState(() => {
+    const saved = localStorage.getItem('vitshik_pets_count');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const [petHearts, setPetHearts] = useState([]);
 
-  // Emotional test state
-  const [testIndex, setTestIndex] = useState(0);
-  const [testScore, setTestScore] = useState(0);
-  const [testFinished, setTestFinished] = useState(false);
+  const handlePetMascot = (e) => {
+    const nextPets = pets + 1;
+    setPets(nextPets);
+    localStorage.setItem('vitshik_pets_count', nextPets.toString());
 
-  const handleQuizSelect = (idx) => {
-    if (selectedOpt !== null) return;
-    setSelectedOpt(idx);
-    const isCorrect = idx === QUIZ_QUESTIONS[quizIndex].correctIndex;
-    if (isCorrect) setQuizScore(s => s + 1);
+    // Floating heart effect
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const id = Date.now() + Math.random();
+    setPetHearts(prev => [...prev, { id, x, y }]);
+    setTimeout(() => {
+      setPetHearts(prev => prev.filter(h => h.id !== id));
+    }, 800);
   };
 
-  const handleNextQuiz = () => {
-    if (quizIndex + 1 >= QUIZ_QUESTIONS.length) {
-      setQuizFinished(true);
-    } else {
-      setQuizIndex(i => i + 1);
-      setSelectedOpt(null);
-    }
+  const levelInfo = useMemo(() => {
+    if (pets < 10) return { lvl: 1, title: "Знакомые 🐾", next: 10, prev: 0, color: "#3B82F6" };
+    if (pets < 25) return { lvl: 2, title: "Приятели 🤝", next: 25, prev: 10, color: "#10B981" };
+    if (pets < 50) return { lvl: 3, title: "Друзья 🐱💖", next: 50, prev: 25, color: "#F59E0B" };
+    if (pets < 100) return { lvl: 4, title: "Лучшие друзья! 🌟", next: 100, prev: 50, color: "#EC4899" };
+    return { lvl: 5, title: "Неразлейвода! 👑🏆", next: 500, prev: 100, color: "#8B5CF6" };
+  }, [pets]);
+
+  const petPercentage = Math.min(100, Math.max(0, ((pets - levelInfo.prev) / (levelInfo.next - levelInfo.prev)) * 100));
+
+  // 2. FORTUNE COOKIE STATE
+  const [cookieOpened, setCookieOpened] = useState(false);
+  const [cookieOpening, setCookieOpening] = useState(false);
+  const [currentPrediction, setCurrentPrediction] = useState('');
+
+  const openCookie = () => {
+    if (cookieOpening || cookieOpened) return;
+    setCookieOpening(true);
+    setTimeout(() => {
+      const idx = Math.floor(Math.random() * PREDICTIONS.length);
+      setCurrentPrediction(PREDICTIONS[idx]);
+      setCookieOpened(true);
+      setCookieOpening(false);
+    }, 600);
   };
 
-  const resetQuiz = () => {
-    setQuizIndex(0);
-    setSelectedOpt(null);
-    setQuizScore(0);
-    setQuizFinished(false);
+  const resetCookie = () => {
+    setCookieOpened(false);
+    setCurrentPrediction('');
   };
 
-  const handleTestSelect = (scoreVal) => {
-    const nextScore = testScore + scoreVal;
-    setTestScore(nextScore);
-    if (testIndex + 1 >= EMOTIONAL_QUESTIONS.length) {
-      setTestFinished(true);
-    } else {
-      setTestIndex(i => i + 1);
-    }
+  // 3. COIN CLICKER STATE
+  const [coins, setCoins] = useState(() => {
+    const saved = localStorage.getItem('vitshik_coins_count');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const [coinBursts, setCoinBursts] = useState([]);
+
+  const handleCoinClick = (e) => {
+    const nextCoins = coins + 1;
+    setCoins(nextCoins);
+    localStorage.setItem('vitshik_coins_count', nextCoins.toString());
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const id = Date.now() + Math.random();
+    setCoinBursts(prev => [...prev, { id, x, y }]);
+    setTimeout(() => {
+      setCoinBursts(prev => prev.filter(b => b.id !== id));
+    }, 700);
   };
 
-  const resetTest = () => {
-    setTestIndex(0);
-    setTestScore(0);
-    setTestFinished(false);
+  // 4. KHALYAVA CATCHER GAME STATE
+  const [khalyavaActive, setKhalyavaActive] = useState(false);
+  const [khalyavaCaught, setKhalyavaCaught] = useState(false);
+  const [khalyavaPos, setKhalyavaPos] = useState({ x: 40, y: 40 });
+  const [khalyavaScore, setKhalyavaScore] = useState(0);
+  const khalyavaTimerRef = useRef(null);
+  const khalyavaTimeoutRef = useRef(null);
+
+  const startKhalyava = () => {
+    setKhalyavaCaught(false);
+    setKhalyavaActive(true);
+    moveKhalyava();
+  };
+
+  const moveKhalyava = () => {
+    if (khalyavaTimerRef.current) clearInterval(khalyavaTimerRef.current);
+    khalyavaTimerRef.current = setInterval(() => {
+      setKhalyavaPos({
+        x: 10 + Math.random() * 75,
+        y: 10 + Math.random() * 65
+      });
+    }, 700);
+
+    if (khalyavaTimeoutRef.current) clearTimeout(khalyavaTimeoutRef.current);
+    khalyavaTimeoutRef.current = setTimeout(() => {
+      if (khalyavaTimerRef.current) clearInterval(khalyavaTimerRef.current);
+      setKhalyavaActive(false);
+    }, 8000);
+  };
+
+  const catchKhalyava = () => {
+    if (!khalyavaActive) return;
+    if (khalyavaTimerRef.current) clearInterval(khalyavaTimerRef.current);
+    if (khalyavaTimeoutRef.current) clearTimeout(khalyavaTimeoutRef.current);
+    setKhalyavaCaught(true);
+    setKhalyavaActive(false);
+    setKhalyavaScore(s => s + 1);
   };
 
   return (
@@ -152,285 +153,312 @@ export default function MiniGamesSection() {
         marginTop: '20px'
       }}
     >
+      {/* HEADER */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ background: 'rgba(0,127,255,0.1)', color: 'var(--primary)', padding: '10px', borderRadius: '12px' }}>
             <Sparkles size={22} />
           </div>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text)' }}>Адаптационные мини-игры ИВИТШ</h3>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: '#666' }}>Интерактивный квиз, эмоциональная диагностика и ачивки</p>
+            <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text)' }}>Мини-игры и Приметы ВИТШика</h3>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: '#666' }}>Погладь маскота, открой предсказание и поймай халяву!</p>
           </div>
         </div>
 
-        {/* Tab Buttons */}
-        <div style={{ display: 'flex', background: '#F1F3F5', padding: '4px', borderRadius: '12px', gap: '4px' }}>
+        {/* NAVIGATION TABS */}
+        <div style={{ display: 'flex', background: '#F1F3F5', padding: '4px', borderRadius: '12px', gap: '4px', flexWrap: 'wrap' }}>
           <button 
-            onClick={() => setActiveTab('quiz')}
+            onClick={() => setActiveTab('petting')}
             style={{
-              border: 'none',
-              padding: '8px 14px',
-              borderRadius: '8px',
-              fontWeight: '700',
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              background: activeTab === 'quiz' ? 'white' : 'transparent',
-              color: activeTab === 'quiz' ? 'var(--primary)' : '#666',
-              boxShadow: activeTab === 'quiz' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-              transition: 'all 0.2s'
+              border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: '700', fontSize: '0.82rem', cursor: 'pointer',
+              background: activeTab === 'petting' ? 'white' : 'transparent', color: activeTab === 'petting' ? 'var(--primary)' : '#666',
+              boxShadow: activeTab === 'petting' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none'
             }}
           >
-            🎯 Квиз
+            🐱 Погладь ВИТШика
           </button>
           <button 
-            onClick={() => setActiveTab('test')}
+            onClick={() => setActiveTab('cookie')}
             style={{
-              border: 'none',
-              padding: '8px 14px',
-              borderRadius: '8px',
-              fontWeight: '700',
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              background: activeTab === 'test' ? 'white' : 'transparent',
-              color: activeTab === 'test' ? 'var(--primary)' : '#666',
-              boxShadow: activeTab === 'test' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-              transition: 'all 0.2s'
+              border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: '700', fontSize: '0.82rem', cursor: 'pointer',
+              background: activeTab === 'cookie' ? 'white' : 'transparent', color: activeTab === 'cookie' ? 'var(--primary)' : '#666',
+              boxShadow: activeTab === 'cookie' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none'
             }}
           >
-            🧠 Настрой
+            🥠 Предсказание
           </button>
           <button 
-            onClick={() => setActiveTab('rewards')}
+            onClick={() => setActiveTab('coin')}
             style={{
-              border: 'none',
-              padding: '8px 14px',
-              borderRadius: '8px',
-              fontWeight: '700',
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              background: activeTab === 'rewards' ? 'white' : 'transparent',
-              color: activeTab === 'rewards' ? 'var(--primary)' : '#666',
-              boxShadow: activeTab === 'rewards' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-              transition: 'all 0.2s'
+              border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: '700', fontSize: '0.82rem', cursor: 'pointer',
+              background: activeTab === 'coin' ? 'white' : 'transparent', color: activeTab === 'coin' ? 'var(--primary)' : '#666',
+              boxShadow: activeTab === 'coin' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none'
             }}
           >
-            🏆 Ачивки
+            🪙 Монетка
+          </button>
+          <button 
+            onClick={() => setActiveTab('khalyava')}
+            style={{
+              border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: '700', fontSize: '0.82rem', cursor: 'pointer',
+              background: activeTab === 'khalyava' ? 'white' : 'transparent', color: activeTab === 'khalyava' ? 'var(--primary)' : '#666',
+              boxShadow: activeTab === 'khalyava' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none'
+            }}
+          >
+            📜 Ловец Халявы
+          </button>
+          <button 
+            onClick={() => setActiveTab('superstition')}
+            style={{
+              border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: '700', fontSize: '0.82rem', cursor: 'pointer',
+              background: activeTab === 'superstition' ? 'white' : 'transparent', color: activeTab === 'superstition' ? 'var(--primary)' : '#666',
+              boxShadow: activeTab === 'superstition' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none'
+            }}
+          >
+            🌟 Приметы
           </button>
         </div>
       </div>
 
       <AnimatePresence mode="wait">
-        {/* TAB 1: QUIZ */}
-        {activeTab === 'quiz' && (
-          <motion.div key="quiz" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-            {!quizFinished ? (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#666', marginBottom: '8px' }}>
-                  <span>Вопрос {quizIndex + 1} из {QUIZ_QUESTIONS.length}</span>
-                  <span style={{ color: 'var(--primary)', fontWeight: '700' }}>Баллы: {quizScore}</span>
-                </div>
+        {/* GAME 1: MASCOT PETTING CLICKER */}
+        {activeTab === 'petting' && (
+          <motion.div key="petting" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={{ textAlign: 'center', padding: '10px 0' }}>
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <motion.button
+                onClick={handlePetMascot}
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.92, rotate: -5 }}
+                style={{
+                  width: '110px',
+                  height: '110px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%)',
+                  border: '3px solid white',
+                  boxShadow: '0 8px 24px rgba(0,127,255,0.15)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '3.5rem',
+                  position: 'relative',
+                  margin: '0 auto'
+                }}
+              >
+                🐱
+              </motion.button>
 
-                <h4 style={{ margin: '0 0 14px 0', fontSize: '1.05rem', color: 'var(--text)' }}>
-                  {QUIZ_QUESTIONS[quizIndex].question}
-                </h4>
+              {/* Floating Hearts */}
+              {petHearts.map(h => (
+                <motion.span
+                  key={h.id}
+                  initial={{ opacity: 1, y: 0, scale: 0.8 }}
+                  animate={{ opacity: 0, y: -45, scale: 1.4 }}
+                  transition={{ duration: 0.7 }}
+                  style={{ position: 'absolute', left: h.x, top: h.y, pointerEvents: 'none', color: '#EC4899' }}
+                >
+                  <Heart size={20} fill="#EC4899" />
+                </motion.span>
+              ))}
+            </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {QUIZ_QUESTIONS[quizIndex].options.map((opt, idx) => {
-                    const isSelected = selectedOpt === idx;
-                    const isCorrect = idx === QUIZ_QUESTIONS[quizIndex].correctIndex;
-                    let bgColor = '#F8F9FA';
-                    let borderColor = '#E9ECEF';
-                    let textColor = 'var(--text)';
-
-                    if (selectedOpt !== null) {
-                      if (isCorrect) {
-                        bgColor = '#E6F4EA';
-                        borderColor = '#34A853';
-                        textColor = '#137333';
-                      } else if (isSelected) {
-                        bgColor = '#FCE8E6';
-                        borderColor = '#EA4335';
-                        textColor = '#C5221F';
-                      }
-                    }
-
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => handleQuizSelect(idx)}
-                        disabled={selectedOpt !== null}
-                        style={{
-                          textAlign: 'left',
-                          padding: '12px 16px',
-                          borderRadius: '12px',
-                          border: `1px solid ${borderColor}`,
-                          background: bgColor,
-                          color: textColor,
-                          fontWeight: '600',
-                          fontSize: '0.9rem',
-                          cursor: selectedOpt !== null ? 'default' : 'pointer',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {selectedOpt !== null && (
-                  <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} style={{ marginTop: '14px', background: '#F1F3F5', padding: '12px 14px', borderRadius: '10px', fontSize: '0.85rem', color: '#444' }}>
-                    💡 <strong>Пояснение:</strong> {QUIZ_QUESTIONS[quizIndex].explanation}
-                  </motion.div>
-                )}
-
-                {selectedOpt !== null && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '14px' }}>
-                    <button
-                      onClick={handleNextQuiz}
-                      style={{
-                        background: 'var(--primary)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '10px 20px',
-                        borderRadius: '10px',
-                        fontWeight: '700',
-                        fontSize: '0.88rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      {quizIndex + 1 === QUIZ_QUESTIONS.length ? 'Завершить квиз 🎉' : 'Следующий вопрос ➔'}
-                    </button>
-                  </div>
-                )}
+            <div style={{ marginTop: '16px', maxWidth: '380px', margin: '16px auto 0 auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem', fontWeight: '700', marginBottom: '6px' }}>
+                <span>Уровень {levelInfo.lvl}: <span style={{ color: levelInfo.color }}>{levelInfo.title}</span></span>
+                <span style={{ color: '#666', fontSize: '0.8rem' }}>{pets} поглаживаний</span>
               </div>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '8px' }}>🏆</div>
-                <h4 style={{ margin: 0, fontSize: '1.3rem', color: 'var(--primary)' }}>Квиз пройден!</h4>
-                <p style={{ margin: '6px 0 16px 0', color: '#666', fontSize: '0.92rem' }}>
-                  Вы правильно ответили на <strong>{quizScore} из {QUIZ_QUESTIONS.length}</strong> вопросов!
-                </p>
-                <button
-                  onClick={resetQuiz}
+
+              {/* Progress Bar */}
+              <div style={{ height: '10px', background: '#E9ECEF', borderRadius: '5px', overflow: 'hidden' }}>
+                <motion.div 
+                  style={{ height: '100%', background: levelInfo.color, borderRadius: '5px' }}
+                  animate={{ width: `${petPercentage}%` }}
+                  transition={{ type: 'spring', stiffness: 100 }}
+                />
+              </div>
+
+              <p style={{ fontSize: '0.82rem', color: '#777', marginTop: '8px' }}>
+                {levelInfo.lvl < 5 ? (
+                  <>Кликай на маскота! Осталось <strong>{levelInfo.next - pets}</strong> поглаживаний до нового уровня дружбы!</>
+                ) : (
+                  <>👑 Вы и ВИТШик — неразлейвода! Достигнут максимальный уровень дружбы!</>
+                )}
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* GAME 2: FORTUNE COOKIE */}
+        {activeTab === 'cookie' && (
+          <motion.div key="cookie" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={{ textAlign: 'center', padding: '16px 0' }}>
+            {!cookieOpened ? (
+              <div>
+                <motion.button
+                  onClick={openCookie}
+                  disabled={cookieOpening}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  animate={cookieOpening ? { rotate: [-10, 10, -10, 10, 0], scale: [1, 1.15, 1] } : {}}
                   style={{
-                    background: '#F1F3F5',
-                    color: 'var(--text)',
-                    border: 'none',
-                    padding: '10px 18px',
-                    borderRadius: '10px',
-                    fontWeight: '700',
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '20px',
+                    background: '#FFF3BF',
+                    border: '2px dashed #FAB005',
+                    fontSize: '2.8rem',
                     cursor: 'pointer',
-                    display: 'inline-flex',
+                    display: 'flex',
                     alignItems: 'center',
-                    gap: '6px'
+                    justifyContent: 'center',
+                    margin: '0 auto 12px auto'
                   }}
                 >
-                  <RefreshCw size={14} /> Пройти заново
-                </button>
+                  🥠
+                </motion.button>
+                <p style={{ margin: 0, fontSize: '0.92rem', color: '#555', fontWeight: '600' }}>
+                  {cookieOpening ? 'ВИТШик раскалывает печенье...' : 'Нажми на печенье, чтобы узнать предсказание!'}
+                </p>
               </div>
+            ) : (
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+                <Sparkles size={32} color="var(--primary)" style={{ marginBottom: '8px' }} />
+                <p style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text)', maxWidth: '440px', margin: '0 auto 14px auto', lineHeight: '1.4' }}>
+                  «{currentPrediction}»
+                </p>
+                <button
+                  onClick={resetCookie}
+                  style={{ background: '#F1F3F5', color: 'var(--primary)', border: 'none', padding: '8px 16px', borderRadius: '10px', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer' }}
+                >
+                  Еще одно предсказание →
+                </button>
+              </motion.div>
             )}
           </motion.div>
         )}
 
-        {/* TAB 2: EMOTIONAL DIAGNOSTIC TEST */}
-        {activeTab === 'test' && (
-          <motion.div key="test" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-            {!testFinished ? (
-              <div>
-                <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '8px' }}>
-                  Вопрос {testIndex + 1} из {EMOTIONAL_QUESTIONS.length}
-                </div>
-                <h4 style={{ margin: '0 0 14px 0', fontSize: '1.05rem', color: 'var(--text)' }}>
-                  {EMOTIONAL_QUESTIONS[testIndex].text}
-                </h4>
+        {/* GAME 3: COIN CLICKER */}
+        {activeTab === 'coin' && (
+          <motion.div key="coin" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={{ textAlign: 'center', padding: '16px 0' }}>
+            <p style={{ fontSize: '0.85rem', color: '#666', margin: '0 0 12px 0' }}>Кликай, чтобы положить монетку под пятку перед экзаменами!</p>
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <motion.button
+                onClick={handleCoinClick}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.85, rotate: 15 }}
+                style={{
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '20px',
+                  background: '#FFE8CC',
+                  border: '2px solid #FD7E14',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto'
+                }}
+              >
+                <Coins size={36} color="#FD7E14" />
+              </motion.button>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {EMOTIONAL_QUESTIONS[testIndex].options.map((opt, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleTestSelect(opt.score)}
-                      style={{
-                        textAlign: 'left',
-                        padding: '12px 16px',
-                        borderRadius: '12px',
-                        border: '1px solid #E9ECEF',
-                        background: '#F8F9FA',
-                        color: 'var(--text)',
-                        fontWeight: '600',
-                        fontSize: '0.9rem',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      {opt.text}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '8px' }}>🌟</div>
-                <h4 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--primary)' }}>
-                  {testScore >= 7 ? 'Вы отлично готовы к старту! 🔥' : testScore >= 5 ? 'Хороший уверенный настрой! 🙂' : 'Главное — не переживать, тьюторы рядом! 💪'}
-                </h4>
-                <p style={{ margin: '8px 0 16px 0', color: '#666', fontSize: '0.9rem', maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto' }}>
-                  ВИТШик и ваша группа помогут с любыми вопросами по учебе и ориентированию в институте.
-                </p>
-                <button
-                  onClick={resetTest}
-                  style={{
-                    background: '#F1F3F5',
-                    color: 'var(--text)',
-                    border: 'none',
-                    padding: '10px 18px',
-                    borderRadius: '10px',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
+              {coinBursts.map(b => (
+                <motion.span
+                  key={b.id}
+                  initial={{ opacity: 1, y: 0, scale: 1 }}
+                  animate={{ opacity: 0, y: -40, scale: 1.4 }}
+                  transition={{ duration: 0.6 }}
+                  style={{ position: 'absolute', left: b.x, top: b.y, pointerEvents: 'none' }}
                 >
-                  <RefreshCw size={14} /> Пройти снова
-                </button>
+                  <Sparkles size={16} color="#FD7E14" />
+                </motion.span>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '14px' }}>
+              <div>
+                <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#FD7E14' }}>{coins}</div>
+                <div style={{ fontSize: '0.78rem', color: '#888' }}>всего монеток</div>
               </div>
-            )}
+            </div>
           </motion.div>
         )}
 
-        {/* TAB 3: REWARDS & ACHIEVEMENTS */}
-        {activeTab === 'rewards' && (
-          <motion.div key="rewards" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-              {REWARDS.map(rw => (
-                <div
-                  key={rw.id}
+        {/* GAME 4: KHALYAVA CATCHER */}
+        {activeTab === 'khalyava' && (
+          <motion.div key="khalyava" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={{ padding: '10px 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontSize: '0.85rem', color: '#666' }}>Поймай летающую халяву за 8 секунд!</span>
+              <span style={{ fontWeight: '800', color: 'var(--primary)' }}>Поймано: {khalyavaScore}</span>
+            </div>
+
+            <div 
+              style={{ 
+                position: 'relative', 
+                height: '160px', 
+                background: '#F0F8FF', 
+                borderRadius: '14px', 
+                border: '1px border #BAE6FD', 
+                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              {!khalyavaActive && !khalyavaCaught && (
+                <button
+                  onClick={startKhalyava}
+                  style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '10px', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  Начать ловлю Халявы 📜
+                </button>
+              )}
+
+              {khalyavaActive && (
+                <motion.button
+                  animate={{ left: `${khalyavaPos.x}%`, top: `${khalyavaPos.y}%` }}
+                  transition={{ type: 'spring', stiffness: 220, damping: 18 }}
+                  onClick={catchKhalyava}
                   style={{
-                    background: rw.unlocked ? '#F0F9FF' : '#F8F9FA',
-                    border: rw.unlocked ? '1px solid #BAE6FD' : '1px dashed #DEE2E6',
-                    padding: '14px',
-                    borderRadius: '14px',
-                    opacity: rw.unlocked ? 1 : 0.7
+                    position: 'absolute',
+                    transform: 'translate(-50%, -50%)',
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '12px',
+                    background: 'var(--primary)',
+                    color: 'white',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(0,127,255,0.3)'
                   }}
                 >
-                  <div style={{ fontSize: '1.8rem', marginBottom: '4px' }}>{rw.icon}</div>
-                  <div style={{ fontWeight: '700', fontSize: '0.92rem', color: rw.unlocked ? '#0369A1' : '#666' }}>{rw.title}</div>
-                  <div style={{ fontSize: '0.78rem', color: '#777', marginTop: '2px' }}>{rw.desc}</div>
-                  <div style={{ marginTop: '8px' }}>
-                    {rw.unlocked ? (
-                      <span style={{ fontSize: '0.72rem', background: '#E0F2FE', color: '#0369A1', padding: '2px 6px', borderRadius: '6px', fontWeight: '800' }}>
-                        ✓ Разблокировано
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '0.72rem', background: '#E9ECEF', color: '#6C757D', padding: '2px 6px', borderRadius: '6px', fontWeight: '700' }}>
-                        🔒 В процессе
-                      </span>
-                    )}
-                  </div>
+                  <Scroll size={22} />
+                </motion.button>
+              )}
+
+              {khalyavaCaught && (
+                <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} style={{ textAlign: 'center' }}>
+                  <Sparkles size={28} color="var(--primary)" />
+                  <p style={{ margin: '4px 0 8px 0', fontWeight: '700', color: 'var(--primary)' }}>Поймал! Халява засчитана! 🎉</p>
+                  <button onClick={startKhalyava} style={{ background: '#E9ECEF', border: 'none', padding: '6px 14px', borderRadius: '8px', fontWeight: '700', fontSize: '0.8rem', cursor: 'pointer' }}>
+                    Еще раз
+                  </button>
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* TAB 5: SUPERSTITIONS */}
+        {activeTab === 'superstition' && (
+          <motion.div key="superstition" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {SUPERSTITIONS.map((s, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#F8F9FA', padding: '12px 16px', borderRadius: '12px', border: '1px solid #E9ECEF' }}>
+                  <span style={{ fontSize: '1.4rem' }}>{s.emoji}</span>
+                  <span style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text)' }}>{s.text}</span>
                 </div>
               ))}
             </div>
