@@ -2,16 +2,218 @@ import React, { useState } from 'react';
 import { Search, Mail, Users as UsersIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+export const OFFICIAL_IVITSH_TEACHERS = [
+  {
+    id: 1,
+    name: "Киприна Людмила Юрьевна",
+    department: "Кафедра Информационных Систем и Технологий (ИСиТ)",
+    role: "Заведующая кафедрой, кандидат технических наук, доцент",
+    email: "L_kiprina@Kosgos.ru",
+    office: "Корпус Б, каб. 214",
+    hours: "Пн-Пт 9:00-17:00 (Тел. 63-49-00 доб. 8120)",
+    courses: "Введение в направление, Архитектура ИС",
+    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/kiprina_lyu.jpg"
+  },
+  {
+    id: 2,
+    name: "Барило Илья Иванович",
+    department: "Кафедра Информационных Систем и Технологий (ИСиТ)",
+    role: "Доцент кафедры, кандидат технических наук, доцент",
+    email: "barilo_ii@kosgos.ru",
+    office: "Корпус Б, 3 этаж",
+    hours: "По расписанию пар",
+    courses: "Базы данных, Веб-технологии",
+    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/barilo_ii.jpg"
+  },
+  {
+    id: 3,
+    name: "Лустгартен Юрий Леонидович",
+    department: "Кафедра Информационных Систем и Технологий (ИСиТ)",
+    role: "Доцент кафедры, кандидат технических наук, доцент",
+    email: "lusgarten_yl@kosgos.ru",
+    office: "Корпус Б, 3 этаж",
+    hours: "По расписанию пар",
+    courses: "Математическое моделирование, Исследование операций",
+    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/lusgarten_yl.jpg"
+  },
+  {
+    id: 4,
+    name: "Красавина Мария Сергеевна",
+    department: "Кафедра Информационных Систем и Технологий (ИСиТ)",
+    role: "Доцент кафедры, кандидат технических наук, доцент",
+    email: "krasavina_ms@kosgos.ru",
+    office: "Корпус Б, 3 этаж",
+    hours: "По расписанию пар",
+    courses: "Программирование, Алгоритмы и структуры данных",
+    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/krasavina.jpg"
+  },
+  {
+    id: 5,
+    name: "Прядкина Нина Олеговна",
+    department: "Кафедра Информационных Систем и Технологий (ИСиТ)",
+    role: "Доцент кафедры, кандидат технических наук, доцент",
+    email: "pryadkina_no@kosgos.ru",
+    office: "Корпус Б, 3 этаж",
+    hours: "По расписанию пар",
+    courses: "Операционные системы, Информационная безопасность",
+    photo: "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IST/PPS/pryadkina_no.jpg"
+  },
+  {
+    id: 6,
+    name: "Смирнова Светлана Геннадьевна",
+    department: "Кафедра Информационных Систем и Технологий (ИСиТ)",
+    role: "Доцент кафедры, кандидат технических наук, доцент",
+    email: "smirnova_sg@kosgos.ru",
+    office: "Корпус Б, 3 этаж",
+    hours: "По расписанию пар",
+    courses: "Объектно-ориентированное программирование",
+    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/smirnova_sg.jpg"
+  },
+  {
+    id: 7,
+    name: "Демчинова Елена Александровна",
+    department: "Кафедра Информационных Систем и Технологий (ИСиТ)",
+    role: "Старший преподаватель кафедры",
+    email: "demchinova_ea@kosgos.ru",
+    office: "Корпус Б, 3 этаж",
+    hours: "По расписанию пар",
+    courses: "Компьютерная графика, Инженерная графика",
+    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/demchinova.jpg"
+  },
+  {
+    id: 8,
+    name: "Дорохова Жанна Викторовна",
+    department: "Кафедра Информационных Систем и Технологий (ИСиТ)",
+    role: "Старший преподаватель кафедры",
+    email: "dorohova_zhv@kosgos.ru",
+    office: "Корпус Б, 3 этаж",
+    hours: "По расписанию пар",
+    courses: "Информационные технологии, Офисные программы",
+    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/dorohova.jpg"
+  },
+  {
+    id: 9,
+    name: "Орлов Александр Валерьевич",
+    department: "Кафедра Информационных Систем и Технологий (ИСиТ)",
+    role: "Доцент кафедры, кандидат технических наук, доцент",
+    email: "orlov_av@kosgos.ru",
+    office: "Корпус Б, 3 этаж",
+    hours: "По расписанию пар",
+    courses: "Сети и телекоммуникации, Системное администрирование",
+    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/orlov.jpg"
+  },
+  {
+    id: 10,
+    name: "Мозохин Александр Евгеньевич",
+    department: "Кафедра Информационных Систем и Технологий (ИСиТ)",
+    role: "Доцент кафедры, кандидат технических наук, доцент",
+    email: "mozohin_ae@kosgos.ru",
+    office: "Корпус Б, 3 этаж",
+    hours: "По расписанию пар",
+    courses: "Параллельное программирование, Вычислительные системы",
+    photo: "https://kosgos.ru/images/INSTITUTS/nophoto.jpg"
+  },
+  {
+    id: 11,
+    name: "Логинова Анна Александровна",
+    department: "Кафедра Информационных Систем и Технологий (ИСиТ)",
+    role: "Ассистент кафедры",
+    email: "loginova_aa@kosgos.ru",
+    office: "Корпус Б, 3 этаж",
+    hours: "По расписанию пар",
+    courses: "Практикум по программированию, Лабораторные работы",
+    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/loginova_aa.jpg"
+  },
+  {
+    id: 12,
+    name: "Силенок Юрий Викторович",
+    department: "Кафедра Информационных Систем и Технологий (ИСиТ)",
+    role: "Программист ООО 'Экзактпро', Преподаватель",
+    email: "silenok_yv@kosgos.ru",
+    office: "Корпус Б, 3 этаж",
+    hours: "По расписанию пар",
+    courses: "Тестирование ПО, Промышленная разработка",
+    photo: "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IST/PPS/silenok_yv.jpg"
+  },
+  {
+    id: 13,
+    name: "Иваницкий Виталий Викторович",
+    department: "Кафедра Информационных Систем и Технологий (ИСиТ)",
+    role: "Доцент кафедры, кандидат технических наук, доцент",
+    email: "ivanickiy_vv@kosgos.ru",
+    office: "Корпус Б, 3 этаж",
+    hours: "По расписанию пар",
+    courses: "Информационные системы, Системный анализ",
+    photo: "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IST/PPS/ivanickiy_vv.jpg"
+  },
+  {
+    id: 14,
+    name: "Попова Светлана Валентиновна",
+    department: "Кафедра экономики и управления",
+    role: "Старший преподаватель кафедры экономики и управления",
+    email: "popova_sv@kosgos.ru",
+    office: "Корпус Б, 2 этаж",
+    hours: "По расписанию пар",
+    courses: "Экономика ИТ-отрасли, Менеджмент проектов",
+    photo: "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IST/PPS/Popova_SV.jpg"
+  },
+  {
+    id: 15,
+    name: "Денисов Артем Руфимович",
+    department: "Кафедра Информатики и Вычислительной Техники (ИиВТ)",
+    role: "Доцент кафедры, доктор технических наук, доцент",
+    email: "denisov_ar@kosgos.ru",
+    office: "Корпус Б, 3 этаж",
+    hours: "По расписанию пар",
+    courses: "Искусственный интеллект, Нейронные сети",
+    photo: "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IiVT/denisov.jpg"
+  },
+  {
+    id: 16,
+    name: "Дружинина Анна Григорьевна",
+    department: "Кафедра Информационных Систем и Технологий (ИСиТ)",
+    role: "Доцент кафедры, кандидат технических наук, доцент",
+    email: "druzhinina_ag@kosgos.ru",
+    office: "Корпус Б, 3 этаж",
+    hours: "По расписанию пар",
+    courses: "Проектирование ИС, Базы данных",
+    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/druzhinina.jpg"
+  },
+  {
+    id: 17,
+    name: "Кириллова Екатерина Сергеевна",
+    department: "Кафедра Информационных Систем и Технологий (ИСиТ)",
+    role: "Доцент кафедры, кандидат технических наук, доцент",
+    email: "kirillova_es@kosgos.ru",
+    office: "Корпус Б, 3 этаж",
+    hours: "По расписанию пар",
+    courses: "Математическая логика, Дискретная математика",
+    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/kirillova.jpg"
+  },
+  {
+    id: 18,
+    name: "Чувиляева Александра Сергеевна",
+    department: "Кафедра Информационных Систем и Технологий (ИСиТ)",
+    role: "Доцент кафедры, кандидат технических наук, доцент",
+    email: "chuvilyaeva_as@kosgos.ru",
+    office: "Корпус Б, 3 этаж",
+    hours: "По расписанию пар",
+    courses: "Разработка мобильных приложений, Веб-программирование",
+    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/chuvilyaeva.jpg"
+  }
+];
+
 const Teachers = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState(null);
 
-  // Read teachers from localStorage (dynamic data only)
+  // Read teachers from localStorage (fallback to official list)
   const teachersList = (() => {
     try {
       const saved = localStorage.getItem('portal_teachers');
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
+      const parsed = saved ? JSON.parse(saved) : [];
+      return parsed.length > 0 ? parsed : OFFICIAL_IVITSH_TEACHERS;
+    } catch { return OFFICIAL_IVITSH_TEACHERS; }
   })();
 
   const filteredTeachers = teachersList.filter(teacher => 
