@@ -152,16 +152,6 @@ const Profile = () => {
               />
             </div>
             <div className="login-field">
-              <label>Номер группы (опционально)</label>
-              <input 
-                type="text"
-                placeholder="24-ИСбо-1"
-                value={loginForm.group}
-                onChange={e => setLoginForm({ ...loginForm, group: e.target.value })}
-                disabled={isLoggingIn}
-              />
-            </div>
-            <div className="login-field">
               <label>Пароль СДО КГУ</label>
               <input 
                 type="password"

@@ -170,22 +170,23 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
         except Exception:
             pass
 
-    # Query EIOS API (https://eios.kosgos.ru/api/tokenauth) for dynamic EIOS profile data
-    try:
-        eios_resp = requests.post(
-            "https://eios.kosgos.ru/api/tokenauth",
-            json={"userName": username, "password": password},
-            timeout=6,
-            verify=False
-        )
-        eios_json = eios_resp.json()
-        if eios_json.get("state") == 1 and eios_json.get("data"):
-            user_obj = eios_json["data"].get("user", {})
-            eios_fio = user_obj.get("fullName") or user_obj.get("userFIO") or user_obj.get("shortFIO")
-            if eios_fio and eios_fio.lower() != username.lower():
-                fullname = eios_fio
-    except Exception:
-        pass
+    # Only fallback to EIOS API if Moodle fullname is missing or equals raw username
+    if not fullname or fullname.lower() == username.lower() or " " not in fullname:
+        try:
+            eios_resp = requests.post(
+                "https://eios.kosgos.ru/api/tokenauth",
+                json={"userName": username, "password": password},
+                timeout=6,
+                verify=False
+            )
+            eios_json = eios_resp.json()
+            if eios_json.get("state") == 1 and eios_json.get("data"):
+                data_inner = eios_json["data"].get("data", {})
+                eios_fio = data_inner.get("userName") or data_inner.get("fullName") or data_inner.get("shortFIO")
+                if eios_fio and eios_fio.lower() != username.lower():
+                    fullname = eios_fio
+        except Exception:
+            pass
 
     # 3. Query user courses if userid is available (core_enrol_get_users_courses / timeline)
     courses_list = []
