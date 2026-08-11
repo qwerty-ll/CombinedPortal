@@ -170,30 +170,8 @@ const CampusMap = () => {
         </div>
       </div>
 
-      {/* LEGEND & NAVIGATION TIPS */}
+      {/* NAVIGATION TIPS */}
       <div style={{ marginTop: '25px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ background: 'white', padding: '20px', borderRadius: '20px', border: '1px solid #e9ecef' }}>
-          <h4 style={{ margin: '0 0 12px 0', fontSize: '1.05rem', fontWeight: '800', color: 'var(--text)' }}>Обозначения на схемах ИВИТШ</h4>
-          <div className="legend-items" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
-            <div className="legend-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', color: '#555' }}>
-              <Compass size={18} color="var(--primary)" />
-              <span>Главный вход</span>
-            </div>
-            <div className="legend-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', color: '#555' }}>
-              <Navigation size={18} color="var(--primary)" />
-              <span>Лестницы</span>
-            </div>
-            <div className="legend-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', color: '#555' }}>
-              <Info size={18} color="var(--primary)" />
-              <span>Дирекция Б-209</span>
-            </div>
-            <div className="legend-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', color: '#555' }}>
-              <Activity size={18} color="var(--primary)" />
-              <span>Коворкинг ВИТШ (4 этаж)</span>
-            </div>
-          </div>
-        </div>
-
         <div style={{ display: 'flex', gap: '12px', background: 'rgba(0, 127, 255, 0.05)', padding: '16px 20px', borderRadius: '16px', border: '1px solid rgba(0, 127, 255, 0.15)' }}>
           <Info size={24} style={{ color: 'var(--primary)', flexShrink: 0, marginTop: '2px' }} />
           <div>

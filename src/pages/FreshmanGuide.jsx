@@ -30,21 +30,27 @@ const DisciplineCard = ({ subject }) => {
         boxShadow: isOpen ? `0 8px 24px ${accentColor}22` : '0 4px 12px rgba(0,0,0,0.03)',
         overflow: 'hidden',
         transition: 'all 0.25s ease',
-        borderLeft: `4px solid ${accentColor}`
+        borderLeft: `4px solid ${accentColor}`,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between'
       }}
     >
       <div 
         onClick={() => setIsOpen(!isOpen)} 
         style={{ 
           display: 'flex', 
-          justify: 'space-between', 
+          justifyContent: 'space-between', 
           alignItems: 'center', 
           cursor: 'pointer', 
           padding: '16px 18px',
-          background: isOpen ? `${accentColor}08` : 'white'
+          background: isOpen ? `${accentColor}08` : 'white',
+          height: '100%',
+          boxSizing: 'border-box'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
           <div style={{ 
             width: '42px', 
             height: '42px', 
@@ -52,17 +58,17 @@ const DisciplineCard = ({ subject }) => {
             background: `${accentColor}18`, 
             display: 'flex', 
             alignItems: 'center', 
-            justify: 'center',
+            justifyContent: 'center',
             fontSize: '1.3rem',
             flexShrink: 0 
           }}>
             {subject.emoji}
           </div>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: '800', color: 'var(--text)', lineHeight: '1.3' }}>
               {subject.name}
             </h4>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '5px', flexWrap: 'wrap' }}>
               <span style={{ 
                 fontSize: '0.72rem', 
                 fontWeight: '700', 
@@ -80,7 +86,7 @@ const DisciplineCard = ({ subject }) => {
           </div>
         </div>
 
-        <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.3 }} style={{ color: accentColor, flexShrink: 0, marginLeft: '8px' }}>
+        <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.3 }} style={{ color: accentColor, flexShrink: 0, marginLeft: '12px' }}>
           <ChevronDown size={18}/>
         </motion.div>
       </div>
