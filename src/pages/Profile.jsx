@@ -274,7 +274,7 @@ const Profile = () => {
         >
           <div className="stat-box-profile">
             <span><Compass size={18} style={{ verticalAlign: 'text-bottom', marginRight: '5px', color: 'var(--primary)' }} /> Чек-лист гида</span>
-            <h2>{checklistCompleted} / 5</h2>
+            <h2>{checklistCompleted} / 7</h2>
             <p style={{ fontSize: '0.8rem', color: '#888', margin: 0 }}>задач отмечено в Гиде</p>
           </div>
 
