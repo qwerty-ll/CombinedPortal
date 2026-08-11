@@ -16,10 +16,23 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (user) {
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+      // Verify JWT token with backend /api/v1/auth/me on app load
+      import('../services/api').then(({ authApi }) => {
+        authApi.getMe().then(res => {
+          if (res && res.role) {
+            setUser(prev => prev ? { ...prev, role: res.role, fullName: res.full_name || prev.fullName } : null);
+          }
+        }).catch(() => {
+          // Token invalid or tampered -> clear session
+          setUser(null);
+          localStorage.removeItem('portal_jwt_token');
+          localStorage.removeItem(AUTH_STORAGE_KEY);
+        });
+      }).catch(() => {});
     } else {
       localStorage.removeItem(AUTH_STORAGE_KEY);
     }
-  }, [user]);
+  }, []);
 
   // Secure Authentication via SDO KGU Backend API
   const login = async (loginInput, groupInput = '', passwordInput = '') => {
