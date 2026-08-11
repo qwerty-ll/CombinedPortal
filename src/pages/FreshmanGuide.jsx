@@ -275,7 +275,7 @@ const FreshmanGuide = () => {
                 {activeTab === 'school' && (
                   <>
                     <li><a href="https://kosgos.ru/svedeniya-ob-organizatsii/struktura-i-organy-upravleniya/instituty/institut-vysshaya-it-shkola.html" target="_blank" rel="noopener noreferrer"><Users size={16}/> Дирекция ИВИТШ (Б-209)</a></li>
-                    <li><a href="https://t.me/ivitsh_chat" target="_blank" rel="noopener noreferrer"><Send size={16}/> Telegram чат ИВИТШ</a></li>
+                    <li><a href="https://vk.com/ivitsh" target="_blank" rel="noopener noreferrer"><Send size={16}/> Официальный чат ИВИТШ</a></li>
                     <li><a href="https://vk.com/ivitsh" target="_blank" rel="noopener noreferrer"><Heart size={16}/> Группа VK ИВИТШ</a></li>
                   </>
                 )}
