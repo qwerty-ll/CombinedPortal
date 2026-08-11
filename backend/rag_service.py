@@ -75,24 +75,37 @@ KNOWLEDGE_CHUNKS = [
     }
 ]
 
-def evaluate_query(query: str):
-    q_lower = query.lower().strip()
-    q_words = re.findall(r"\w{2,}", q_lower)
+    # 1. Exact match for classroom numbers (101-409)
+    room_match = re.search(r"\b(101|102|104|107|108|201|202|203|204|206|207|208|209|301|302|303|304|306|307|308|309|310|312|313|401|403|406|407|408|409)\b", q_lower)
+    if room_match:
+        room_num = room_match.group(1)
+        floor_map = {'1': '1 этаже', '2': '2 этаже', '3': '3 этаже', '4': '4 этаже'}
+        floor = floor_map.get(room_num[0], 'соответствующем этаже')
+        extra = ' (Дирекция ИВИТШ КГУ)' if room_num == '209' else ''
+        return 100, {
+            "keywords": [room_num],
+            "content": f"Аудитория {room_num}{extra} находится на **{floor} Корпуса Б** (ул. Ивановская, 24а).\n\n[IMG:{room_num}.png]"
+        }
+
+    # 2. Food query direct match
+    if any(k in q_lower for k in ("поесть", "голоден", "столов", "еда", "шаурм", "обед")):
+        return 100, KNOWLEDGE_CHUNKS[4]
 
     best_match = None
     max_score = 0
+
+    stop_words = {"где", "как", "находиться", "находится", "какой", "какая", "пожалуйста"}
 
     for chunk in KNOWLEDGE_CHUNKS:
         score = 0
         for kw in chunk["keywords"]:
             if kw in q_lower:
-                # Heavy weight for exact classroom numbers or audit/room keywords
                 if re.match(r"^\d{3}$", kw):
-                    score += 25
+                    score += 35
                 else:
                     score += 8
         for w in q_words:
-            if len(w) >= 3 and w in chunk["content"].lower():
+            if w not in stop_words and len(w) >= 3 and w in chunk["content"].lower():
                 score += 2
         if score > max_score:
             max_score = score

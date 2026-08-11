@@ -135,6 +135,28 @@ export const KNOWLEDGE_TEXT = `
 export const searchKnowledgeBase = (query) => {
   if (!query || !query.trim()) return '';
 
+  const queryLower = query.toLowerCase().trim();
+
+  // 1. Direct match for specific classroom numbers (101-409)
+  const roomMatch = queryLower.match(/\b(101|102|104|107|108|201|202|203|204|206|207|208|209|301|302|303|304|306|307|308|309|310|312|313|401|403|406|407|408|409)\b/);
+  if (roomMatch) {
+    const roomNum = roomMatch[1];
+    const floorMap = {
+      '1': '1 этаже',
+      '2': '2 этаже',
+      '3': '3 этаже',
+      '4': '4 этаже'
+    };
+    const floor = floorMap[roomNum[0]] || 'соответствующем этаже';
+    const extra = roomNum === '209' ? ' (Дирекция ИВИТШ КГУ)' : '';
+    return `### Аудитория ${roomNum}\nАудитория ${roomNum}${extra} находится на **${floor} Корпуса Б** (ул. Ивановская, 24а).\n\n[IMG:${roomNum}.png]`;
+  }
+
+  // 2. Direct match for food queries
+  if (queryLower.includes('поесть') || queryLower.includes('голоден') || queryLower.includes('столов') || queryLower.includes('еда') || queryLower.includes('шаурм') || queryLower.includes('обед')) {
+    return `### Где поесть рядом\n- **Жуй да Ешь** (от 100р): ул. Советская, 42/1.\n- **Шаурмастер44** (от 140р): ул. Советская, 61/39.\n- **Еда-кафе** (от 150р): ул. Лермонтова, 3/1.\n- **Coffee Like**: ул. Советская, 26/1.\n- **Магазины**: Пятёрочка (Советская, 47), Высшая лига (Советская, 61 и 22).`;
+  }
+
   const rawChunks = KNOWLEDGE_TEXT.split(/===\s*(.*?)\s*===/);
   const chunks = [];
 
@@ -146,8 +168,7 @@ export const searchKnowledgeBase = (query) => {
     }
   }
 
-  const queryLower = query.toLowerCase();
-  const queryWords = queryLower.match(/[а-яА-ЯёЁa-zA-Z]{3,}/g) || [];
+  const queryWords = queryLower.match(/[а-яА-ЯёЁa-zA-Z0-9]{2,}/g) || [];
 
   const scoredChunks = [];
   for (const chunk of chunks) {
@@ -157,8 +178,9 @@ export const searchKnowledgeBase = (query) => {
 
     // Word matching
     for (const word of queryWords) {
+      if (word === 'где' || word === 'как' || word === 'находиться') continue;
       if (headerLower.includes(word)) score += 6;
-      if (contentLower.includes(word)) score += 2;
+      if (contentLower.includes(word)) score += 3;
     }
 
     // Exact phrase bonus
