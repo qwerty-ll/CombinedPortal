@@ -2,6 +2,7 @@ import os
 from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 import requests
@@ -383,29 +384,55 @@ def get_forum_questions(
 
     questions = query.order_by(models.ForumQuestion.is_pinned.desc(), models.ForumQuestion.created_at.desc()).all()
 
+    q_ids = [q.id for q in questions]
+    votes_dict = {}
+    answers_dict = {}
+    user_votes_dict = {}
+
+    if q_ids:
+        # Batch votes aggregation
+        votes_query = (
+            db.query(models.Vote.question_id, models.Vote.vote_type, func.count(models.Vote.id))
+            .filter(models.Vote.question_id.in_(q_ids))
+            .group_by(models.Vote.question_id, models.Vote.vote_type)
+            .all()
+        )
+        for q_id, v_type, count in votes_query:
+            if q_id not in votes_dict:
+                votes_dict[q_id] = 0
+            votes_dict[q_id] += count if v_type == 1 else -count
+
+        # Batch answers aggregation
+        answers_query = (
+            db.query(models.ForumAnswer.question_id, func.count(models.ForumAnswer.id))
+            .filter(models.ForumAnswer.question_id.in_(q_ids))
+            .group_by(models.ForumAnswer.question_id)
+            .all()
+        )
+        answers_dict = {q_id: count for q_id, count in answers_query}
+
+        # Batch user votes
+        if current_user:
+            u_votes = (
+                db.query(models.Vote.question_id, models.Vote.vote_type)
+                .filter(models.Vote.question_id.in_(q_ids), models.Vote.user_id == current_user.id)
+                .all()
+            )
+            user_votes_dict = {q_id: v_type for q_id, v_type in u_votes}
+
     result = []
     for q in questions:
-        upvotes = db.query(models.Vote).filter(models.Vote.question_id == q.id, models.Vote.vote_type == 1).count()
-        downvotes = db.query(models.Vote).filter(models.Vote.question_id == q.id, models.Vote.vote_type == -1).count()
-        answers_count = db.query(models.ForumAnswer).filter(models.ForumAnswer.question_id == q.id).count()
-
-        user_vote = 0
-        if current_user:
-            v = db.query(models.Vote).filter(models.Vote.question_id == q.id, models.Vote.user_id == current_user.id).first()
-            if v:
-                user_vote = v.vote_type
-
         result.append(schemas.ForumQuestionResponse(
             id=q.id,
             author_id=q.author_id,
-            author_name=q.author.full_name,
+            author_name=q.author.full_name if q.author else "Студент",
             title=q.title,
             category=q.category,
             content=q.content,
             views_count=q.views_count,
-            votes_count=upvotes - downvotes,
-            answers_count=answers_count,
-            user_vote=user_vote,
+            votes_count=votes_dict.get(q.id, 0),
+            answers_count=answers_dict.get(q.id, 0),
+            user_vote=user_votes_dict.get(q.id, 0),
             is_pinned=q.is_pinned,
             created_at=q.created_at
         ))

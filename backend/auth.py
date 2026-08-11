@@ -1,4 +1,5 @@
 import os
+import hashlib
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
@@ -13,23 +14,28 @@ import models
 
 load_dotenv()
 
-import hashlib
-
 SECRET_KEY = os.getenv("SECRET_KEY", "ksu_ivitsh_super_secret_jwt_key_2026")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "43200"))
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     if not plain_password or not hashed_password:
         return False
+    # If bcrypt hash
     if hashed_password.startswith("$2"):
-        return True
-    return get_password_hash(plain_password) == hashed_password
+        try:
+            return pwd_context.verify(plain_password, hashed_password)
+        except Exception:
+            return False
+    # Legacy SHA256 hash
+    sha256_hash = hashlib.sha256((plain_password or "").encode("utf-8")).hexdigest()
+    return sha256_hash == hashed_password
 
 def get_password_hash(password: str) -> str:
-    return hashlib.sha256((password or "").encode("utf-8")).hexdigest()
+    return pwd_context.hash(password or "")
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
