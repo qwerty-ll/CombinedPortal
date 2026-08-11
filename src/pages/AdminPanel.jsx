@@ -475,34 +475,50 @@ const AdminPanel = () => {
             <div className="admin-items-list">
               {usersList.length === 0 ? (
                 <div className="admin-empty">Нет зарегистрированных пользователей.</div>
-              ) : usersList.map(u => (
-                <div key={u.id} className="admin-item-row" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div className="admin-item-info">
-                    <h4 style={{ margin: 0 }}>{u.full_name || u.username}</h4>
-                    <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#777' }}>
-                      Логин: <strong>{u.username}</strong> • Группа: {u.group_number || 'Не указана'}
-                    </p>
+              ) : usersList.map(u => {
+                const isSuperAdmin = ['ivitsh_admin', 'admin', 'smirnovmakar'].includes(u.username.toLowerCase());
+                return (
+                  <div key={u.id} className="admin-item-row" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div className="admin-item-info">
+                      <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {u.full_name || u.username}
+                        {isSuperAdmin && (
+                          <span style={{ fontSize: '0.7rem', background: '#059669', color: 'white', padding: '2px 6px', borderRadius: '6px', fontWeight: '800' }}>
+                            Главный Админ
+                          </span>
+                        )}
+                      </h4>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#777' }}>
+                        Логин: <strong>{u.username}</strong> • Группа: {u.group_number || 'Не указана'}
+                      </p>
+                    </div>
+                    <div className="admin-item-actions" style={{ alignItems: 'center', gap: '8px' }}>
+                      {isSuperAdmin ? (
+                        <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#059669', padding: '6px 12px', background: '#ECFDF5', borderRadius: '8px' }}>
+                          Администратор ИВИТШ
+                        </span>
+                      ) : (
+                        <select
+                          value={u.role}
+                          onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid #CED4DA',
+                            fontSize: '0.85rem',
+                            fontWeight: '700',
+                            color: u.role === 'admin' ? '#059669' : u.role === 'moderator' ? '#007FFF' : '#495057'
+                          }}
+                        >
+                          <option value="student">Студент</option>
+                          <option value="moderator">Модератор</option>
+                          <option value="admin">Администратор</option>
+                        </select>
+                      )}
+                    </div>
                   </div>
-                  <div className="admin-item-actions" style={{ alignItems: 'center', gap: '8px' }}>
-                    <select
-                      value={u.role}
-                      onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #CED4DA',
-                        fontSize: '0.85rem',
-                        fontWeight: '700',
-                        color: u.role === 'admin' ? '#059669' : u.role === 'moderator' ? '#007FFF' : '#495057'
-                      }}
-                    >
-                      <option value="student">Студент</option>
-                      <option value="moderator">Модератор</option>
-                      <option value="admin">Администратор</option>
-                    </select>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </motion.div>
         )}

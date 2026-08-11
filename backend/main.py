@@ -124,6 +124,7 @@ def admin_login(user_in: schemas.UserLogin, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(db_user)
     else:
+        # Superadmins always maintain role='admin'
         if db_user.role != "admin":
             db_user.role = "admin"
             db.commit()
@@ -148,13 +149,19 @@ def update_user_role(
     target_user = db.query(models.User).filter(models.User.id == user_id).first()
     if not target_user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    # Security Guard 1: Prevent self-demotion or self-role change
+    if target_user.id == current_user.id or target_user.username.lower() == current_user.username.lower():
+        raise HTTPException(status_code=400, detail="Нельзя изменить собственную роль администратора")
+
+    # Security Guard 2: Protect system superadmin accounts
+    if target_user.username.lower() in ("ivitsh_admin", "admin", "smirnovmakar"):
+        raise HTTPException(status_code=400, detail="Нельзя изменять роль Главного Администратора ИВИТШ")
+
     target_user.role = req.role
     db.commit()
     db.refresh(target_user)
     return target_user
-
-    token = auth.create_access_token(data={"sub": db_user.username})
-    return schemas.TokenResponse(access_token=token, user=db_user)
 
 @app.post("/api/v1/auth/sdo-login", response_model=schemas.TokenResponse)
 def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
