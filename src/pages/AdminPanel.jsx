@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  BellRing, Users, HelpCircle, MessageSquare, Plus, Pencil, Trash2, X, Save, Shield
+  BellRing, Users, HelpCircle, MessageSquare, Plus, Pencil, Trash2, X, Save, Shield, UserCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { adminApi } from '../services/api';
 
 // --- Data access helpers (future: replace with API calls) ---
 const getFromStorage = (key, fallback = []) => {
@@ -23,13 +24,28 @@ const AdminPanel = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('announcements');
+  const [usersList, setUsersList] = useState([]);
 
   // Redirect non-admins
   useEffect(() => {
     if (!isAdmin) {
       navigate('/');
+      return;
     }
+    adminApi.getUsers().then(res => {
+      if (Array.isArray(res)) setUsersList(res);
+    }).catch(e => console.warn('Failed to load users for admin:', e));
   }, [isAdmin, navigate]);
+
+  const handleRoleChange = async (userId, newRole) => {
+    try {
+      const updated = await adminApi.updateUserRole(userId, newRole);
+      setUsersList(prev => prev.map(u => u.id === userId ? { ...u, role: updated.role } : u));
+      toast.show(`Роль пользователя обновлена на ${newRole}`, 'success');
+    } catch (err) {
+      toast.show(err.message || 'Ошибка изменения роли', 'warning');
+    }
+  };
 
   // --- ANNOUNCEMENTS ---
   const [announcements, setAnnouncements] = useState(() => getFromStorage('portal_announcements'));
@@ -216,6 +232,7 @@ const AdminPanel = () => {
     { id: 'teachers', label: 'Преподаватели', icon: <Users size={18} />, count: teachers.length },
     { id: 'faq', label: 'FAQ', icon: <HelpCircle size={18} />, count: faqItems.length },
     { id: 'forum', label: 'Модерация форума', icon: <MessageSquare size={18} />, count: forumQuestions.length },
+    { id: 'users', label: 'Пользователи и Роли', icon: <UserCheck size={18} />, count: usersList.length },
   ];
 
   return (
@@ -438,6 +455,51 @@ const AdminPanel = () => {
                   </div>
                   <div className="admin-item-actions">
                     <button onClick={() => handleDeleteForumQuestion(q.id)} title="Удалить тему" className="danger"><Trash2 size={16} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* USERS & ROLES TAB */}
+        {activeTab === 'users' && (
+          <motion.div key="users" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+            <div className="admin-section-card">
+              <h3>Управление ролями пользователей</h3>
+              <p style={{ color: '#666', fontSize: '0.9rem', margin: 0 }}>
+                Вы можете назначать права Администратора или Модератора зарегистрированным студентам ИВИТШ.
+              </p>
+            </div>
+
+            <div className="admin-items-list">
+              {usersList.length === 0 ? (
+                <div className="admin-empty">Нет зарегистрированных пользователей.</div>
+              ) : usersList.map(u => (
+                <div key={u.id} className="admin-item-row" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div className="admin-item-info">
+                    <h4 style={{ margin: 0 }}>{u.full_name || u.username}</h4>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#777' }}>
+                      Логин: <strong>{u.username}</strong> • Группа: {u.group_number || 'Не указана'}
+                    </p>
+                  </div>
+                  <div className="admin-item-actions" style={{ alignItems: 'center', gap: '8px' }}>
+                    <select
+                      value={u.role}
+                      onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #CED4DA',
+                        fontSize: '0.85rem',
+                        fontWeight: '700',
+                        color: u.role === 'admin' ? '#059669' : u.role === 'moderator' ? '#007FFF' : '#495057'
+                      }}
+                    >
+                      <option value="student">Студент</option>
+                      <option value="moderator">Модератор</option>
+                      <option value="admin">Администратор</option>
+                    </select>
                   </div>
                 </div>
               ))}

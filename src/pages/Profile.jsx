@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Mail, GraduationCap, Award, Compass, MessageSquare, Star, CheckCircle2, 
-  Lock, RefreshCw, LogIn, Shield, LogOut, FileText, Download, User, Camera, BookOpen, Edit3, Check
+  Lock, RefreshCw, LogIn, Shield, LogOut, FileText, Download, User, Camera, BookOpen, Edit3, Check, UserCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import MiniGamesSection from '../components/MiniGamesSection';
 
 const Profile = () => {
-  const { user, isLoggedIn, login, logout, setRole, updateUserProfile } = useAuth();
+  const { user, isLoggedIn, login, adminLogin, logout, updateUserProfile } = useAuth();
   const toast = useToast();
 
   // Login form states
-  const [loginForm, setLoginForm] = useState({ username: '', group: '', password: '' });
+  const [loginMode, setLoginMode] = useState('sdo'); // 'sdo' | 'staff'
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
@@ -56,23 +58,29 @@ const Profile = () => {
     setIsLoggingIn(true);
     
     if (!loginForm.username.trim()) {
-      setLoginError('Введите логин СДО КГУ');
+      setLoginError(loginMode === 'sdo' ? 'Введите логин СДО КГУ' : 'Введите логин администратора');
       setIsLoggingIn(false);
       return;
     }
 
     try {
-      const res = await login(loginForm.username, loginForm.group, loginForm.password);
+      let res;
+      if (loginMode === 'staff') {
+        res = await adminLogin(loginForm.username, loginForm.password);
+      } else {
+        res = await login(loginForm.username, '', loginForm.password);
+      }
+
       if (res && res.error) {
         setLoginError(res.error);
         setIsLoggingIn(false);
         return;
       }
 
-      toast.show(`Вы вошли через СДО как ${res.fullName}`, 'success');
-      setLoginForm({ username: '', group: '', password: '' });
+      toast.show(`Успешный вход: ${res.fullName}`, 'success');
+      setLoginForm({ username: '', password: '' });
     } catch (err) {
-      setLoginError(err.message || 'Ошибка подключения к СДО КГУ');
+      setLoginError(err.message || 'Ошибка авторизации');
     } finally {
       setIsLoggingIn(false);
     }
@@ -80,24 +88,25 @@ const Profile = () => {
 
   const handleLogout = () => {
     logout();
-    toast.show('Вы вышли из аккаунта СДО', 'info');
+    toast.show('Вы вышли из аккаунта', 'info');
   };
 
   const handleAvatarUpload = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.show('Размер файла не должен превышать 5МБ', 'warning');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        updateUserProfile({ photoUrl: reader.result });
-        setAvatarLoadError(false);
-        toast.show('Аватар обновлен', 'success');
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.show('Файл слишком большой! Максимальный размер 2МБ', 'warning');
+      return;
     }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      updateUserProfile({ photoUrl: reader.result });
+      setAvatarLoadError(false);
+      toast.show('Фотография профиля успешно обновлена!', 'success');
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSendFeedback = (e) => {
@@ -118,7 +127,7 @@ const Profile = () => {
     }
   };
 
-  // --- NOT LOGGED IN: SHOW SDO KGU LOGIN FORM ---
+  // --- NOT LOGGED IN: SHOW LOGIN FORM WITH MODE SWITCHER ---
   if (!isLoggedIn) {
     return (
       <div className="container">
@@ -131,20 +140,62 @@ const Profile = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
+          {/* Mode Switcher Tabs */}
+          <div style={{ display: 'flex', background: '#F1F3F5', padding: '4px', borderRadius: '14px', marginBottom: '20px', gap: '4px' }}>
+            <button
+              type="button"
+              onClick={() => { setLoginMode('sdo'); setLoginError(''); }}
+              style={{
+                flex: 1,
+                border: 'none',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                fontWeight: '700',
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                background: loginMode === 'sdo' ? 'white' : 'transparent',
+                color: loginMode === 'sdo' ? 'var(--primary)' : '#666',
+                boxShadow: loginMode === 'sdo' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.2s'
+              }}
+            >
+              🎓 Студент СДО КГУ
+            </button>
+            <button
+              type="button"
+              onClick={() => { setLoginMode('staff'); setLoginError(''); }}
+              style={{
+                flex: 1,
+                border: 'none',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                fontWeight: '700',
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                background: loginMode === 'staff' ? 'white' : 'transparent',
+                color: loginMode === 'staff' ? '#059669' : '#666',
+                boxShadow: loginMode === 'staff' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.2s'
+              }}
+            >
+              🛡️ Сотрудник ИВИТШ
+            </button>
+          </div>
+
           <div className="login-card-header">
-            <div className="login-icon-box" style={{ background: 'rgba(0,127,255,0.1)', color: 'var(--primary)' }}>
-              <GraduationCap size={32} />
+            <div className="login-icon-box" style={{ background: loginMode === 'staff' ? 'rgba(5,150,105,0.1)' : 'rgba(0,127,255,0.1)', color: loginMode === 'staff' ? '#059669' : 'var(--primary)' }}>
+              {loginMode === 'staff' ? <UserCheck size={32} /> : <GraduationCap size={32} />}
             </div>
-            <h2>Вход через СДО КГУ</h2>
-            <p>Авторизация через единый сервис sdo.kosgos.ru</p>
+            <h2>{loginMode === 'staff' ? 'Вход для Администрации ИВИТШ' : 'Вход через СДО КГУ'}</h2>
+            <p>{loginMode === 'staff' ? 'Служебная авторизация администраторов и деканата' : 'Авторизация через единый сервис sdo.kosgos.ru'}</p>
           </div>
 
           <form onSubmit={handleLogin} className="login-form">
             <div className="login-field">
-              <label>Логин СДО КГУ</label>
+              <label>{loginMode === 'staff' ? 'Логин администратора' : 'Логин СДО КГУ'}</label>
               <input 
                 type="text"
-                placeholder="Логин в sdo.kosgos.ru (напр. student)"
+                placeholder={loginMode === 'staff' ? 'Учетная запись деканата' : 'Логин в sdo.kosgos.ru (напр. student)'}
                 value={loginForm.username}
                 onChange={e => setLoginForm({ ...loginForm, username: e.target.value })}
                 required
@@ -152,24 +203,25 @@ const Profile = () => {
               />
             </div>
             <div className="login-field">
-              <label>Пароль СДО КГУ</label>
+              <label>Пароль</label>
               <input 
                 type="password"
                 placeholder="••••••••"
                 value={loginForm.password}
                 onChange={e => setLoginForm({ ...loginForm, password: e.target.value })}
                 disabled={isLoggingIn}
+                required
               />
             </div>
 
             {loginError && <div className="login-error">{loginError}</div>}
 
-            <button type="submit" className="btn-auth login-submit" disabled={isLoggingIn}>
+            <button type="submit" className="btn-auth login-submit" disabled={isLoggingIn} style={{ background: loginMode === 'staff' ? '#059669' : 'var(--primary)' }}>
               {isLoggingIn ? (
-                <>Проверка в СДО КГУ...</>
+                <>Проверка авторизации...</>
               ) : (
                 <>
-                  <Lock size={16} /> Войти через СДО
+                  <Lock size={16} /> {loginMode === 'staff' ? 'Войти в админку' : 'Войти через СДО'}
                 </>
               )}
             </button>
@@ -285,52 +337,8 @@ const Profile = () => {
           </div>
         </motion.section>
 
-        {/* CURATOR FEEDBACK */}
-        <motion.section 
-          className="curator-profile-section"
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <h3>Оценить куратора</h3>
-          <p style={{ fontSize: '0.9rem', color: '#666', margin: '0 0 15px 0' }}>
-            Оставьте отзыв о работе вашего куратора. Данные будут доступны администрации.
-          </p>
-          
-          <div className="curator-rating-section">
-            <div className="rating-stars-container">
-              {[1, 2, 3, 4, 5].map((starIndex) => {
-                const isActive = starIndex <= (hoverRating || rating);
-                return (
-                  <button
-                    key={starIndex}
-                    type="button"
-                    className={`star-icon-btn ${isActive ? 'active' : ''}`}
-                    onClick={() => setRating(starIndex)}
-                    onMouseEnter={() => setHoverRating(starIndex)}
-                    onMouseLeave={() => setHoverRating(0)}
-                    title={`Оценить на ${starIndex} звёзд`}
-                  >
-                    <Star size={24} fill={isActive ? '#FFC107' : 'none'} />
-                  </button>
-                );
-              })}
-            </div>
-
-            <form onSubmit={handleSendFeedback} className="curator-feedback-form">
-              <textarea
-                placeholder="Оставьте ваш отзыв о работе куратора..."
-                value={feedbackText}
-                onChange={(e) => setFeedbackText(e.target.value)}
-                maxLength={500}
-                required
-              />
-              <button type="submit" className="btn-send-feedback">
-                Отправить отзыв
-              </button>
-            </form>
-          </div>
-        </motion.section>
+        {/* ADAPTATION MINI-GAMES */}
+        <MiniGamesSection />
 
         {/* RESET PROGRESS */}
         <motion.section 

@@ -106,6 +106,33 @@ export const AuthProvider = ({ children }) => {
     return { error: 'Не удалось получить данные профиля из СДО КГУ' };
   };
 
+  const adminLogin = async (username, password) => {
+    try {
+      const { authApi } = await import('../services/api');
+      const res = await authApi.adminLogin(username.trim(), password);
+      if (res && res.user) {
+        const adminUser = {
+          id: res.user.id,
+          username: res.user.username,
+          fullName: res.user.full_name,
+          group: res.user.group_number || 'Деканат ИВИТШ',
+          role: res.user.role || 'admin',
+          photoUrl: res.user.userpictureurl || '',
+          createdAt: new Date().toISOString()
+        };
+        setUser(adminUser);
+        if (res.access_token) {
+          localStorage.setItem('portal_jwt_token', res.access_token);
+        }
+        return adminUser;
+      }
+    } catch (err) {
+      console.warn('[Admin Auth] Login failed:', err.message);
+      return { error: err.message || 'Неверный логин или пароль администратора' };
+    }
+    return { error: 'Ошибка входа в систему администрации' };
+  };
+
   const logout = () => {
     setUser(null);
     localStorage.removeItem('portal_jwt_token');

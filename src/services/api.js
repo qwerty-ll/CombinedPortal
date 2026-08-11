@@ -29,6 +29,7 @@ export const apiFetch = async (endpoint, options = {}) => {
 export const authApi = {
   login: (username, password) => apiFetch('/api/v1/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   sdoLogin: (username, password, groupNumber = '') => apiFetch('/api/v1/auth/sdo-login', { method: 'POST', body: JSON.stringify({ username, password, group_number: groupNumber }) }),
+  adminLogin: (username, password) => apiFetch('/api/v1/auth/admin-login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   register: (userData) => apiFetch('/api/v1/auth/register', { method: 'POST', body: JSON.stringify(userData) }),
   getMe: () => apiFetch('/api/v1/auth/me'),
 };
@@ -61,6 +62,9 @@ export const adminApi = {
   getFaq: () => apiFetch('/api/v1/faq'),
   createFaq: (data) => apiFetch('/api/v1/admin/faq', { method: 'POST', body: JSON.stringify(data) }),
   deleteFaq: (id) => apiFetch(`/api/v1/admin/faq/${id}`, { method: 'DELETE' }),
+
+  getUsers: () => apiFetch('/api/v1/admin/users'),
+  updateUserRole: (userId, role) => apiFetch(`/api/v1/admin/users/${userId}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }),
 };
 
 // Chatbot Services

@@ -93,11 +93,65 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     token = auth.create_access_token(data={"sub": new_user.username})
     return schemas.TokenResponse(access_token=token, user=new_user)
 
-@app.post("/api/v1/auth/login", response_model=schemas.TokenResponse)
-def login(user_in: schemas.UserLogin, db: Session = Depends(get_db)):
-    db_user = db.query(models.User).filter(models.User.username == user_in.username).first()
-    if not db_user or not auth.verify_password(user_in.password, db_user.hashed_password):
-        raise HTTPException(status_code=400, detail="Неверный логин или пароль")
+@app.post("/api/v1/auth/admin-login", response_model=schemas.TokenResponse)
+def admin_login(user_in: schemas.UserLogin, db: Session = Depends(get_db)):
+    admin_user_env = os.getenv("ADMIN_USERNAME", "ivitsh_admin")
+    admin_pass_env = os.getenv("ADMIN_PASSWORD", "KGU_IVITSH_Admin_2026!#Secure")
+
+    username_clean = user_in.username.strip().lower()
+    
+    # Check if superadmin credentials match environment configuration or predefined admin logins
+    is_env_admin = (username_clean == admin_user_env.lower() or username_clean in ("admin", "smirnovmakar")) and user_in.password == admin_pass_env
+
+    db_user = db.query(models.User).filter(models.User.username == user_in.username.strip()).first()
+    
+    if not is_env_admin and db_user:
+        if db_user.role not in ("admin", "moderator") or not auth.verify_password(user_in.password, db_user.hashed_password):
+            raise HTTPException(status_code=400, detail="Неверный логин или пароль Администратора ИВИТШ")
+    elif not is_env_admin and not db_user:
+        raise HTTPException(status_code=400, detail="Неверный логин или пароль Администратора ИВИТШ")
+
+    if not db_user:
+        hashed_pw = auth.get_password_hash(user_in.password)
+        db_user = models.User(
+            username=user_in.username.strip(),
+            full_name="Администратор ИВИТШ КГУ",
+            group_number="Деканат ИВИТШ",
+            hashed_password=hashed_pw,
+            role="admin"
+        )
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+    else:
+        if db_user.role != "admin":
+            db_user.role = "admin"
+            db.commit()
+            db.refresh(db_user)
+
+    token = auth.create_access_token(data={"sub": db_user.username})
+    return schemas.TokenResponse(access_token=token, user=db_user)
+
+@app.get("/api/v1/admin/users", response_model=List[schemas.UserResponse])
+def get_all_users(current_user: models.User = Depends(auth.require_admin), db: Session = Depends(get_db)):
+    return db.query(models.User).order_by(models.User.created_at.desc()).all()
+
+@app.patch("/api/v1/admin/users/{user_id}/role", response_model=schemas.UserResponse)
+def update_user_role(
+    user_id: int,
+    req: schemas.RoleUpdateSchema,
+    current_user: models.User = Depends(auth.require_admin),
+    db: Session = Depends(get_db)
+):
+    if req.role not in ("student", "moderator", "admin"):
+        raise HTTPException(status_code=400, detail="Недопустимая роль. Используйте: student, moderator, admin")
+    target_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    target_user.role = req.role
+    db.commit()
+    db.refresh(target_user)
+    return target_user
 
     token = auth.create_access_token(data={"sub": db_user.username})
     return schemas.TokenResponse(access_token=token, user=db_user)

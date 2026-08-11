@@ -40,6 +40,9 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user: UserResponse
 
+class RoleUpdateSchema(BaseModel):
+    role: str
+
 # --- Forum Schemas ---
 class ForumAnswerCreate(BaseModel):
     content: str
