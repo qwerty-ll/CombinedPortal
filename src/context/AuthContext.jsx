@@ -170,6 +170,7 @@ export const AuthProvider = ({ children }) => {
       isModerator,
       canModerate,
       login,
+      adminLogin,
       logout,
       setRole,
       updateUserProfile
