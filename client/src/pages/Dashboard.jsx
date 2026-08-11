@@ -93,8 +93,16 @@ const Dashboard = () => {
   const completedCount = completedTaskIds.length;
   const progressPercent = Math.round((completedCount / initialTasks.length) * 100);
 
-  // Greeting based on auth state
-  const greetingName = isLoggedIn ? user.fullName.split(' ')[0] : null;
+  // Greeting based on auth state (formats "Фамилия Имя Отчество" -> "Имя Фамилия" or full name)
+  const greetingName = isLoggedIn
+    ? (() => {
+        const parts = (user.fullName || '').trim().split(/\s+/);
+        if (parts.length >= 2) {
+          return `${parts[1]} ${parts[0]}`; // e.g. "Макар Смирнов"
+        }
+        return user.fullName || user.username;
+      })()
+    : null;
 
   return (
     <div className="container">

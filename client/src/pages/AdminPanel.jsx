@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { adminApi } from '../services/api';
+import { OFFICIAL_IVITSH_TEACHERS } from './Teachers';
 
 // --- Data access helpers (future: replace with API calls) ---
 const getFromStorage = (key, fallback = []) => {
@@ -96,7 +97,7 @@ const AdminPanel = () => {
   };
 
   // --- TEACHERS ---
-  const [teachers, setTeachers] = useState(() => getFromStorage('portal_teachers'));
+  const [teachers, setTeachers] = useState(() => getFromStorage('portal_teachers', OFFICIAL_IVITSH_TEACHERS));
   const [teacherForm, setTeacherForm] = useState({
     name: '', department: '', role: '', email: '', office: '', hours: '', courses: '', photo: ''
   });

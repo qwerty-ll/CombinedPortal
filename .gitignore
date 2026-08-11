@@ -5,6 +5,7 @@ node_modules/
 .pnpm-store/
 venv/
 .venv/
+server/venv/
 env/
 ENV/
 env.bak/
@@ -24,7 +25,9 @@ __pycache__/
 *.sqlite
 *.sqlite3
 backend/portal.db*
+server/portal.db*
 backend_data/
+server_data/
 sqlite_data/
 
 # ==========================================
