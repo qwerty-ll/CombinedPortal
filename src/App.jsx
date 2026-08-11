@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, X, Send, XCircle, Menu, ExternalLink, MapPin, Maximize2 } from 'lucide-react';
@@ -9,16 +9,25 @@ import { searchKnowledgeBase, mapImageNameToPath } from './data/knowledgeData';
 import Sidebar from './components/Sidebar';
 import BackgroundDecor from './components/BackgroundDecor';
 
-// Pages
-import Dashboard from './pages/Dashboard';
-import FreshmanGuide from './pages/FreshmanGuide';
-import Forum from './pages/Forum';
-import QuestionDetail from './pages/QuestionDetail';
-import CampusMap from './pages/CampusMap';
-import Teachers from './pages/Teachers';
-import FaqPage from './pages/FaqPage';
-import Profile from './pages/Profile';
-import AdminPanel from './pages/AdminPanel';
+// Lazy Loaded Pages for Optimal Bundle Splitting
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const FreshmanGuide = lazy(() => import('./pages/FreshmanGuide'));
+const Forum = lazy(() => import('./pages/Forum'));
+const QuestionDetail = lazy(() => import('./pages/QuestionDetail'));
+const CampusMap = lazy(() => import('./pages/CampusMap'));
+const Teachers = lazy(() => import('./pages/Teachers'));
+const FaqPage = lazy(() => import('./pages/FaqPage'));
+const Profile = lazy(() => import('./pages/Profile'));
+const AdminPanel = lazy(() => import('./pages/AdminPanel'));
+
+// Fallback Spinner Loader
+const PageLoader = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', color: 'var(--primary)' }}>
+    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}>
+      <MessageCircle size={32} />
+    </motion.div>
+  </div>
+);
 
 function App() {
   const location = useLocation();
@@ -187,17 +196,19 @@ function App() {
 
       {/* MAIN CONTENT AREA */}
       <main className={`game-map ${isSidebarCollapsed ? 'expanded' : ''}`}>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/guide" element={<FreshmanGuide />} />
-          <Route path="/forum" element={<Forum />} />
-          <Route path="/forum/question/:id" element={<QuestionDetail />} />
-          <Route path="/map" element={<CampusMap />} />
-          <Route path="/teachers" element={<Teachers />} />
-          <Route path="/faq" element={<FaqPage />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/admin" element={<AdminPanel />} />
-        </Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/guide" element={<FreshmanGuide />} />
+            <Route path="/forum" element={<Forum />} />
+            <Route path="/forum/question/:id" element={<QuestionDetail />} />
+            <Route path="/map" element={<CampusMap />} />
+            <Route path="/teachers" element={<Teachers />} />
+            <Route path="/faq" element={<FaqPage />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/admin" element={<AdminPanel />} />
+          </Routes>
+        </Suspense>
       </main>
 
       {/* AI ASSISTANT PANEL */}

@@ -164,15 +164,16 @@ def update_user_role(
     db.refresh(target_user)
     return target_user
 
+import httpx
+
 @app.post("/api/v1/auth/sdo-login", response_model=schemas.TokenResponse)
-def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
+async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
     username = sdo_req.username.strip()
     password = sdo_req.password.strip()
 
     if not username or not password:
         raise HTTPException(status_code=400, detail="Логин и пароль обязательны для входа через СДО")
 
-    # 1. Query Moodle Mobile token from sdo.kosgos.ru
     token_url = "https://sdo.kosgos.ru/login/token.php"
     token_params = {
         "username": username,
@@ -180,115 +181,90 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
         "service": "moodle_mobile_app"
     }
 
-    try:
-        token_resp = requests.get(token_url, params=token_params, timeout=12, verify=False)
-        token_data = token_resp.json()
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Ошибка соединения с сервером СДО КГУ: {str(e)}")
-
-    if "error" in token_data or "token" not in token_data:
-        err_msg = token_data.get("error", "Неверный логин или пароль СДО")
-        raise HTTPException(status_code=400, detail=err_msg)
-
-    wstoken = token_data["token"]
-
-    # 2. Query user profile info (core_webservice_get_site_info)
-    rest_url = "https://sdo.kosgos.ru/webservice/rest/server.php"
-    info_params = {
-        "wstoken": wstoken,
-        "moodlewsrestformat": "json",
-        "wsfunction": "core_webservice_get_site_info"
-    }
-
-    try:
-        info_resp = requests.post(rest_url, data=info_params, timeout=12, verify=False)
-        info_data = info_resp.json()
-    except Exception:
-        info_data = {}
-
-    fullname = info_data.get("fullname", "").strip() or info_data.get("username", "").strip() or username
-    userid = info_data.get("userid")
-    userpictureurl = info_data.get("userpictureurl", "")
-    department_name = ""
-
-    # Query detailed Moodle user profile if userid is available (core_user_get_users_by_field)
-    if userid:
+    async with httpx.AsyncClient(verify=False, timeout=12.0) as client:
         try:
-            u_params = {
-                "wstoken": wstoken,
-                "moodlewsrestformat": "json",
-                "wsfunction": "core_user_get_users_by_field",
-                "field": "id",
-                "values[0]": userid
-            }
-            u_resp = requests.post(rest_url, data=u_params, timeout=8, verify=False)
-            u_json = u_resp.json()
-            if isinstance(u_json, list) and len(u_json) > 0:
-                u_item = u_json[0]
-                u_fn = u_item.get("fullname") or f"{u_item.get('lastname', '')} {u_item.get('firstname', '')}".strip()
-                if u_fn and u_fn.lower() != username.lower():
-                    fullname = u_fn
-                if u_item.get("profileimageurl"):
-                    userpictureurl = u_item.get("profileimageurl")
-                if u_item.get("department"):
-                    department_name = u_item.get("department")
-        except Exception:
-            pass
+            token_resp = await client.get(token_url, params=token_params)
+            token_data = token_resp.json()
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Ошибка соединения с сервером СДО КГУ: {str(e)}")
 
-    # Only fallback to EIOS API if Moodle fullname is missing or equals raw username
-    if not fullname or fullname.lower() == username.lower() or " " not in fullname:
-        try:
-            eios_resp = requests.post(
-                "https://eios.kosgos.ru/api/tokenauth",
-                json={"userName": username, "password": password},
-                timeout=6,
-                verify=False
-            )
-            eios_json = eios_resp.json()
-            if eios_json.get("state") == 1 and eios_json.get("data"):
-                data_inner = eios_json["data"].get("data", {})
-                eios_fio = data_inner.get("userName") or data_inner.get("fullName") or data_inner.get("shortFIO")
-                if eios_fio and eios_fio.lower() != username.lower():
-                    fullname = eios_fio
-        except Exception:
-            pass
+        if "error" in token_data or "token" not in token_data:
+            err_msg = token_data.get("error", "Неверный логин или пароль СДО")
+            raise HTTPException(status_code=400, detail=err_msg)
 
-    # 3. Query user courses if userid is available (core_enrol_get_users_courses / timeline)
-    courses_list = []
-    detected_group = sdo_req.group_number.strip() if sdo_req.group_number else ""
+        wstoken = token_data["token"]
 
-    if userid:
-        course_params = {
+        rest_url = "https://sdo.kosgos.ru/webservice/rest/server.php"
+        info_params = {
             "wstoken": wstoken,
             "moodlewsrestformat": "json",
-            "wsfunction": "core_enrol_get_users_courses",
-            "userid": userid,
-            "returnusercount": 0
+            "wsfunction": "core_webservice_get_site_info"
         }
+
         try:
-            course_resp = requests.post(rest_url, data=course_params, timeout=12, verify=False)
-            course_json = course_resp.json()
-            if isinstance(course_json, list) and len(course_json) > 0:
-                courses_list = [
-                    {
-                        "id": c.get("id"),
-                        "fullname": c.get("fullname"),
-                        "shortname": c.get("shortname"),
-                        "progress": c.get("progress", 0)
-                    }
-                    for c in course_json
-                ]
-            else:
-                # Fallback to core_course_get_enrolled_courses_by_timeline_classification
-                t_params = {
+            info_resp = await client.post(rest_url, data=info_params)
+            info_data = info_resp.json()
+        except Exception:
+            info_data = {}
+
+        fullname = info_data.get("fullname", "").strip() or info_data.get("username", "").strip() or username
+        userid = info_data.get("userid")
+        userpictureurl = info_data.get("userpictureurl", "")
+        department_name = ""
+
+        if userid:
+            try:
+                u_params = {
                     "wstoken": wstoken,
                     "moodlewsrestformat": "json",
-                    "wsfunction": "core_course_get_enrolled_courses_by_timeline_classification",
-                    "classification": "all"
+                    "wsfunction": "core_user_get_users_by_field",
+                    "field": "id",
+                    "values[0]": userid
                 }
-                t_resp = requests.post(rest_url, data=t_params, timeout=12, verify=False)
-                t_json = t_resp.json()
-                if isinstance(t_json, dict) and "courses" in t_json:
+                u_resp = await client.post(rest_url, data=u_params)
+                u_json = u_resp.json()
+                if isinstance(u_json, list) and len(u_json) > 0:
+                    u_item = u_json[0]
+                    u_fn = u_item.get("fullname") or f"{u_item.get('lastname', '')} {u_item.get('firstname', '')}".strip()
+                    if u_fn and u_fn.lower() != username.lower():
+                        fullname = u_fn
+                    if u_item.get("profileimageurl"):
+                        userpictureurl = u_item.get("profileimageurl")
+                    if u_item.get("department"):
+                        department_name = u_item.get("department")
+            except Exception:
+                pass
+
+        if not fullname or fullname.lower() == username.lower() or " " not in fullname:
+            try:
+                eios_resp = await client.post(
+                    "https://eios.kosgos.ru/api/tokenauth",
+                    json={"userName": username, "password": password}
+                )
+                eios_json = eios_resp.json()
+                if eios_json.get("state") == 1 and eios_json.get("data"):
+                    data_inner = eios_json["data"].get("data", {})
+                    eios_fio = data_inner.get("userName") or data_inner.get("fullName") or data_inner.get("shortFIO")
+                    if eios_fio and eios_fio.lower() != username.lower():
+                        fullname = eios_fio
+            except Exception:
+                pass
+
+        courses_list = []
+        detected_group = sdo_req.group_number.strip() if sdo_req.group_number else ""
+
+        if userid:
+            course_params = {
+                "wstoken": wstoken,
+                "moodlewsrestformat": "json",
+                "wsfunction": "core_enrol_get_users_courses",
+                "userid": userid,
+                "returnusercount": 0
+            }
+            try:
+                course_resp = await client.post(rest_url, data=course_params)
+                course_json = course_resp.json()
+                if isinstance(course_json, list) and len(course_json) > 0:
                     courses_list = [
                         {
                             "id": c.get("id"),
@@ -296,19 +272,37 @@ def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
                             "shortname": c.get("shortname"),
                             "progress": c.get("progress", 0)
                         }
-                        for c in t_json["courses"]
+                        for c in course_json
                     ]
+                else:
+                    t_params = {
+                        "wstoken": wstoken,
+                        "moodlewsrestformat": "json",
+                        "wsfunction": "core_course_get_enrolled_courses_by_timeline_classification",
+                        "classification": "all"
+                    }
+                    t_resp = await client.post(rest_url, data=t_params)
+                    t_json = t_resp.json()
+                    if isinstance(t_json, dict) and "courses" in t_json:
+                        courses_list = [
+                            {
+                                "id": c.get("id"),
+                                "fullname": c.get("fullname"),
+                                "shortname": c.get("shortname"),
+                                "progress": c.get("progress", 0)
+                            }
+                            for c in t_json["courses"]
+                        ]
 
-            # Auto-detect group pattern like 24-ИСбо-1 or 25-ИСбо-1 from course names if not provided
-            if not detected_group and courses_list:
-                import re
-                for c in courses_list:
-                    match = re.search(r'\b(\d{2}-[А-Яа-яA-Za-z]+-\d+)\b', c.get("fullname", "") + " " + c.get("shortname", ""))
-                    if match:
-                        detected_group = match.group(1)
-                        break
-        except Exception:
-            courses_list = []
+                if not detected_group and courses_list:
+                    import re
+                    for c in courses_list:
+                        match = re.search(r'\b(\d{2}-[А-Яа-яA-Za-z]+-\d+)\b', c.get("fullname", "") + " " + c.get("shortname", ""))
+                        if match:
+                            detected_group = match.group(1)
+                            break
+            except Exception:
+                courses_list = []
 
     if not detected_group:
         detected_group = department_name or "24-ИСбо-1"
