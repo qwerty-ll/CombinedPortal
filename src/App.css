@@ -4345,3 +4345,123 @@ mark {
 .doc-download-btn:active {
   transform: translateY(-1px);
 }
+
+/* ===================================
+   MOBILE & TABLET RESPONSIVE OVERRIDES
+   =================================== */
+
+@media (max-width: 992px) {
+  .app-container {
+    overflow-x: hidden;
+  }
+
+  .sidebar {
+    width: 260px !important;
+    position: fixed !important;
+    left: -280px !important;
+    top: 0 !important;
+    height: 100vh !important;
+    z-index: 1000 !important;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+
+  .sidebar.mobile-open {
+    left: 0 !important;
+    transform: none !important;
+  }
+
+  .game-map, .game-map.expanded {
+    margin-left: 0 !important;
+    width: 100% !important;
+    padding: 75px 16px 40px 16px !important;
+  }
+
+  .mobile-menu-toggle {
+    display: flex !important;
+    top: 14px !important;
+    left: 14px !important;
+    width: 44px !important;
+    height: 44px !important;
+    z-index: 1001 !important;
+  }
+
+  .mobile-menu-toggle.open {
+    left: auto !important;
+    right: 14px !important;
+  }
+}
+
+@media (max-width: 576px) {
+  html, body {
+    overflow-x: hidden !important;
+  }
+
+  .game-map {
+    padding: 68px 12px 30px 12px !important;
+  }
+
+  h1 {
+    font-size: 1.35rem !important;
+  }
+  h2 {
+    font-size: 1.18rem !important;
+  }
+  h3 {
+    font-size: 1.05rem !important;
+  }
+
+  .login-card {
+    margin: 0 !important;
+    padding: 20px 14px !important;
+    border-radius: 16px !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05) !important;
+  }
+
+  .curator-profile-section {
+    padding: 16px 12px !important;
+    border-radius: 16px !important;
+  }
+
+  .profile-stats-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .chat-window {
+    width: 92vw !important;
+    max-width: 380px !important;
+    right: 4vw !important;
+    bottom: 75px !important;
+    height: 75vh !important;
+    border-radius: 18px !important;
+  }
+
+  .chat-toggle {
+    right: 16px !important;
+    bottom: 16px !important;
+    width: 52px !important;
+    height: 52px !important;
+  }
+
+  .admin-tabs {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  .admin-tab-btn {
+    padding: 8px 10px !important;
+    font-size: 0.78rem !important;
+  }
+
+  .admin-item-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  .admin-item-actions {
+    width: 100% !important;
+    justify-content: flex-start !important;
+  }
+}
+

@@ -163,6 +163,20 @@ function App() {
         {isMobileMenuOpen ? <X /> : <Menu />}
       </button>
 
+      {/* MOBILE BACKDROP OVERLAY */}
+      {isMobileMenuOpen && (
+        <div 
+          onClick={() => setIsMobileMenuOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 999
+          }}
+        />
+      )}
+
       {/* SIDE NAVIGATION */}
       <Sidebar 
         isCollapsed={isSidebarCollapsed} 
