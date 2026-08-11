@@ -8,7 +8,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
-import models
+import app.models as models
 
 load_dotenv()
 
@@ -113,7 +113,6 @@ def evaluate_query(query: str):
     q_lower = query.lower().strip()
     q_words = re.findall(r"\w{2,}", q_lower)
 
-    # 1. Exact match for classroom numbers (101-409)
     room_match = re.search(r"\b(101|102|104|107|108|201|202|203|204|206|207|208|209|301|302|303|304|306|307|308|309|310|312|313|401|403|406|407|408|409)\b", q_lower)
     if room_match:
         room_num = room_match.group(1)
@@ -125,13 +124,11 @@ def evaluate_query(query: str):
             "content": f"Аудитория {room_num}{extra} находится на **{floor} Корпуса Б** (ул. Ивановская, 24а).\n\n[IMG:{room_num}.png]"
         }
 
-    # 2. Food query direct match
     if any(k in q_lower for k in ("поесть", "голоден", "столов", "еда", "шаурм", "обед")):
         return 100, KNOWLEDGE_CHUNKS[4]
 
     best_match = None
     max_score = 0
-
     stop_words = {"где", "как", "находиться", "находится", "какой", "какая", "пожалуйста"}
 
     for chunk in KNOWLEDGE_CHUNKS:
@@ -165,17 +162,15 @@ def track_question_analytics(query_text: str, db: Session):
             item = models.AnalyticsQuestion(question_text=clean_text, ask_count=1)
             db.add(item)
         db.commit()
-    except Exception as e:
+    except Exception:
         db.rollback()
 
 def generate_chatbot_reply(user_message: str, history: list, db: Session) -> str:
     score, chunk = evaluate_query(user_message)
 
-    # Reject off-topic queries strictly
     if score < 4 or not chunk:
         return "Я — цифровой маскот ВИТШик и отвечаю исключительно на вопросы про Высшую ИТ-Школу КГУ, аудитории, расписание, стипендии, клубы и учебу! 😸 Задай мне вопрос по университету!"
 
-    # Log analytics
     track_question_analytics(user_message, db)
 
     system_prompt = (
@@ -212,7 +207,6 @@ def generate_chatbot_reply(user_message: str, history: list, db: Session) -> str
         }
         resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=VERIFY_SSL, timeout=15)
         
-        # If token expired or key changed, force refresh once
         if resp.status_code in (401, 402):
             token_cache["access_token"] = ""
             token = get_access_token(force_refresh=True)

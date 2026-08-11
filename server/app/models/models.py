@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from database import Base
+from app.db.database import Base
 
 class User(Base):
     __tablename__ = "users"
@@ -26,7 +26,7 @@ class ForumQuestion(Base):
     id = Column(Integer, primary_key=True, index=True)
     author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     title = Column(String, index=True, nullable=False)
-    category = Column(String, default="Учеба") # "Учеба" | "Общежития" | "Мероприятия" | "Карта" | "Другое"
+    category = Column(String, default="Учеба")
     content = Column(Text, nullable=False)
     views_count = Column(Integer, default=0)
     is_pinned = Column(Boolean, default=False)

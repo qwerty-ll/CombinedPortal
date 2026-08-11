@@ -1,5 +1,6 @@
 import os
 import hashlib
+import secrets
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
@@ -9,10 +10,8 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
-from database import get_db
-import models
-
-import secrets
+from app.db.database import get_db
+import app.models as models
 
 load_dotenv()
 
@@ -24,6 +23,7 @@ if not raw_secret:
 SECRET_KEY = raw_secret
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+VERIFY_SSL = os.getenv("VERIFY_SSL", "true").lower() == "true"
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
@@ -31,13 +31,11 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=F
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     if not plain_password or not hashed_password:
         return False
-    # If bcrypt hash
     if hashed_password.startswith("$2"):
         try:
             return pwd_context.verify(plain_password, hashed_password)
         except Exception:
             return False
-    # Legacy SHA256 hash
     sha256_hash = hashlib.sha256((plain_password or "").encode("utf-8")).hexdigest()
     return sha256_hash == hashed_password
 

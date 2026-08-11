@@ -1,21 +1,20 @@
 version: '3.8'
 
 services:
-  # FastAPI Backend Service with Standalone High-Performance SQLite
+  # FastAPI Backend Service
   backend:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: infrastructure/Dockerfile
     container_name: ivitsh_portal_backend
     restart: always
+    env_file:
+      - ../.env
     environment:
       - DATABASE_URL=sqlite:///./portal.db
-      - SECRET_KEY=ksu_ivitsh_production_jwt_super_secret_key_2026_secure
-      - ALGORITHM=HS256
-      - GIGACHAT_CLIENT_ID=019e2c26-97a8-75cf-8d25-1caf90fcdd51
-      - GIGACHAT_SECRET=MDE5ZTJjMjYtOTdhOC03NWNmLThkMjUtMWNhZjkwZmNkZDUxOjFkODQ2YzZjLTgwNmEtNGIwZi1iZmQ2LTY0Zjg2NTAwMmU2Yg==
+      - PYTHONPATH=/app/server
     volumes:
-      - sqlite_data:/app/backend_data
+      - sqlite_data:/app/server_data
     ports:
       - "127.0.0.1:8000:8000"
 

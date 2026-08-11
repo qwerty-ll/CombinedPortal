@@ -1,9 +1,9 @@
 # --- Stage 1: Build Vite Frontend ---
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
-COPY package*.json ./
+COPY client/package*.json ./
 RUN npm ci
-COPY . .
+COPY client ./
 RUN npm run build
 
 # --- Stage 2: Python Backend Environment ---
@@ -18,18 +18,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy backend requirements
-COPY backend/requirements.txt ./requirements.txt
+COPY server/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir httpx psycopg2-binary passlib[bcrypt]
 
 # Copy backend application code
-COPY backend ./backend
+COPY server ./server
 
 # Copy built frontend static assets into backend static folder
-COPY --from=frontend-builder /app/dist ./backend/static
+COPY --from=frontend-builder /app/dist ./server/static
 
 EXPOSE 8000
 
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app/server
 
-CMD ["python3", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python3", "-m", "uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8000"]

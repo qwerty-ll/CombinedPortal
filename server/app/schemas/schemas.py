@@ -74,7 +74,7 @@ class ForumQuestionResponse(BaseModel):
     views_count: int
     votes_count: int
     answers_count: int
-    user_vote: Optional[int] = 0 # 1, -1, or 0
+    user_vote: Optional[int] = 0
     is_pinned: bool
     created_at: datetime
 
@@ -82,7 +82,7 @@ class ForumQuestionResponse(BaseModel):
         from_attributes = True
 
 class VoteRequest(BaseModel):
-    vote_type: int # 1 for Up, -1 for Down
+    vote_type: int
 
 # --- Admin Content Schemas ---
 class TeacherCreate(BaseModel):
@@ -127,7 +127,7 @@ class FaqItemResponse(FaqItemCreate):
 
 # --- Chatbot Schemas ---
 class ChatMessageTurn(BaseModel):
-    role: str # "user" or "assistant"
+    role: str
     content: str
 
 class ChatRequest(BaseModel):

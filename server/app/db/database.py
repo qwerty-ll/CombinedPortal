@@ -7,7 +7,6 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./portal.db")
 
-# High-performance SQLite options: WAL mode & 30s lock timeout
 if DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False, "timeout": 30}
 else:
@@ -15,7 +14,6 @@ else:
 
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
 
-# Enable WAL mode for SQLite to support concurrent reads & writes
 if DATABASE_URL.startswith("sqlite"):
     @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
