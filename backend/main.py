@@ -164,7 +164,10 @@ def update_user_role(
     db.refresh(target_user)
     return target_user
 
-import httpx
+try:
+    import httpx
+except ImportError:
+    import requests as httpx
 
 @app.post("/api/v1/auth/sdo-login", response_model=schemas.TokenResponse)
 async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
