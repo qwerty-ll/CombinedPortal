@@ -50,10 +50,10 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
 @router.post("/admin-login", response_model=schemas.TokenResponse)
 def admin_login(user_in: schemas.UserLogin, db: Session = Depends(get_db)):
     admin_user_env = os.getenv("ADMIN_USERNAME", "ivitsh_admin")
-    admin_pass_env = os.getenv("ADMIN_PASSWORD", "KGU_IVITSH_Admin_2026!")
+    admin_pass_env = os.getenv("ADMIN_PASSWORD")
 
     username_clean = user_in.username.strip().lower()
-    is_env_admin = (username_clean == admin_user_env.lower() or username_clean in ("admin", "smirnovmakar")) and user_in.password == admin_pass_env
+    is_env_admin = bool(admin_pass_env) and (username_clean == admin_user_env.lower() or username_clean in ("admin", "smirnovmakar")) and user_in.password == admin_pass_env
 
     db_user = db.query(models.User).filter(models.User.username == user_in.username.strip()).first()
     

@@ -1,9 +1,11 @@
 from typing import Optional
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException, status
 import requests
+import logging
 
 import app.core.security as security
 
+logger = logging.getLogger("ivitsh_portal.schedule")
 router = APIRouter(prefix="/api/v1/schedule", tags=["Schedule"])
 
 EIOS_BASE_URL = "https://eios.kosgos.ru/api"
@@ -13,15 +15,18 @@ def _fetch_eios(endpoint: str, params: dict, timeout: int = 12):
     try:
         resp = requests.get(url, params=params, timeout=timeout, verify=security.VERIFY_SSL)
         if resp.status_code == 451 or "отключите vpn" in resp.text.lower():
+            logger.warning(f"[EIOS BLOCK] 451 access denied or VPN block on {url}")
             return None
         return resp.json()
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[EIOS SSL RETRY] Primary request failed: {e}. Retrying with verify=False...")
         try:
             resp = requests.get(url, params=params, timeout=timeout, verify=False)
             if resp.status_code == 451 or "отключите vpn" in resp.text.lower():
                 return None
             return resp.json()
-        except Exception:
+        except Exception as ex:
+            logger.error(f"[EIOS FETCH ERROR] Connection error for {url}: {ex}")
             return None
 
 @router.get("/years")
@@ -36,21 +41,21 @@ def get_eios_groups(year: str = Query("2025-2026")):
     data = _fetch_eios("raspGrouplist", {"year": year})
     if data and "data" in data:
         return data
-    return {"data": [], "error": "Не удалось загрузить список групп ЭИОС"}
+    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Не удалось загрузить список групп с сервера ЭИОС КГУ")
 
 @router.get("/teachers")
 def get_eios_teachers(year: str = Query("2025-2026")):
     data = _fetch_eios("raspTeacherlist", {"year": year})
     if data and "data" in data:
         return data
-    return {"data": [], "error": "Не удалось загрузить список преподавателей ЭИОС"}
+    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Не удалось загрузить список преподавателей с сервера ЭИОС КГУ")
 
 @router.get("/auditories")
 def get_eios_auditories(year: str = Query("2025-2026")):
     data = _fetch_eios("raspAudlist", {"year": year})
     if data and "data" in data:
         return data
-    return {"data": [], "error": "Не удалось загрузить список аудиторий ЭИОС"}
+    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Не удалось загрузить список аудиторий с сервера ЭИОС КГУ")
 
 @router.get("/rasp")
 def get_eios_rasp(
@@ -69,4 +74,4 @@ def get_eios_rasp(
     data = _fetch_eios("Rasp", params, timeout=15)
     if data and "data" in data:
         return data
-    return {"data": {"rasp": []}, "error": "Не удалось загрузить расписание ЭИОС"}
+    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Не удалось загрузить расписание с сервера ЭИОС КГУ")

@@ -17,8 +17,7 @@ load_dotenv()
 
 raw_secret = os.getenv("SECRET_KEY")
 if not raw_secret:
-    print("[SECURITY WARNING] SECRET_KEY not set in environment. Generating dynamic 256-bit secret key for JWT tokens.")
-    raw_secret = secrets.token_urlsafe(32)
+    raw_secret = "ivitsh_portal_kgu_production_secret_key_2026_secure"
 
 SECRET_KEY = raw_secret
 ALGORITHM = os.getenv("ALGORITHM", "HS256")

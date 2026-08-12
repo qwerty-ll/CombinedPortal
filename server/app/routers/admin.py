@@ -20,8 +20,8 @@ def update_user_role(
     current_user: models.User = Depends(security.require_admin),
     db: Session = Depends(get_db)
 ):
-    if req.role not in ("student", "moderator", "admin"):
-        raise HTTPException(status_code=400, detail="Недопустимая роль. Используйте: student, moderator, admin")
+    if req.role not in ("student", "curator", "moderator", "admin"):
+        raise HTTPException(status_code=400, detail="Недопустимая роль. Используйте: student, curator, moderator, admin")
     target_user = db.query(models.User).filter(models.User.id == user_id).first()
     if not target_user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
