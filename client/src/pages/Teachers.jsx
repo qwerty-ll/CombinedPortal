@@ -123,15 +123,6 @@ export const OFFICIAL_IVITSH_TEACHERS = [
   },
   {
     id: 14,
-    name: "Попова Светлана Валентиновна",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Старший преподаватель кафедры экономики и управления",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IST/PPS/Popova_SV.jpg"
-  },
-  {
-    id: 15,
     name: "Денисов Артем Руфимович",
     department: "Высшая ИТ-школа КГУ",
     role: "Доцент кафедры, доктор технических наук, доцент",
@@ -140,7 +131,7 @@ export const OFFICIAL_IVITSH_TEACHERS = [
     photo: "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IiVT/denisov.jpg"
   },
   {
-    id: 16,
+    id: 15,
     name: "Дружинина Анна Григорьевна",
     department: "Высшая ИТ-школа КГУ",
     role: "Доцент кафедры, кандидат технических наук, доцент",
@@ -149,7 +140,7 @@ export const OFFICIAL_IVITSH_TEACHERS = [
     photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/druzhinina.jpg"
   },
   {
-    id: 17,
+    id: 16,
     name: "Кириллова Екатерина Сергеевна",
     department: "Высшая ИТ-школа КГУ",
     role: "Доцент кафедры, кандидат технических наук, доцент",
@@ -158,7 +149,7 @@ export const OFFICIAL_IVITSH_TEACHERS = [
     photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/kirillova.jpg"
   },
   {
-    id: 18,
+    id: 17,
     name: "Чувиляева Александра Сергеевна",
     department: "Высшая ИТ-школа КГУ",
     role: "Доцент кафедры, кандидат технических наук, доцент",
@@ -244,18 +235,19 @@ const Teachers = () => {
                   viewport={{ once: true }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="teacher-photo-circle" style={{ background: '#F1F5F9', color: '#0369A1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                    <img 
-                      src={teacher.photo || `/img/teachers/teacher-${((teacher.id - 1) % 6) + 1}.png`} 
-                      alt={teacher.name}
-                      onError={(e) => { 
-                        if (!e.target.dataset.fallback) {
-                          e.target.dataset.fallback = "true";
-                          e.target.src = `/img/teachers/teacher-${((teacher.id - 1) % 6) + 1}.png`;
-                        }
-                      }}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
+                  <div className="teacher-photo-circle" style={{ background: '#E0F2FE', color: '#007FFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                    {teacher.photo && !teacher.photo.includes('nophoto') ? (
+                      <img 
+                        src={teacher.photo} 
+                        alt={teacher.name}
+                        onError={(e) => { 
+                          e.target.style.display = 'none';
+                        }}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <UsersIcon size={32} color="#007FFF" />
+                    )}
                   </div>
                   <div className="teacher-card-info">
                     <h4>{highlightText(teacher.name, searchQuery)}</h4>
@@ -279,132 +271,49 @@ const Teachers = () => {
         ))}
       </div>
 
-      {/* STUNNING TEACHER MODAL */}
+      {/* TEACHER MODAL */}
       <AnimatePresence>
         {selectedTeacher && (
-          <div 
-            className="modal-overlay" 
-            onClick={() => setSelectedTeacher(null)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 9999,
-              background: 'rgba(15, 23, 42, 0.65)',
-              backdropFilter: 'blur(8px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '20px'
-            }}
-          >
+          <div className="modal-overlay" onClick={() => setSelectedTeacher(null)}>
             <motion.div 
-              onClick={(e) => e.stopPropagation()}
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              style={{
-                background: '#FFFFFF',
-                borderRadius: '28px',
-                padding: '32px',
-                maxWidth: '480px',
-                width: '100%',
-                boxShadow: '0 25px 60px rgba(0, 0, 0, 0.25)',
-                position: 'relative',
-                color: '#1E293B',
-                border: '1px solid rgba(226, 232, 240, 0.8)'
-              }}
+              className="modal-card"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              style={{ maxWidth: '520px', padding: '30px' }}
             >
-              {/* Close button */}
-              <button 
-                onClick={() => setSelectedTeacher(null)}
-                style={{
-                  position: 'absolute',
-                  top: '20px',
-                  right: '20px',
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  border: 'none',
-                  background: '#F1F5F9',
-                  color: '#64748B',
-                  fontSize: '18px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.2s'
-                }}
-              >
-                ✕
-              </button>
-
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '24px' }}>
-                <img 
-                  src={selectedTeacher.photo} 
-                  alt={selectedTeacher.name} 
-                  style={{ 
-                    width: '110px', 
-                    height: '110px', 
-                    borderRadius: '50%', 
-                    objectFit: 'cover',
-                    boxShadow: '0 10px 25px rgba(0,127,255,0.25)',
-                    border: '4px solid #007FFF',
-                    marginBottom: '16px'
-                  }}
-                />
-                <span style={{ 
-                  background: '#E0F2FE', 
-                  color: '#0284C7', 
-                  padding: '4px 14px', 
-                  borderRadius: '20px', 
-                  fontSize: '0.8rem', 
-                  fontWeight: '700',
-                  display: 'inline-block',
-                  marginBottom: '8px'
-                }}>
-                  {selectedTeacher.department || 'Высшая ИТ-школа КГУ'}
-                </span>
-                <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '800', color: '#0F172A', lineHeight: '1.3' }}>
-                  {selectedTeacher.name}
-                </h3>
-              </div>
-
-              <div style={{ background: '#F8FAFC', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Должность и степень</span>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.95rem', fontWeight: '600', color: '#1E293B', lineHeight: '1.4' }}>
-                    {selectedTeacher.role}
-                  </p>
+              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                <div className="teacher-photo-circle" style={{ width: '100px', height: '100px', margin: '0 auto 15px auto', background: '#E0F2FE', color: '#007FFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                  {selectedTeacher.photo && !selectedTeacher.photo.includes('nophoto') ? (
+                    <img 
+                      src={selectedTeacher.photo} 
+                      alt={selectedTeacher.name} 
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    />
+                  ) : (
+                    <UsersIcon size={48} color="#007FFF" />
+                  )}
                 </div>
-
-                {selectedTeacher.office && (
-                  <div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Местоположение</span>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '0.95rem', fontWeight: '600', color: '#1E293B' }}>
-                      📍 {selectedTeacher.office}
-                    </p>
-                  </div>
-                )}
-
-                {selectedTeacher.hours && (
-                  <div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Контакты</span>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '0.95rem', fontWeight: '600', color: '#1E293B' }}>
-                      📞 {selectedTeacher.hours}
-                    </p>
-                  </div>
-                )}
-
-                {selectedTeacher.email && (
-                  <div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Электронная почта</span>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '0.95rem', fontWeight: '600', color: '#0284C7' }}>
-                      ✉️ {selectedTeacher.email}
-                    </p>
-                  </div>
-                )}
+                <h3 style={{ margin: '0 0 6px 0', fontSize: '1.3rem', color: 'var(--text)' }}>{selectedTeacher.name}</h3>
+                <p style={{ margin: 0, color: 'var(--primary)', fontWeight: '600', fontSize: '0.9rem' }}>{selectedTeacher.role}</p>
               </div>
+
+              <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.9rem' }}>
+                <div><strong>Кафедра:</strong> {selectedTeacher.department}</div>
+                {selectedTeacher.office && <div><strong>Кабинет / Корпус:</strong> {selectedTeacher.office}</div>}
+                {selectedTeacher.email && <div><strong>E-mail:</strong> <a href={`mailto:${selectedTeacher.email}`}>{selectedTeacher.email}</a></div>}
+                {selectedTeacher.hours && <div><strong>Контакты / Часы:</strong> {selectedTeacher.hours}</div>}
+              </div>
+
+              <button 
+                className="btn-primary" 
+                style={{ width: '100%', marginTop: '20px' }}
+                onClick={() => setSelectedTeacher(null)}
+              >
+                Закрыть
+              </button>
             </motion.div>
           </div>
         )}

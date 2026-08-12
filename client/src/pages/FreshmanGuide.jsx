@@ -196,6 +196,7 @@ const FreshmanGuide = () => {
         <motion.img 
           src="/img/mascot.png" 
           alt="ВИТШик" 
+          onError={(e) => { e.target.src = "/mascot.png"; }}
           style={{ width: '96px', height: '96px', objectFit: 'contain' }}
           animate={{ y: [0, -8, 0] }}
           transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}

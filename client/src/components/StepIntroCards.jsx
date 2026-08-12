@@ -7,7 +7,7 @@ export function StepFoundation({ onComplete }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
       {/* Hero */}
       <div style={{ background: 'linear-gradient(135deg, #007AFF 0%, #5856D6 100%)', borderRadius: '20px', padding: '20px', color: 'white', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 8px 24px rgba(0,127,255,0.2)' }}>
-        <img src="/img/mascot.png" alt="ВИТШик" style={{ width: '64px', height: '64px', objectFit: 'contain', flexShrink: 0 }} />
+        <img src="/img/mascot.png" alt="ВИТШик" onError={(e) => { e.target.src = "/mascot.png"; }} style={{ width: '64px', height: '64px', objectFit: 'contain', flexShrink: 0 }} />
         <div>
           <span style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.8 }}>Этап 1 · Основа</span>
           <h2 style={{ fontSize: '1.25rem', fontWeight: '800', margin: '2px 0 0 0' }}>Добро пожаловать в ИВИТШ!</h2>
