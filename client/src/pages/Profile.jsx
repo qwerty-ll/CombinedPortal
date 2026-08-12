@@ -166,7 +166,7 @@ const Profile = () => {
                 transition: 'all 0.2s'
               }}
             >
-              🎓 Студент ЭИОС КГУ
+              🎓 Студент СДО КГУ
             </button>
             <button
               type="button"
@@ -193,16 +193,16 @@ const Profile = () => {
             <div className="login-icon-box" style={{ background: loginMode === 'staff' ? 'rgba(5,150,105,0.1)' : 'rgba(0,127,255,0.1)', color: loginMode === 'staff' ? '#059669' : 'var(--primary)' }}>
               {loginMode === 'staff' ? <UserCheck size={32} /> : <GraduationCap size={32} />}
             </div>
-            <h2>{loginMode === 'staff' ? 'Вход для Администрации ИВИТШ' : 'Вход через ЭИОС КГУ'}</h2>
-            <p>{loginMode === 'staff' ? 'Служебная авторизация администраторов и деканата' : 'Единый портал авторизации eios.kosgos.ru (Account/Login.aspx)'}</p>
+            <h2>{loginMode === 'staff' ? 'Вход для Администрации ИВИТШ' : 'Вход через СДО КГУ'}</h2>
+            <p>{loginMode === 'staff' ? 'Служебная авторизация администраторов и деканата' : 'Единая авторизация студентов сдо.kosgos.ru / eios.kosgos.ru'}</p>
           </div>
 
           <form onSubmit={handleLogin} className="login-form">
             <div className="login-field">
-              <label>{loginMode === 'staff' ? 'Логин администратора' : 'Логин ЭИОС КГУ'}</label>
+              <label>{loginMode === 'staff' ? 'Логин администратора' : 'Логин СДО КГУ'}</label>
               <input 
                 type="text"
-                placeholder={loginMode === 'staff' ? 'Учетная запись деканата' : 'Логин учетной записи ЭИОС (напр. 22-isbo-035)'}
+                placeholder={loginMode === 'staff' ? 'Учетная запись деканата' : 'Логин учетной записи СДО КГУ (напр. 22-isbo-035)'}
                 value={loginForm.username}
                 onChange={e => setLoginForm({ ...loginForm, username: e.target.value })}
                 required
@@ -221,7 +221,7 @@ const Profile = () => {
               />
               {loginMode !== 'staff' && (
                 <span style={{ fontSize: '0.78rem', color: '#666', marginTop: '6px', display: 'block', lineHeight: '1.3' }}>
-                  💡 <strong>Подсказка:</strong> Логин и пароль такие же, как для входа в СДО / ЭИОС КГУ (<a href="https://eios.kosgos.ru/Account/Login.aspx" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>eios.kosgos.ru</a>).
+                  💡 <strong>Подсказка:</strong> Используется единый логин и пароль от аккаунта СДО / ЭИОС КГУ.
                 </span>
               )}
             </div>
@@ -233,7 +233,7 @@ const Profile = () => {
                 <>Проверка авторизации...</>
               ) : (
                 <>
-                  <Lock size={16} /> {loginMode === 'staff' ? 'Войти в админку' : 'Войти через ЭИОС'}
+                  <Lock size={16} /> {loginMode === 'staff' ? 'Войти в админку' : 'Войти через СДО'}
                 </>
               )}
             </button>
