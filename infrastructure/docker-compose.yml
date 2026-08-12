@@ -13,8 +13,9 @@ services:
       - PYTHONPATH=/app/server
     volumes:
       - sqlite_data:/app/server_data
-    ports:
-      - "127.0.0.1:8000:8000"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     networks:
       - portal_network
 

@@ -131,34 +131,30 @@ async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_
                 detail="Сервер СДО КГУ вернул некорректный ответ."
             )
 
+    import requests as sync_requests
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
     try:
-        async with httpx.AsyncClient(verify=verify_ssl_setting, timeout=12.0) as client:
-            token_resp = await client.get(token_url, params=token_params)
-            token_data = process_token_response(token_resp)
+        # First attempt with standard SSL verification setting
+        resp = sync_requests.get(token_url, params=token_params, verify=verify_ssl_setting, timeout=8.0)
+        token_data = process_token_response(resp)
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"[SDO CONN ERROR] Failed SSL/TLS connection to sdo.kosgos.ru (verify={verify_ssl_setting}): {e}")
-        # Retry with SSL verify disabled if KSU internal certificate chain fails
-        if verify_ssl_setting:
-            try:
-                logger.info("[SDO RETRY] Retrying SDO authentication with verify=False for KSU internal network")
-                async with httpx.AsyncClient(verify=False, timeout=12.0) as client:
-                    token_resp = await client.get(token_url, params=token_params)
-                    token_data = process_token_response(token_resp)
-                    verify_ssl_setting = False
-            except HTTPException:
-                raise
-            except Exception as retry_err:
-                logger.error(f"[SDO RETRY FAILED] {retry_err}")
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail=f"Ошибка соединения с сервером СДО КГУ (sdo.kosgos.ru): {str(retry_err)}"
-                )
-        else:
+    except Exception as first_err:
+        logger.warning(f"[SDO CONN WARN] Direct connection with verify={verify_ssl_setting} failed ({first_err}). Retrying with verify=False...")
+        try:
+            # Second attempt with verify=False (supports internal KSU network & custom CA)
+            resp = sync_requests.get(token_url, params=token_params, verify=False, timeout=8.0)
+            token_data = process_token_response(resp)
+            verify_ssl_setting = False
+        except HTTPException:
+            raise
+        except Exception as retry_err:
+            logger.error(f"[SDO CONN FAILED] Both SSL verified and insecure attempts failed: {retry_err}")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Ошибка соединения с сервером СДО КГУ (sdo.kosgos.ru): {str(e)}"
+                detail=f"Сервер СДО КГУ (sdo.kosgos.ru) недоступен из сети виртуальной машины: {str(retry_err)}"
             )
 
     if not token_data or "error" in token_data or "token" not in token_data:
