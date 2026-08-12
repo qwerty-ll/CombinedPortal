@@ -2,7 +2,7 @@
 
 **Проект:** Официальный Портал и Гайд первокурсника Высшей ИТ-Школы КГУ  
 **Архитектура:** React (Vite SPA) + FastAPI (REST API) + Standalone SQLite WAL + Nginx Reverse Proxy  
-**Домен проекта (3-й уровень):** `portal.kosgos.ru` (или `ivitsh.kosgos.ru`)  
+**Домен проекта (3-й уровень):** `ivitshGuide.kosgos.ru` (альтернативно: `portal.kosgos.ru` / `ivitsh.kosgos.ru`)  
 **Способ развертывания:** Docker Compose (2 отдельных контейнера: `client` и `backend`)
 
 ---
@@ -17,10 +17,10 @@
 
 ---
 
-## 🌐 2. Домен и Инфраструктура КГУ (`{domen}.kosgos.ru`)
+## 🌐 2. Домен и Инфраструктура КГУ (`ivitshGuide.kosgos.ru`)
 
-Для развертывания проекта в локальной сети / интернете КГУ предусмотрен домен 3-го уровня:
-👉 **`portal.kosgos.ru`** (или **`ivitsh.kosgos.ru`**).
+Для развертывания проекта в локальной сети / интернете КГУ закреплен официальный домен 3-го уровня:
+👉 **`ivitshGuide.kosgos.ru`** (альтернативно: `portal.kosgos.ru` / `ivitsh.kosgos.ru`).
 
 Nginx проксирует трафик следующим образом:
 - **`http://portal.kosgos.ru/`** — Фронтенд (React SPA)

@@ -35,12 +35,12 @@ CombinedPortal/
 
 ---
 
-## 🌐 Настройка Домена (`{domen}.kosgos.ru`)
+## 🌐 Настройка Домена (`ivitshGuide.kosgos.ru`)
 
-Для развертывания портала в инфраструктуре КГУ выделен домен 3-го уровня:
-👉 **`portal.kosgos.ru`** (или **`ivitsh.kosgos.ru`**).
+Для развертывания портала в инфраструктуре КГУ закреплен официальный домен 3-го уровня:
+👉 **`ivitshGuide.kosgos.ru`** (альтернативно: `portal.kosgos.ru` / `ivitsh.kosgos.ru`).
 
-Nginx сконфигурирован на обработку домена `portal.kosgos.ru`, проксирование API-запросов (`/api/`), документации Swagger (`/docs`) и отдачу React SPA.
+Nginx сконфигурирован на обработку домена `ivitshGuide.kosgos.ru`, проксирование API-запросов (`/api/`), документации Swagger (`/docs`) и отдачу React SPA.
 
 ---
 
