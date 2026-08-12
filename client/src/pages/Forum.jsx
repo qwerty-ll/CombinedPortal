@@ -174,12 +174,12 @@ const Forum = () => {
           <div className="auth-gate-content">
             <LogIn size={20} />
             <div>
-              <strong>Для участия в форуме необходимо войти через ЭИОС КГУ</strong>
+              <strong>Для участия в форуме необходимо войти через СДО КГУ</strong>
               <p>Вы можете просматривать темы, но для создания вопросов и ответов нужна авторизация</p>
             </div>
           </div>
           <button className="btn-auth-gate" onClick={() => navigate('/profile')}>
-            Войти через ЭИОС
+            Войти через СДО
           </button>
         </div>
       )}
@@ -303,7 +303,7 @@ const Forum = () => {
           <div className="empty-state-card">
             <MessageSquare size={48} strokeWidth={1.5} />
             <h4>На форуме пока нет вопросов</h4>
-            <p>{isLoggedIn ? 'Станьте первым, кто задаст вопрос!' : 'Войдите через ЭИОС КГУ, чтобы задать вопрос'}</p>
+            <p>{isLoggedIn ? 'Станьте первым, кто задаст вопрос!' : 'Войдите через СДО, чтобы задать вопрос'}</p>
           </div>
         )}
       </div>

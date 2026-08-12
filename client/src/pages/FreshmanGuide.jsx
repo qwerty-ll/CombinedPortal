@@ -262,7 +262,7 @@ const FreshmanGuide = () => {
                   <>
                     <li><a href="https://guide.kosgos.ru/" target="_blank" rel="noopener noreferrer"><FileText size={16}/> Справочник первокурсника</a></li>
                     <li><a href="https://eios.kosgos.ru/WebApp/#/Rasp/Group/8540" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Расписание занятий</a></li>
-                    <li><a href="https://eios.kosgos.ru" target="_blank" rel="noopener noreferrer"><Zap size={16}/> Вход в ЭИОС КГУ</a></li>
+                    <li><a href="https://eios.kosgos.ru" target="_blank" rel="noopener noreferrer"><Zap size={16}/> Вход в СДО ЕИОС</a></li>
                     <li><a href="https://kosgos.ru" target="_blank" rel="noopener noreferrer"><Users size={16}/> Сайт Университета</a></li>
                   </>
                 )}

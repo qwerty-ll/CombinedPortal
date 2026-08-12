@@ -143,7 +143,7 @@ const QuestionDetail = () => {
   // Voting on the question
   const handleVote = (type) => {
     if (!isLoggedIn) {
-      toast.show('Войдите через ЭИОС КГУ, чтобы голосовать', 'warning');
+      toast.show('Войдите через СДО, чтобы голосовать', 'warning');
       return;
     }
     const updatedQuestions = questions.map(q => {
@@ -237,7 +237,7 @@ const QuestionDetail = () => {
   // Vote on comment
   const handleVoteComment = (replyId, type) => {
     if (!isLoggedIn) {
-      toast.show('Войдите через ЭИОС КГУ, чтобы голосовать', 'warning');
+      toast.show('Войдите через СДО, чтобы голосовать', 'warning');
       return;
     }
     const updatedAnswers = currentAnswers.map(ans => {
@@ -487,7 +487,7 @@ const QuestionDetail = () => {
           <div className="auth-gate-content">
             <LogIn size={20} />
             <div>
-              <strong>Войдите через ЭИОС КГУ, чтобы ответить на вопрос</strong>
+              <strong>Войдите через СДО, чтобы ответить на вопрос</strong>
             </div>
           </div>
           <button className="btn-auth-gate" onClick={() => navigate('/profile')}>

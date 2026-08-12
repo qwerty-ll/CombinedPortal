@@ -5,7 +5,7 @@ import { CheckCircle, Square, CheckSquare } from 'lucide-react';
 const INITIAL_TASKS = [
   { id: 1, text: "Оригинал справки 086-У и прививочный сертификат", done: true },
   { id: 2, text: "Фотографии 3х4 (4 штуки)", done: true },
-  { id: 3, text: "Получить логин и пароль в ЭИОС КГУ", done: false },
+  { id: 3, text: "Получить логин и пароль в СДО/ЕИОС КГУ", done: false },
   { id: 4, text: "Вступить в общий чат вашей группы ИВИТШ", done: true },
   { id: 5, text: "Узнать свой кабинет в Корпусе Б (101-409)", done: false },
   { id: 6, text: "Познакомиться со старостой и куратором", done: false },
