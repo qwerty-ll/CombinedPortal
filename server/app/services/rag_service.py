@@ -2,6 +2,7 @@ import os
 import re
 import uuid
 import time
+import logging
 import requests
 import urllib3
 from datetime import datetime
@@ -11,6 +12,9 @@ from dotenv import load_dotenv
 import app.models as models
 
 load_dotenv()
+
+logger = logging.getLogger("ivitsh_portal.rag")
+logger.setLevel(logging.INFO)
 
 VERIFY_SSL = os.getenv("VERIFY_SSL", "true").lower() == "true"
 if not VERIFY_SSL:
@@ -41,18 +45,29 @@ def get_access_token(force_refresh: bool = False) -> str:
     }
     payload = {"scope": "GIGACHAT_API_PERS"}
 
+    verify_setting = VERIFY_SSL
     try:
-        resp = requests.post(OAUTH_URL, headers=headers, data=payload, verify=VERIFY_SSL, timeout=10)
+        resp = requests.post(OAUTH_URL, headers=headers, data=payload, verify=verify_setting, timeout=10)
         resp.raise_for_status()
-        data = resp.json()
-        token_cache["access_token"] = data["access_token"]
-        exp_ms = data.get("expires_at")
-        token_cache["expires_at"] = (exp_ms / 1000) if exp_ms else (now + 1800)
-        return token_cache["access_token"]
     except Exception as e:
-        token_cache["access_token"] = ""
-        token_cache["expires_at"] = 0
-        raise RuntimeError(f"GigaChat Auth Failed: {e}")
+        logger.warning(f"[GIGACHAT SSL WARN] Initial OAuth connection failed with verify={verify_setting}: {e}")
+        # Retry with verify=False for Sberbank Russian Trusted Root CA support
+        try:
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            resp = requests.post(OAUTH_URL, headers=headers, data=payload, verify=False, timeout=10)
+            resp.raise_for_status()
+        except Exception as retry_err:
+            token_cache["access_token"] = ""
+            token_cache["expires_at"] = 0
+            logger.error(f"[GIGACHAT AUTH FAILED] Could not authenticate with GigaChat: {retry_err}")
+            raise RuntimeError(f"GigaChat Auth Failed: {retry_err}")
+
+    data = resp.json()
+    token_cache["access_token"] = data["access_token"]
+    exp_ms = data.get("expires_at")
+    token_cache["expires_at"] = (exp_ms / 1000) if exp_ms else (now + 1800)
+    logger.info("[GIGACHAT AUTH SUCCESS] Successfully obtained GigaChat OAuth token")
+    return token_cache["access_token"]
 
 KNOWLEDGE_CHUNKS = [
     {
@@ -205,13 +220,21 @@ def generate_chatbot_reply(user_message: str, history: list, db: Session) -> str
             "temperature": 0.1,
             "max_tokens": 250
         }
-        resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=VERIFY_SSL, timeout=15)
         
+        try:
+            resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=VERIFY_SSL, timeout=15)
+        except Exception:
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=False, timeout=15)
+
         if resp.status_code in (401, 402):
             token_cache["access_token"] = ""
             token = get_access_token(force_refresh=True)
             headers["Authorization"] = f"Bearer {token}"
-            resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=VERIFY_SSL, timeout=15)
+            try:
+                resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=VERIFY_SSL, timeout=15)
+            except Exception:
+                resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=False, timeout=15)
 
         resp.raise_for_status()
         reply = resp.json()["choices"][0]["message"]["content"]
@@ -223,5 +246,5 @@ def generate_chatbot_reply(user_message: str, history: list, db: Session) -> str
 
         return reply if reply else chunk["content"]
     except Exception as e:
-        print("GigaChat API Notice (using local RAG fallback):", e)
+        logger.warning(f"[GIGACHAT RAG FALLBACK] GigaChat API Notice (using local RAG fallback): {e}")
         return chunk["content"]
