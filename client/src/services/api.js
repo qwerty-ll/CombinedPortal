@@ -79,9 +79,11 @@ export const scheduleApi = {
   getGroups: (year = '2025-2026') => apiFetch(`/api/v1/schedule/groups?year=${encodeURIComponent(year)}`),
   getTeachers: (year = '2025-2026') => apiFetch(`/api/v1/schedule/teachers?year=${encodeURIComponent(year)}`),
   getAuditories: (year = '2025-2026') => apiFetch(`/api/v1/schedule/auditories?year=${encodeURIComponent(year)}`),
-  getSchedule: (idGroup, year = '2025-2026', sdate = '') => {
+  getSchedule: (idGroup = null, year = '2025-2026', sdate = '', idTeacher = null, idAud = null) => {
     const query = new URLSearchParams({ year });
     if (idGroup) query.append('idGroup', idGroup);
+    if (idTeacher) query.append('idTeacher', idTeacher);
+    if (idAud) query.append('idAud', idAud);
     if (sdate) query.append('sdate', sdate);
     return apiFetch(`/api/v1/schedule/rasp?${query.toString()}`);
   }

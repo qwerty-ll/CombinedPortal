@@ -40,7 +40,7 @@ const Forum = () => {
   const handleVote = (id, type, e) => {
     e.stopPropagation();
     if (!isLoggedIn) {
-      toast.show('Войдите через СДО, чтобы голосовать', 'warning');
+      toast.show('Войдите через ЭИОС КГУ, чтобы голосовать', 'warning');
       return;
     }
     setQuestions(prev => prev.map(q => {
@@ -174,12 +174,12 @@ const Forum = () => {
           <div className="auth-gate-content">
             <LogIn size={20} />
             <div>
-              <strong>Для участия в форуме необходимо войти через СДО КГУ</strong>
+              <strong>Для участия в форуме необходимо войти через ЭИОС КГУ</strong>
               <p>Вы можете просматривать темы, но для создания вопросов и ответов нужна авторизация</p>
             </div>
           </div>
           <button className="btn-auth-gate" onClick={() => navigate('/profile')}>
-            Войти через СДО
+            Войти через ЭИОС
           </button>
         </div>
       )}

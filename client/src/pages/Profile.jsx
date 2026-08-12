@@ -166,7 +166,7 @@ const Profile = () => {
                 transition: 'all 0.2s'
               }}
             >
-              🎓 Студент СДО КГУ
+              🎓 Студент ЭИОС КГУ
             </button>
             <button
               type="button"
@@ -193,16 +193,16 @@ const Profile = () => {
             <div className="login-icon-box" style={{ background: loginMode === 'staff' ? 'rgba(5,150,105,0.1)' : 'rgba(0,127,255,0.1)', color: loginMode === 'staff' ? '#059669' : 'var(--primary)' }}>
               {loginMode === 'staff' ? <UserCheck size={32} /> : <GraduationCap size={32} />}
             </div>
-            <h2>{loginMode === 'staff' ? 'Вход для Администрации ИВИТШ' : 'Вход через СДО КГУ'}</h2>
-            <p>{loginMode === 'staff' ? 'Служебная авторизация администраторов и деканата' : 'Авторизация через единый сервис sdo.kosgos.ru'}</p>
+            <h2>{loginMode === 'staff' ? 'Вход для Администрации ИВИТШ' : 'Вход через ЭИОС КГУ'}</h2>
+            <p>{loginMode === 'staff' ? 'Служебная авторизация администраторов и деканата' : 'Единый сервис авторизации eios.kosgos.ru / sdo.kosgos.ru'}</p>
           </div>
 
           <form onSubmit={handleLogin} className="login-form">
             <div className="login-field">
-              <label>{loginMode === 'staff' ? 'Логин администратора' : 'Логин СДО КГУ'}</label>
+              <label>{loginMode === 'staff' ? 'Логин администратора' : 'Логин ЭИОС КГУ'}</label>
               <input 
                 type="text"
-                placeholder={loginMode === 'staff' ? 'Учетная запись деканата' : 'Логин в sdo.kosgos.ru (напр. student)'}
+                placeholder={loginMode === 'staff' ? 'Учетная запись деканата' : 'Логин учетной записи ЭИОС'}
                 value={loginForm.username}
                 onChange={e => setLoginForm({ ...loginForm, username: e.target.value })}
                 required
@@ -228,7 +228,7 @@ const Profile = () => {
                 <>Проверка авторизации...</>
               ) : (
                 <>
-                  <Lock size={16} /> {loginMode === 'staff' ? 'Войти в админку' : 'Войти через СДО'}
+                  <Lock size={16} /> {loginMode === 'staff' ? 'Войти в админку' : 'Войти через ЭИОС'}
                 </>
               )}
             </button>
@@ -305,7 +305,7 @@ const Profile = () => {
               <h2>{user.fullName}</h2>
               {user.isSdoAuth && (
                 <span style={{ background: '#E6F4EA', color: '#137333', fontSize: '0.75rem', padding: '3px 8px', borderRadius: '8px', fontWeight: '800' }}>
-                  ✓ СДО KOSGOS
+                  ✓ ЭИОС KOSGOS
                 </span>
               )}
             </div>
@@ -317,7 +317,7 @@ const Profile = () => {
             </p>
 
             <button onClick={handleLogout} className="profile-logout-btn">
-              <LogOut size={14} /> Выйти из СДО
+              <LogOut size={14} /> Выйти из аккаунта
             </button>
           </div>
         </motion.section>

@@ -487,7 +487,7 @@ const QuestionDetail = () => {
           <div className="auth-gate-content">
             <LogIn size={20} />
             <div>
-              <strong>Войдите через СДО, чтобы ответить на вопрос</strong>
+              <strong>Войдите через ЭИОС КГУ, чтобы ответить на вопрос</strong>
             </div>
           </div>
           <button className="btn-auth-gate" onClick={() => navigate('/profile')}>

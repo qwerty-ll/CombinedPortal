@@ -177,7 +177,10 @@ const ScheduleWidget = () => {
       try {
         const res = await scheduleApi.getSchedule(
           targetType === 'group' ? id : null,
-          selectedYear
+          selectedYear,
+          '',
+          targetType === 'teacher' ? id : null,
+          targetType === 'aud' ? id : null
         );
         raspData = res?.data?.rasp || [];
       } catch (e) {
