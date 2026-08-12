@@ -87,15 +87,16 @@ def admin_login(user_in: schemas.UserLogin, db: Session = Depends(get_db)):
     logger.info(f"[ADMIN LOGIN SUCCESS] Admin logged in: {db_user.username}")
     return schemas.TokenResponse(access_token=token, user=db_user)
 
+@router.post("/eios-login", response_model=schemas.TokenResponse)
 @router.post("/sdo-login", response_model=schemas.TokenResponse)
-async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
+async def eios_login(sdo_req: schemas.EiosLoginRequest, db: Session = Depends(get_db)):
     username = sdo_req.username.strip()
     password = sdo_req.password.strip()
 
-    logger.info(f"[SDO LOGIN ATTEMPT] Initiating SDO authentication for user: {username}")
+    logger.info(f"[EIOS LOGIN ATTEMPT] Initiating EIOS authentication for user: {username}")
 
     if not username or not password:
-        raise HTTPException(status_code=400, detail="Логин и пароль обязательны для входа через СДО")
+        raise HTTPException(status_code=400, detail="Логин и пароль обязательны для входа через ЭИОС КГУ")
 
     token_url = "https://sdo.kosgos.ru/login/token.php"
     token_params = {

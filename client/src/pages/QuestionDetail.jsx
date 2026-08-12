@@ -143,7 +143,7 @@ const QuestionDetail = () => {
   // Voting on the question
   const handleVote = (type) => {
     if (!isLoggedIn) {
-      toast.show('Войдите через СДО, чтобы голосовать', 'warning');
+      toast.show('Войдите через ЭИОС КГУ, чтобы голосовать', 'warning');
       return;
     }
     const updatedQuestions = questions.map(q => {
@@ -237,7 +237,7 @@ const QuestionDetail = () => {
   // Vote on comment
   const handleVoteComment = (replyId, type) => {
     if (!isLoggedIn) {
-      toast.show('Войдите через СДО, чтобы голосовать', 'warning');
+      toast.show('Войдите через ЭИОС КГУ, чтобы голосовать', 'warning');
       return;
     }
     const updatedAnswers = currentAnswers.map(ans => {

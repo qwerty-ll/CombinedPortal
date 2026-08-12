@@ -28,7 +28,8 @@ export const apiFetch = async (endpoint, options = {}) => {
 // Auth Services
 export const authApi = {
   login: (username, password) => apiFetch('/api/v1/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
-  sdoLogin: (username, password, groupNumber = '') => apiFetch('/api/v1/auth/sdo-login', { method: 'POST', body: JSON.stringify({ username, password, group_number: groupNumber }) }),
+  eiosLogin: (username, password, groupNumber = '') => apiFetch('/api/v1/auth/eios-login', { method: 'POST', body: JSON.stringify({ username, password, group_number: groupNumber }) }),
+  sdoLogin: (username, password, groupNumber = '') => apiFetch('/api/v1/auth/eios-login', { method: 'POST', body: JSON.stringify({ username, password, group_number: groupNumber }) }),
   adminLogin: (username, password) => apiFetch('/api/v1/auth/admin-login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   register: (userData) => apiFetch('/api/v1/auth/register', { method: 'POST', body: JSON.stringify(userData) }),
   getMe: () => apiFetch('/api/v1/auth/me'),
