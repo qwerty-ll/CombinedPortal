@@ -96,43 +96,40 @@ const ScheduleWidget = () => {
     const loadCatalog = async () => {
       setCatalogLoading(true);
       try {
-        let directUrl = `${EIOS_DIRECT_URL}/raspGrouplist?year=${encodeURIComponent(selectedYear)}`;
-        if (targetType === 'teacher') directUrl = `${EIOS_DIRECT_URL}/raspTeacherlist?year=${encodeURIComponent(selectedYear)}`;
-        if (targetType === 'aud') directUrl = `${EIOS_DIRECT_URL}/raspAudlist?year=${encodeURIComponent(selectedYear)}`;
-
-        let items = [];
-        try {
-          if (targetType === 'group') {
-            const res = await scheduleApi.getGroups(selectedYear);
-            items = res?.data || [];
-          } else if (targetType === 'teacher') {
-            const res = await scheduleApi.getTeachers(selectedYear);
-            items = res?.data || [];
-          } else if (targetType === 'aud') {
-            const res = await scheduleApi.getAuditories(selectedYear);
-            items = res?.data || [];
-          }
-        } catch (e) {
-          const res = await fetch(directUrl);
-          const json = await res.json();
-          items = json?.data || [];
+        let rawItems = [];
+        if (targetType === 'group') {
+          const res = await scheduleApi.getGroups(selectedYear);
+          rawItems = res?.data || [];
+        } else if (targetType === 'teacher') {
+          const res = await scheduleApi.getTeachers(selectedYear);
+          rawItems = res?.data || [];
+        } else if (targetType === 'aud') {
+          const res = await scheduleApi.getAuditories(selectedYear);
+          rawItems = res?.data || [];
         }
+
+        const items = (rawItems || []).map(i => ({
+          ...i,
+          id: i.id || i.idName,
+          idName: i.idName || i.id
+        }));
 
         if (isMounted) {
           setCatalogItems(items);
           setCatalogLoading(false);
 
           if (items.length > 0) {
-            const exists = items.find(i => i.id === Number(selectedId));
+            const exists = items.find(i => Number(i.id) === Number(selectedId));
             if (!exists) {
               const defaultItem = targetType === 'group' 
-                ? (items.find(g => g.name.includes('24-ИСбо-1')) || items.find(g => g.facul === 'ИВИТШ') || items[0])
+                ? (items.find(g => g.name && g.name.includes('24-ИСбо-1')) || items.find(g => g.facul === 'ИВИТШ') || items[0])
                 : items[0];
               if (defaultItem) handleSelectItem(defaultItem);
             }
           }
         }
       } catch (err) {
+        console.warn('[ScheduleWidget] Catalog load error:', err);
         if (isMounted) setCatalogLoading(false);
       }
     };
@@ -143,12 +140,13 @@ const ScheduleWidget = () => {
 
   // Handle selecting an item from search dropdown
   const handleSelectItem = (item) => {
-    setSelectedId(item.id);
+    const itemId = item.id || item.idName;
+    setSelectedId(itemId);
     setSelectedName(item.name);
     setIsDropdownOpen(false);
     setSearchQuery('');
 
-    localStorage.setItem('portal_sched_id', item.id);
+    localStorage.setItem('portal_sched_id', itemId);
     localStorage.setItem('portal_sched_name', item.name);
   };
 
@@ -157,7 +155,7 @@ const ScheduleWidget = () => {
     if (!searchQuery.trim()) return catalogItems.slice(0, 30);
     const query = searchQuery.toLowerCase().trim();
     return catalogItems.filter(item => 
-      item.name.toLowerCase().includes(query) || 
+      (item.name && item.name.toLowerCase().includes(query)) || 
       (item.facul && item.facul.toLowerCase().includes(query)) ||
       (item.kaf && item.kaf.toLowerCase().includes(query))
     ).slice(0, 40);
@@ -169,28 +167,18 @@ const ScheduleWidget = () => {
     setLessonsLoading(true);
     setError(null);
     try {
-      let paramKey = 'idGroup';
-      if (targetType === 'teacher') paramKey = 'idTeacher';
-      if (targetType === 'aud') paramKey = 'idAud';
-
-      let raspData = [];
-      try {
-        const res = await scheduleApi.getSchedule(
-          targetType === 'group' ? id : null,
-          selectedYear,
-          '',
-          targetType === 'teacher' ? id : null,
-          targetType === 'aud' ? id : null
-        );
-        raspData = res?.data?.rasp || [];
-      } catch (e) {
-        const res = await fetch(`${EIOS_DIRECT_URL}/Rasp?${paramKey}=${id}&year=${encodeURIComponent(selectedYear)}`);
-        const json = await res.json();
-        raspData = json?.data?.rasp || [];
-      }
-
+      const res = await scheduleApi.getSchedule(
+        targetType === 'group' ? id : null,
+        selectedYear,
+        '',
+        targetType === 'teacher' ? id : null,
+        targetType === 'aud' ? id : null
+      );
+      
+      const raspData = res?.data?.rasp || (Array.isArray(res?.data) ? res.data : []);
       setRawLessons(raspData);
     } catch (err) {
+      console.error('[ScheduleWidget] Fetch schedule error:', err);
       setError('Не удалось загрузить расписание.');
       setRawLessons([]);
     } finally {
