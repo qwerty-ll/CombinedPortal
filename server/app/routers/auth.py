@@ -109,10 +109,34 @@ async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_
     wstoken = None
     verify_ssl_setting = security.VERIFY_SSL
 
+    # Helper to safely parse SDO token response and detect VPN / 451 blocks
+    def process_token_response(resp):
+        if resp.status_code == 451 or "отключите vpn" in resp.text.lower() or "правовыми ограничениями" in resp.text.lower():
+            logger.warning("[SDO VPN BLOCK] sdo.kosgos.ru returned 451 VPN Block")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Сервер СДО КГУ заблокировал подключение из-за включенного VPN. Пожалуйста, отключите VPN на компьютере или в браузере и повторите попытку."
+            )
+        try:
+            return resp.json()
+        except Exception as json_err:
+            logger.error(f"[SDO NON-JSON RESP] HTTP {resp.status_code}: {resp.text[:200]}")
+            if resp.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=f"Сервер СДО КГУ недоступен (код ошибки {resp.status_code})."
+                )
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Сервер СДО КГУ вернул некорректный ответ."
+            )
+
     try:
         async with httpx.AsyncClient(verify=verify_ssl_setting, timeout=12.0) as client:
             token_resp = await client.get(token_url, params=token_params)
-            token_data = token_resp.json()
+            token_data = process_token_response(token_resp)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"[SDO CONN ERROR] Failed SSL/TLS connection to sdo.kosgos.ru (verify={verify_ssl_setting}): {e}")
         # Retry with SSL verify disabled if KSU internal certificate chain fails
@@ -121,8 +145,10 @@ async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_
                 logger.info("[SDO RETRY] Retrying SDO authentication with verify=False for KSU internal network")
                 async with httpx.AsyncClient(verify=False, timeout=12.0) as client:
                     token_resp = await client.get(token_url, params=token_params)
-                    token_data = token_resp.json()
+                    token_data = process_token_response(token_resp)
                     verify_ssl_setting = False
+            except HTTPException:
+                raise
             except Exception as retry_err:
                 logger.error(f"[SDO RETRY FAILED] {retry_err}")
                 raise HTTPException(
