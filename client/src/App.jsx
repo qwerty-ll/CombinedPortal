@@ -454,9 +454,14 @@ function App() {
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={() => setIsChatOpen(!isChatOpen)}
-        style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}
+        style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', overflow: 'hidden', padding: '6px' }}
       >
-        <MessageCircle size={26} color="white" />
+        <img 
+          src="/img/mascot.png" 
+          alt="ВИТШик" 
+          style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+          onError={(e) => { e.target.src = "/mascot.png"; }}
+        />
       </motion.div>
     </div>
   );

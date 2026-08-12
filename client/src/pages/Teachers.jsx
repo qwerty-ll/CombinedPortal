@@ -244,16 +244,18 @@ const Teachers = () => {
                   viewport={{ once: true }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="teacher-photo-circle" style={{ background: '#E0F2FE', color: '#0369A1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                    {teacher.photo ? (
-                      <img 
-                        src={teacher.photo} 
-                        alt={teacher.name}
-                        onError={(e) => { e.target.style.display = 'none'; }}
-                      />
-                    ) : (
-                      <UsersIcon size={32} />
-                    )}
+                  <div className="teacher-photo-circle" style={{ background: '#F1F5F9', color: '#0369A1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                    <img 
+                      src={teacher.photo || `/img/teachers/teacher-${((teacher.id - 1) % 6) + 1}.png`} 
+                      alt={teacher.name}
+                      onError={(e) => { 
+                        if (!e.target.dataset.fallback) {
+                          e.target.dataset.fallback = "true";
+                          e.target.src = `/img/teachers/teacher-${((teacher.id - 1) % 6) + 1}.png`;
+                        }
+                      }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
                   </div>
                   <div className="teacher-card-info">
                     <h4>{highlightText(teacher.name, searchQuery)}</h4>
