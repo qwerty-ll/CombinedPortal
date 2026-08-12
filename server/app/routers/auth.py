@@ -1,4 +1,5 @@
 import os
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -11,6 +12,9 @@ try:
     import httpx
 except ImportError:
     import requests as httpx
+
+logger = logging.getLogger("ivitsh_portal.auth")
+logger.setLevel(logging.INFO)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
@@ -40,12 +44,13 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
 
     token = security.create_access_token(data={"sub": new_user.username})
+    logger.info(f"[REGISTER SUCCESS] New user registered: {new_user.username}")
     return schemas.TokenResponse(access_token=token, user=new_user)
 
 @router.post("/admin-login", response_model=schemas.TokenResponse)
 def admin_login(user_in: schemas.UserLogin, db: Session = Depends(get_db)):
     admin_user_env = os.getenv("ADMIN_USERNAME", "ivitsh_admin")
-    admin_pass_env = os.getenv("ADMIN_PASSWORD", "KGU_IVITSH_Admin_2026!#Secure")
+    admin_pass_env = os.getenv("ADMIN_PASSWORD", "KGU_IVITSH_Admin_2026!")
 
     username_clean = user_in.username.strip().lower()
     is_env_admin = (username_clean == admin_user_env.lower() or username_clean in ("admin", "smirnovmakar")) and user_in.password == admin_pass_env
@@ -54,8 +59,10 @@ def admin_login(user_in: schemas.UserLogin, db: Session = Depends(get_db)):
     
     if not is_env_admin and db_user:
         if db_user.role not in ("admin", "moderator") or not security.verify_password(user_in.password, db_user.hashed_password):
+            logger.warning(f"[ADMIN LOGIN FAILED] Invalid admin password for user: {user_in.username}")
             raise HTTPException(status_code=400, detail="Неверный логин или пароль Администратора ИВИТШ")
     elif not is_env_admin and not db_user:
+        logger.warning(f"[ADMIN LOGIN FAILED] User not found: {user_in.username}")
         raise HTTPException(status_code=400, detail="Неверный логин или пароль Администратора ИВИТШ")
 
     if not db_user:
@@ -77,12 +84,15 @@ def admin_login(user_in: schemas.UserLogin, db: Session = Depends(get_db)):
             db.refresh(db_user)
 
     token = security.create_access_token(data={"sub": db_user.username})
+    logger.info(f"[ADMIN LOGIN SUCCESS] Admin logged in: {db_user.username}")
     return schemas.TokenResponse(access_token=token, user=db_user)
 
 @router.post("/sdo-login", response_model=schemas.TokenResponse)
 async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_db)):
     username = sdo_req.username.strip()
     password = sdo_req.password.strip()
+
+    logger.info(f"[SDO LOGIN ATTEMPT] Initiating SDO authentication for user: {username}")
 
     if not username or not password:
         raise HTTPException(status_code=400, detail="Логин и пароль обязательны для входа через СДО")
@@ -94,35 +104,67 @@ async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_
         "service": "moodle_mobile_app"
     }
 
-    async with httpx.AsyncClient(verify=security.VERIFY_SSL, timeout=12.0) as client:
-        try:
+    # Attempt SDO authentication (with fallback SSL verification to support internal KSU network)
+    token_data = None
+    wstoken = None
+    verify_ssl_setting = security.VERIFY_SSL
+
+    try:
+        async with httpx.AsyncClient(verify=verify_ssl_setting, timeout=12.0) as client:
             token_resp = await client.get(token_url, params=token_params)
             token_data = token_resp.json()
-        except Exception as e:
-            raise HTTPException(status_code=502, detail=f"Ошибка соединения с сервером СДО КГУ: {str(e)}")
+    except Exception as e:
+        logger.error(f"[SDO CONN ERROR] Failed SSL/TLS connection to sdo.kosgos.ru (verify={verify_ssl_setting}): {e}")
+        # Retry with SSL verify disabled if KSU internal certificate chain fails
+        if verify_ssl_setting:
+            try:
+                logger.info("[SDO RETRY] Retrying SDO authentication with verify=False for KSU internal network")
+                async with httpx.AsyncClient(verify=False, timeout=12.0) as client:
+                    token_resp = await client.get(token_url, params=token_params)
+                    token_data = token_resp.json()
+                    verify_ssl_setting = False
+            except Exception as retry_err:
+                logger.error(f"[SDO RETRY FAILED] {retry_err}")
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=f"Ошибка соединения с сервером СДО КГУ (sdo.kosgos.ru): {str(retry_err)}"
+                )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Ошибка соединения с сервером СДО КГУ (sdo.kosgos.ru): {str(e)}"
+            )
 
-        if "error" in token_data or "token" not in token_data:
-            err_msg = token_data.get("error", "Неверный логин или пароль СДО")
-            raise HTTPException(status_code=400, detail=err_msg)
+    if not token_data or "error" in token_data or "token" not in token_data:
+        err_msg = token_data.get("error", "Неверный логин или пароль СДО") if token_data else "Неверный ответ сервера СДО"
+        logger.warning(f"[SDO AUTH REJECTED] User: {username}, Error: {err_msg}")
+        raise HTTPException(status_code=400, detail=err_msg)
 
-        wstoken = token_data["token"]
-        rest_url = "https://sdo.kosgos.ru/webservice/rest/server.php"
-        info_params = {
-            "wstoken": wstoken,
-            "moodlewsrestformat": "json",
-            "wsfunction": "core_webservice_get_site_info"
-        }
+    wstoken = token_data["token"]
+    logger.info(f"[SDO AUTH SUCCESS] Token obtained for {username}")
 
+    rest_url = "https://sdo.kosgos.ru/webservice/rest/server.php"
+    info_params = {
+        "wstoken": wstoken,
+        "moodlewsrestformat": "json",
+        "wsfunction": "core_webservice_get_site_info"
+    }
+
+    fullname = username
+    userid = None
+    userpictureurl = ""
+    department_name = ""
+    courses_list = []
+
+    async with httpx.AsyncClient(verify=verify_ssl_setting, timeout=12.0) as client:
         try:
             info_resp = await client.post(rest_url, data=info_params)
             info_data = info_resp.json()
-        except Exception:
-            info_data = {}
-
-        fullname = info_data.get("fullname", "").strip() or info_data.get("username", "").strip() or username
-        userid = info_data.get("userid")
-        userpictureurl = info_data.get("userpictureurl", "")
-        department_name = ""
+            fullname = info_data.get("fullname", "").strip() or info_data.get("username", "").strip() or username
+            userid = info_data.get("userid")
+            userpictureurl = info_data.get("userpictureurl", "")
+        except Exception as info_err:
+            logger.warning(f"[SDO SITE INFO WARN] Could not fetch site info: {info_err}")
 
         if userid:
             try:
@@ -144,10 +186,9 @@ async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_
                         userpictureurl = u_item.get("profileimageurl")
                     if u_item.get("department"):
                         department_name = u_item.get("department")
-            except Exception:
-                pass
+            except Exception as user_err:
+                logger.warning(f"[SDO USER DETAILS WARN] Could not fetch user details: {user_err}")
 
-        courses_list = []
         detected_group = sdo_req.group_number.strip() if sdo_req.group_number else ""
 
         if userid:
@@ -198,7 +239,8 @@ async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_
                         if match:
                             detected_group = match.group(1)
                             break
-            except Exception:
+            except Exception as course_err:
+                logger.warning(f"[SDO COURSES WARN] Could not fetch enrolled courses: {course_err}")
                 courses_list = []
 
     if not detected_group:
@@ -239,6 +281,7 @@ async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_
         created_at=db_user.created_at
     )
 
+    logger.info(f"[SDO LOGIN COMPLETE] User {username} ({fullname}) successfully logged in")
     return schemas.TokenResponse(access_token=jwt_token, user=user_resp)
 
 @router.get("/me", response_model=schemas.UserResponse)

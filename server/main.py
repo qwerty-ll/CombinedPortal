@@ -9,7 +9,18 @@ from app.db.database import engine, Base
 import app.core.security as security
 from app.routers import auth, forum, chat, schedule, admin
 
+import logging
+
 load_dotenv()
+
+# Configure Application Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger("ivitsh_portal")
+logger.info("Initializing IVITSH KSU Portal Backend Services...")
 
 # Initialize DB tables automatically on startup
 Base.metadata.create_all(bind=engine)
