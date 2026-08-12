@@ -194,7 +194,7 @@ const Profile = () => {
               {loginMode === 'staff' ? <UserCheck size={32} /> : <GraduationCap size={32} />}
             </div>
             <h2>{loginMode === 'staff' ? 'Вход для Администрации ИВИТШ' : 'Вход через ЭИОС КГУ'}</h2>
-            <p>{loginMode === 'staff' ? 'Служебная авторизация администраторов и деканата' : 'Единый сервис авторизации eios.kosgos.ru / sdo.kosgos.ru'}</p>
+            <p>{loginMode === 'staff' ? 'Служебная авторизация администраторов и деканата' : 'Единый портал авторизации eios.kosgos.ru (Account/Login.aspx)'}</p>
           </div>
 
           <form onSubmit={handleLogin} className="login-form">
@@ -202,7 +202,7 @@ const Profile = () => {
               <label>{loginMode === 'staff' ? 'Логин администратора' : 'Логин ЭИОС КГУ'}</label>
               <input 
                 type="text"
-                placeholder={loginMode === 'staff' ? 'Учетная запись деканата' : 'Логин учетной записи ЭИОС'}
+                placeholder={loginMode === 'staff' ? 'Учетная запись деканата' : 'Логин учетной записи ЭИОС (напр. 22-isbo-035)'}
                 value={loginForm.username}
                 onChange={e => setLoginForm({ ...loginForm, username: e.target.value })}
                 required
@@ -219,6 +219,11 @@ const Profile = () => {
                 disabled={isLoggingIn}
                 required
               />
+              {loginMode !== 'staff' && (
+                <span style={{ fontSize: '0.78rem', color: '#666', marginTop: '6px', display: 'block', lineHeight: '1.3' }}>
+                  💡 <strong>Подсказка:</strong> Логин и пароль такие же, как для входа в СДО / ЭИОС КГУ (<a href="https://eios.kosgos.ru/Account/Login.aspx" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>eios.kosgos.ru</a>).
+                </span>
+              )}
             </div>
 
             {loginError && <div className="login-error">{loginError}</div>}

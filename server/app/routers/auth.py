@@ -109,26 +109,26 @@ async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_
     wstoken = None
     verify_ssl_setting = security.VERIFY_SSL
 
-    # Helper to safely parse SDO token response and detect VPN / 451 blocks
+    # Helper to safely parse EIOS/SDO token response and detect VPN / 451 blocks
     def process_token_response(resp):
         if resp.status_code == 451 or "отключите vpn" in resp.text.lower() or "правовыми ограничениями" in resp.text.lower():
-            logger.warning("[SDO VPN BLOCK] sdo.kosgos.ru returned 451 VPN Block")
+            logger.warning("[EIOS/SDO VPN BLOCK] eios.kosgos.ru / sdo.kosgos.ru returned 451 VPN Block")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Сервер СДО КГУ заблокировал подключение из-за включенного VPN. Пожалуйста, отключите VPN на компьютере или в браузере и повторите попытку."
+                detail="Сервер ЭИОС КГУ заблокировал подключение из-за включенного VPN. Пожалуйста, отключите VPN на компьютере или в браузере и повторите попытку."
             )
         try:
             return resp.json()
         except Exception as json_err:
-            logger.error(f"[SDO NON-JSON RESP] HTTP {resp.status_code}: {resp.text[:200]}")
+            logger.error(f"[EIOS/SDO NON-JSON RESP] HTTP {resp.status_code}: {resp.text[:200]}")
             if resp.status_code != 200:
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail=f"Сервер СДО КГУ недоступен (код ошибки {resp.status_code})."
+                    detail=f"Сервер ЭИОС КГУ недоступен (код ошибки {resp.status_code})."
                 )
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Сервер СДО КГУ вернул некорректный ответ."
+                detail="Сервер ЭИОС КГУ вернул некорректный ответ."
             )
 
     import requests as sync_requests
@@ -142,7 +142,7 @@ async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_
     except HTTPException:
         raise
     except Exception as first_err:
-        logger.warning(f"[SDO CONN WARN] Direct connection with verify={verify_ssl_setting} failed ({first_err}). Retrying with verify=False...")
+        logger.warning(f"[EIOS/SDO CONN WARN] Direct connection with verify={verify_ssl_setting} failed ({first_err}). Retrying with verify=False...")
         try:
             # Second attempt with verify=False (supports internal KSU network & custom CA)
             resp = sync_requests.get(token_url, params=token_params, verify=False, timeout=8.0)
@@ -151,15 +151,15 @@ async def sdo_login(sdo_req: schemas.SdoLoginRequest, db: Session = Depends(get_
         except HTTPException:
             raise
         except Exception as retry_err:
-            logger.error(f"[SDO CONN FAILED] Both SSL verified and insecure attempts failed: {retry_err}")
+            logger.error(f"[EIOS/SDO CONN FAILED] Both SSL verified and insecure attempts failed: {retry_err}")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Сервер СДО КГУ (sdo.kosgos.ru) недоступен из сети виртуальной машины: {str(retry_err)}"
+                detail=f"Сервер ЭИОС КГУ (eios.kosgos.ru / sdo.kosgos.ru) недоступен из сети виртуальной машины: {str(retry_err)}"
             )
 
     if not token_data or "error" in token_data or "token" not in token_data:
-        err_msg = token_data.get("error", "Неверный логин или пароль СДО") if token_data else "Неверный ответ сервера СДО"
-        logger.warning(f"[SDO AUTH REJECTED] User: {username}, Error: {err_msg}")
+        err_msg = token_data.get("error", "Неверный логин или пароль ЭИОС / СДО КГУ") if token_data else "Неверный ответ сервера ЭИОС КГУ"
+        logger.warning(f"[EIOS/SDO AUTH REJECTED] User: {username}, Error: {err_msg}")
         raise HTTPException(status_code=400, detail=err_msg)
 
     wstoken = token_data["token"]
