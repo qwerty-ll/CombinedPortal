@@ -88,4 +88,5 @@ Thumbs.db
 .cache/
 coverage/
 push_and_merge.py
+*/push_and_merge.py
 scratch/
