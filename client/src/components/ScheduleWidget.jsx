@@ -645,7 +645,7 @@ const ScheduleWidget = () => {
       {lessonsLoading ? (
         <div style={{ textAlign: 'center', padding: '45px 0', color: '#666' }}>
           <div className="spinner" style={{ margin: '0 auto 10px auto' }}></div>
-          <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>Загрузка расписания для "{selectedName}"...</span>
+          <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>Загрузка расписания для "{currentTarget?.name || 'выбранного объекта'}"...</span>
         </div>
       ) : error ? (
         <div style={{ textAlign: 'center', padding: '24px', background: '#FFF5F5', borderRadius: '16px', color: '#C53030', border: '1px solid #FEB2B2' }}>
