@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import DOMPurify from 'dompurify';
 import {
-  BellRing, Users, HelpCircle, MessageSquare, Plus, Pencil, Trash2, X, Save, Shield, UserCheck
+  BellRing, Users, HelpCircle, MessageSquare, Plus, Pencil, Trash2, X, Save, Shield, UserCheck, BookOpen
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { adminApi } from '../services/api';
+import { adminApi, subjectsApi, teachersApi } from '../services/api';
 import { OFFICIAL_IVITSH_TEACHERS } from './Teachers';
 
 // --- Data access helpers (future: replace with API calls) ---
@@ -103,6 +103,25 @@ const AdminPanel = () => {
   });
   const [editingTeacherId, setEditingTeacherId] = useState(null);
 
+  // --- SUBJECTS ---
+  const [subjects, setSubjects] = useState([]);
+  const [subjectForm, setSubjectForm] = useState({
+    subject_code: '', name: '', short_name: '', emoji: '📚', color: '#007AFF',
+    difficulty: 3, hours: 108, credits: 3, semester: 1, control_type: 'Зачет',
+    extra_type: '', description: '', mascot_hack: '', senior_advice: ''
+  });
+  const [editingSubjectId, setEditingSubjectId] = useState(null);
+
+  useEffect(() => {
+    teachersApi.getTeachers().then(res => {
+      if (Array.isArray(res) && res.length > 0) setTeachers(res);
+    }).catch(e => console.warn('Failed to load DB teachers:', e));
+
+    subjectsApi.getSubjects().then(res => {
+      if (Array.isArray(res)) setSubjects(res);
+    }).catch(e => console.warn('Failed to load DB subjects:', e));
+  }, []);
+
   const handlePhotoUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -127,40 +146,32 @@ const AdminPanel = () => {
     reader.readAsDataURL(file);
   };
 
-  const saveTeachers = (data) => {
-    setTeachers(data);
-    saveToStorage('portal_teachers', data);
-  };
-
-  const handleAddTeacher = (e) => {
+  const handleAddTeacher = async (e) => {
     e.preventDefault();
     if (!teacherForm.name.trim()) return;
 
     const teacherData = {
-      ...teacherForm,
       name: teacherForm.name.trim(),
-      department: teacherForm.department.trim() || 'Кафедра не указана',
-      role: teacherForm.role.trim(),
+      department: teacherForm.department.trim() || 'Высшая ИТ-школа КГУ',
+      role: teacherForm.role.trim() || 'Преподаватель',
       email: teacherForm.email.trim(),
-      office: teacherForm.office.trim(),
+      office: teacherForm.office.trim() || 'Корпус Б',
       hours: teacherForm.hours.trim(),
-      courses: teacherForm.courses.split(',').map(c => c.trim()).filter(Boolean),
-      photo: teacherForm.photo || `teacher-${Math.floor(Math.random() * 6) + 1}.png`
+      courses: teacherForm.courses,
+      photo_url: teacherForm.photo || 'https://kosgos.ru/images/INSTITUTS/nophoto.jpg'
     };
 
-    if (editingTeacherId) {
-      const updated = teachers.map(t =>
-        t.id === editingTeacherId ? { ...t, ...teacherData } : t
-      );
-      saveTeachers(updated);
-      toast.show('Преподаватель обновлён', 'success');
+    try {
+      const created = await teachersApi.createTeacher(teacherData);
+      setTeachers(prev => [created, ...prev.filter(t => t.id !== created.id)]);
+      toast.show('Преподаватель сохранён на сервере', 'success');
+      setTeacherForm({ name: '', department: '', role: '', email: '', office: '', hours: '', courses: '', photo: '' });
       setEditingTeacherId(null);
-    } else {
-      const newTeacher = { id: Date.now(), ...teacherData };
-      saveTeachers([...teachers, newTeacher]);
-      toast.show('Преподаватель добавлен', 'success');
+    } catch (err) {
+      const newTeacher = { id: Date.now(), ...teacherData, photo: teacherData.photo_url };
+      setTeachers([newTeacher, ...teachers]);
+      toast.show('Сохранено локально', 'info');
     }
-    setTeacherForm({ name: '', department: '', role: '', email: '', office: '', hours: '', courses: '', photo: '' });
   };
 
   const handleEditTeacher = (t) => {
@@ -168,19 +179,80 @@ const AdminPanel = () => {
       name: t.name,
       department: t.department,
       role: t.role,
-      email: t.email,
-      office: t.office,
-      hours: t.hours,
-      courses: Array.isArray(t.courses) ? t.courses.join(', ') : '',
-      photo: t.photo || ''
+      email: t.email || '',
+      office: t.office || '',
+      hours: t.hours || '',
+      courses: t.courses || '',
+      photo: t.photo_url || t.photo || ''
     });
     setEditingTeacherId(t.id);
   };
 
-  const handleDeleteTeacher = (id) => {
+  const handleDeleteTeacher = async (id) => {
     if (window.confirm('Удалить преподавателя?')) {
-      saveTeachers(teachers.filter(t => t.id !== id));
+      try {
+        await teachersApi.deleteTeacher(id);
+      } catch (err) {}
+      setTeachers(teachers.filter(t => t.id !== id));
       toast.show('Преподаватель удалён', 'info');
+    }
+  };
+
+  // --- SUBJECTS HANDLERS ---
+  const handleAddSubject = async (e) => {
+    e.preventDefault();
+    if (!subjectForm.name.trim() || !subjectForm.subject_code.trim()) return;
+
+    try {
+      if (editingSubjectId) {
+        const updated = await subjectsApi.updateSubject(editingSubjectId, subjectForm);
+        setSubjects(prev => prev.map(s => s.id === editingSubjectId ? updated : s));
+        toast.show('Предмет обновлён на сервере', 'success');
+        setEditingSubjectId(null);
+      } else {
+        const created = await subjectsApi.createSubject(subjectForm);
+        setSubjects(prev => [...prev, created]);
+        toast.show('Предмет создан в базе данных', 'success');
+      }
+      setSubjectForm({
+        subject_code: '', name: '', short_name: '', emoji: '📚', color: '#007AFF',
+        difficulty: 3, hours: 108, credits: 3, semester: 1, control_type: 'Зачет',
+        extra_type: '', description: '', mascot_hack: '', senior_advice: ''
+      });
+    } catch (err) {
+      toast.show(err.message || 'Ошибка сохранения предмета', 'warning');
+    }
+  };
+
+  const handleEditSubject = (s) => {
+    setSubjectForm({
+      subject_code: s.subject_code,
+      name: s.name,
+      short_name: s.short_name,
+      emoji: s.emoji || '📚',
+      color: s.color || '#007AFF',
+      difficulty: s.difficulty || 3,
+      hours: s.hours || 108,
+      credits: s.credits || 3,
+      semester: s.semester || 1,
+      control_type: s.control_type || 'Зачет',
+      extra_type: s.extra_type || '',
+      description: s.description || '',
+      mascot_hack: s.mascot_hack || '',
+      senior_advice: s.senior_advice || ''
+    });
+    setEditingSubjectId(s.id);
+  };
+
+  const handleDeleteSubject = async (id) => {
+    if (window.confirm('Удалить дисциплину из каталога?')) {
+      try {
+        await subjectsApi.deleteSubject(id);
+        setSubjects(prev => prev.filter(s => s.id !== id));
+        toast.show('Предмет удалён из базы данных', 'info');
+      } catch (err) {
+        toast.show(err.message || 'Ошибка удаления', 'warning');
+      }
     }
   };
 
@@ -246,6 +318,7 @@ const AdminPanel = () => {
   const tabs = [
     { id: 'announcements', label: 'Объявления', icon: <BellRing size={18} />, count: announcements.length },
     { id: 'teachers', label: 'Преподаватели', icon: <Users size={18} />, count: teachers.length },
+    { id: 'subjects', label: 'Предметы / Дисциплины', icon: <BookOpen size={18} />, count: subjects.length },
     { id: 'faq', label: 'FAQ', icon: <HelpCircle size={18} />, count: faqItems.length },
     { id: 'forum', label: 'Модерация форума', icon: <MessageSquare size={18} />, count: forumQuestions.length },
     { id: 'users', label: 'Пользователи и Роли', icon: <UserCheck size={18} />, count: usersList.length },
@@ -403,6 +476,64 @@ const AdminPanel = () => {
                   <div className="admin-item-actions">
                     <button onClick={() => handleEditTeacher(t)} title="Редактировать"><Pencil size={16} /></button>
                     <button onClick={() => handleDeleteTeacher(t.id)} title="Удалить" className="danger"><Trash2 size={16} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* SUBJECTS TAB */}
+        {activeTab === 'subjects' && (
+          <motion.div key="subjects" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+            <div className="admin-section-card">
+              <h3>{editingSubjectId ? 'Редактировать дисциплину' : 'Добавить новую дисциплину'}</h3>
+              <form onSubmit={handleAddSubject} className="admin-form">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '10px' }}>
+                  <input type="text" placeholder="Код (напр. s1-algo) *" value={subjectForm.subject_code} onChange={e => setSubjectForm({ ...subjectForm, subject_code: e.target.value })} required />
+                  <input type="text" placeholder="Полное название *" value={subjectForm.name} onChange={e => setSubjectForm({ ...subjectForm, name: e.target.value })} required />
+                  <input type="text" placeholder="Сокращение *" value={subjectForm.short_name} onChange={e => setSubjectForm({ ...subjectForm, short_name: e.target.value })} required />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                  <input type="number" placeholder="Семестр *" min={1} max={8} value={subjectForm.semester} onChange={e => setSubjectForm({ ...subjectForm, semester: Number(e.target.value) })} required />
+                  <input type="number" placeholder="Часы *" value={subjectForm.hours} onChange={e => setSubjectForm({ ...subjectForm, hours: Number(e.target.value) })} required />
+                  <input type="number" placeholder="Зач. ед. *" value={subjectForm.credits} onChange={e => setSubjectForm({ ...subjectForm, credits: Number(e.target.value) })} required />
+                  <select value={subjectForm.control_type} onChange={e => setSubjectForm({ ...subjectForm, control_type: e.target.value })}>
+                    <option value="Зачет">Зачет</option>
+                    <option value="Экзамен">Экзамен</option>
+                    <option value="Практика">Практика</option>
+                  </select>
+                  <input type="text" placeholder="Эмодзи" value={subjectForm.emoji} onChange={e => setSubjectForm({ ...subjectForm, emoji: e.target.value })} />
+                </div>
+                <textarea placeholder="Описание предмета *" value={subjectForm.description} onChange={e => setSubjectForm({ ...subjectForm, description: e.target.value })} required rows={2} style={{ marginTop: '10px' }} />
+                <textarea placeholder="Лайфхак ВИТШика (Кота-маскота)..." value={subjectForm.mascot_hack} onChange={e => setSubjectForm({ ...subjectForm, mascot_hack: e.target.value })} rows={2} style={{ marginTop: '10px' }} />
+                <textarea placeholder="Совет старшекурсника..." value={subjectForm.senior_advice} onChange={e => setSubjectForm({ ...subjectForm, senior_advice: e.target.value })} rows={2} style={{ marginTop: '10px' }} />
+
+                <div className="admin-form-actions" style={{ marginTop: '10px' }}>
+                  <button type="submit" className="btn-admin-save">
+                    <Save size={16} /> {editingSubjectId ? 'Сохранить' : 'Добавить предмет'}
+                  </button>
+                  {editingSubjectId && (
+                    <button type="button" className="btn-admin-cancel" onClick={() => { setEditingSubjectId(null); setSubjectForm({ subject_code: '', name: '', short_name: '', emoji: '📚', color: '#007AFF', difficulty: 3, hours: 108, credits: 3, semester: 1, control_type: 'Зачет', extra_type: '', description: '', mascot_hack: '', senior_advice: '' }); }}>
+                      Отмена
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+
+            <div className="admin-items-list">
+              {subjects.length === 0 ? (
+                <div className="admin-empty">Предметы не найдены. Нажмите «Добавить», чтобы занести первый предмет в базу.</div>
+              ) : subjects.map(s => (
+                <div key={s.id} className="admin-item-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '12px 16px', borderRadius: '12px', marginBottom: '8px', border: '1px solid #eee' }}>
+                  <div>
+                    <div style={{ fontWeight: '700', fontSize: '1rem' }}>{s.emoji} {s.name} ({s.short_name})</div>
+                    <div style={{ fontSize: '0.82rem', color: '#666' }}>{s.semester}-й семестр | {s.hours}ч | {s.credits} з.е. | {s.control_type}</div>
+                  </div>
+                  <div className="admin-item-actions">
+                    <button onClick={() => handleEditSubject(s)} title="Редактировать"><Pencil size={16} /></button>
+                    <button onClick={() => handleDeleteSubject(s.id)} title="Удалить" className="danger"><Trash2 size={16} /></button>
                   </div>
                 </div>
               ))}

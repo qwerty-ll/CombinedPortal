@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Mail, Users as UsersIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { teachersApi } from '../services/api';
 
 export const OFFICIAL_IVITSH_TEACHERS = [
   {
@@ -162,8 +163,25 @@ export const OFFICIAL_IVITSH_TEACHERS = [
 const Teachers = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [teachersList, setTeachersList] = useState(OFFICIAL_IVITSH_TEACHERS);
 
-  const teachersList = OFFICIAL_IVITSH_TEACHERS;
+  useEffect(() => {
+    teachersApi.getTeachers().then(res => {
+      if (Array.isArray(res) && res.length > 0) {
+        setTeachersList(res.map(t => ({
+          id: t.id,
+          name: t.name,
+          department: t.department,
+          role: t.role,
+          email: t.email || '',
+          office: t.office || 'Корпус Б',
+          hours: t.hours || '',
+          courses: t.courses ? t.courses.split(',') : [],
+          photo: t.photo_url || 'https://kosgos.ru/images/INSTITUTS/nophoto.jpg'
+        })));
+      }
+    }).catch(e => console.warn('Using static teachers fallback:', e));
+  }, []);
 
   const filteredTeachers = teachersList.filter(teacher => 
     teacher.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

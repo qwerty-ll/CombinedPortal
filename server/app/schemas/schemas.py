@@ -127,6 +127,28 @@ class FaqItemResponse(FaqItemCreate):
     class Config:
         from_attributes = True
 
+class SubjectCreate(BaseModel):
+    subject_code: str
+    name: str
+    short_name: str
+    emoji: Optional[str] = "📚"
+    color: Optional[str] = "#007AFF"
+    difficulty: Optional[int] = 3
+    hours: Optional[int] = 108
+    credits: Optional[int] = 3
+    semester: Optional[int] = 1
+    control_type: Optional[str] = "Зачет"
+    extra_type: Optional[str] = None
+    description: str
+    mascot_hack: Optional[str] = None
+    senior_advice: Optional[str] = None
+
+class SubjectResponse(SubjectCreate):
+    id: int
+
+    class Config:
+        from_attributes = True
+
 # --- Chatbot Schemas ---
 class ChatMessageTurn(BaseModel):
     role: str

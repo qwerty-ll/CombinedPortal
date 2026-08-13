@@ -98,3 +98,22 @@ class AnalyticsQuestion(Base):
     question_text = Column(String, unique=True, index=True, nullable=False)
     ask_count = Column(Integer, default=1)
     last_asked = Column(DateTime, default=datetime.utcnow)
+
+class Subject(Base):
+    __tablename__ = "subjects"
+
+    id = Column(Integer, primary_key=True, index=True)
+    subject_code = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String, nullable=False)
+    short_name = Column(String, nullable=False)
+    emoji = Column(String, default="📚")
+    color = Column(String, default="#007AFF")
+    difficulty = Column(Integer, default=3)
+    hours = Column(Integer, default=108)
+    credits = Column(Integer, default=3)
+    semester = Column(Integer, default=1)
+    control_type = Column(String, default="Зачет")
+    extra_type = Column(String, nullable=True)
+    description = Column(Text, nullable=False)
+    mascot_hack = Column(Text, nullable=True)
+    senior_advice = Column(Text, nullable=True)

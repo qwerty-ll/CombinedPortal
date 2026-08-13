@@ -58,6 +58,11 @@ export const adminApi = {
   createTeacher: (data) => apiFetch('/api/v1/admin/teachers', { method: 'POST', body: JSON.stringify(data) }),
   deleteTeacher: (id) => apiFetch(`/api/v1/admin/teachers/${id}`, { method: 'DELETE' }),
 
+  getSubjects: () => apiFetch('/api/v1/subjects'),
+  createSubject: (data) => apiFetch('/api/v1/admin/subjects', { method: 'POST', body: JSON.stringify(data) }),
+  updateSubject: (id, data) => apiFetch(`/api/v1/admin/subjects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteSubject: (id) => apiFetch(`/api/v1/admin/subjects/${id}`, { method: 'DELETE' }),
+
   getAnnouncements: () => apiFetch('/api/v1/announcements'),
   createAnnouncement: (data) => apiFetch('/api/v1/admin/announcements', { method: 'POST', body: JSON.stringify(data) }),
   deleteAnnouncement: (id) => apiFetch(`/api/v1/admin/announcements/${id}`, { method: 'DELETE' }),
@@ -68,6 +73,19 @@ export const adminApi = {
 
   getUsers: () => apiFetch('/api/v1/admin/users'),
   updateUserRole: (userId, role) => apiFetch(`/api/v1/admin/users/${userId}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+};
+
+export const subjectsApi = {
+  getSubjects: () => apiFetch('/api/v1/subjects'),
+  createSubject: (data) => apiFetch('/api/v1/admin/subjects', { method: 'POST', body: JSON.stringify(data) }),
+  updateSubject: (id, data) => apiFetch(`/api/v1/admin/subjects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteSubject: (id) => apiFetch(`/api/v1/admin/subjects/${id}`, { method: 'DELETE' }),
+};
+
+export const teachersApi = {
+  getTeachers: () => apiFetch('/api/v1/teachers'),
+  createTeacher: (data) => apiFetch('/api/v1/admin/teachers', { method: 'POST', body: JSON.stringify(data) }),
+  deleteTeacher: (id) => apiFetch(`/api/v1/admin/teachers/${id}`, { method: 'DELETE' }),
 };
 
 // Chatbot Services

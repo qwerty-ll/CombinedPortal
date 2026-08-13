@@ -99,3 +99,42 @@ def delete_faq_item(faq_id: int, current_user: models.User = Depends(security.re
         db.delete(f)
         db.commit()
     return {"status": "deleted"}
+
+# --- Subjects ---
+@router.get("/subjects", response_model=List[schemas.SubjectResponse])
+def get_subjects(db: Session = Depends(get_db)):
+    return db.query(models.Subject).order_by(models.Subject.semester.asc(), models.Subject.id.asc()).all()
+
+@router.post("/admin/subjects", response_model=schemas.SubjectResponse)
+def create_subject(s_in: schemas.SubjectCreate, current_user: models.User = Depends(security.require_admin), db: Session = Depends(get_db)):
+    existing = db.query(models.Subject).filter(models.Subject.subject_code == s_in.subject_code).first()
+    if existing:
+        for key, value in s_in.dict().items():
+            setattr(existing, key, value)
+        db.commit()
+        db.refresh(existing)
+        return existing
+    new_s = models.Subject(**s_in.dict())
+    db.add(new_s)
+    db.commit()
+    db.refresh(new_s)
+    return new_s
+
+@router.put("/admin/subjects/{subject_id}", response_model=schemas.SubjectResponse)
+def update_subject(subject_id: int, s_in: schemas.SubjectCreate, current_user: models.User = Depends(security.require_admin), db: Session = Depends(get_db)):
+    s = db.query(models.Subject).filter(models.Subject.id == subject_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Предмет не найден")
+    for key, value in s_in.dict().items():
+        setattr(s, key, value)
+    db.commit()
+    db.refresh(s)
+    return s
+
+@router.delete("/admin/subjects/{subject_id}")
+def delete_subject(subject_id: int, current_user: models.User = Depends(security.require_admin), db: Session = Depends(get_db)):
+    s = db.query(models.Subject).filter(models.Subject.id == subject_id).first()
+    if s:
+        db.delete(s)
+        db.commit()
+    return {"status": "deleted"}
