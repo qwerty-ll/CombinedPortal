@@ -45,9 +45,34 @@ const ScheduleWidget = () => {
   const [targetType, setTargetType] = useState('group'); // 'group' | 'teacher' | 'aud'
   const availableYears = ['2025-2026', '2024-2025', '2023-2024', '2026-2027'];
 
-  // Selected target object
-  const [selectedId, setSelectedId] = useState(() => Number(localStorage.getItem('portal_sched_id')) || 8540);
-  const [selectedName, setSelectedName] = useState(() => localStorage.getItem('portal_sched_name') || '24-ИСбо-1');
+  // Separate target selection states per category
+  const [selectedGroup, setSelectedGroup] = useState(() => {
+    try {
+      const saved = localStorage.getItem('portal_sched_group');
+      return saved ? JSON.parse(saved) : { id: 8540, name: '24-ИСбо-1' };
+    } catch { return { id: 8540, name: '24-ИСбо-1' }; }
+  });
+
+  const [selectedTeacher, setSelectedTeacher] = useState(() => {
+    try {
+      const saved = localStorage.getItem('portal_sched_teacher');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  const [selectedAud, setSelectedAud] = useState(() => {
+    try {
+      const saved = localStorage.getItem('portal_sched_aud');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  // Current active target object depending on active tab
+  const currentTarget = useMemo(() => {
+    if (targetType === 'teacher') return selectedTeacher;
+    if (targetType === 'aud') return selectedAud;
+    return selectedGroup;
+  }, [targetType, selectedGroup, selectedTeacher, selectedAud]);
 
   // Input & Dropdown state
   const [searchQuery, setSearchQuery] = useState('');
@@ -70,6 +95,13 @@ const ScheduleWidget = () => {
       const autoYear = calculateAcademicYear(newDateIso);
       setSelectedYear(autoYear);
     }
+  };
+
+  // Switch category tabs and clear search input
+  const handleSwitchTargetType = (newType) => {
+    setTargetType(newType);
+    setSearchQuery('');
+    setIsDropdownOpen(false);
   };
 
   // Catalog items & Lessons state
@@ -96,43 +128,41 @@ const ScheduleWidget = () => {
     const loadCatalog = async () => {
       setCatalogLoading(true);
       try {
-        let directUrl = `${EIOS_DIRECT_URL}/raspGrouplist?year=${encodeURIComponent(selectedYear)}`;
-        if (targetType === 'teacher') directUrl = `${EIOS_DIRECT_URL}/raspTeacherlist?year=${encodeURIComponent(selectedYear)}`;
-        if (targetType === 'aud') directUrl = `${EIOS_DIRECT_URL}/raspAudlist?year=${encodeURIComponent(selectedYear)}`;
-
-        let items = [];
-        try {
-          if (targetType === 'group') {
-            const res = await scheduleApi.getGroups(selectedYear);
-            items = res?.data || [];
-          } else if (targetType === 'teacher') {
-            const res = await scheduleApi.getTeachers(selectedYear);
-            items = res?.data || [];
-          } else if (targetType === 'aud') {
-            const res = await scheduleApi.getAuditories(selectedYear);
-            items = res?.data || [];
-          }
-        } catch (e) {
-          const res = await fetch(directUrl);
-          const json = await res.json();
-          items = json?.data || [];
+        let rawItems = [];
+        if (targetType === 'group') {
+          const res = await scheduleApi.getGroups(selectedYear);
+          rawItems = res?.data || [];
+        } else if (targetType === 'teacher') {
+          const res = await scheduleApi.getTeachers(selectedYear);
+          rawItems = res?.data || [];
+        } else if (targetType === 'aud') {
+          const res = await scheduleApi.getAuditories(selectedYear);
+          rawItems = res?.data || [];
         }
+
+        const items = (rawItems || []).map(i => ({
+          ...i,
+          id: i.id || i.idName,
+          idName: i.idName || i.id
+        }));
 
         if (isMounted) {
           setCatalogItems(items);
           setCatalogLoading(false);
 
           if (items.length > 0) {
-            const exists = items.find(i => i.id === Number(selectedId));
+            const activeId = currentTarget?.id;
+            const exists = activeId ? items.find(i => Number(i.id) === Number(activeId)) : null;
             if (!exists) {
               const defaultItem = targetType === 'group' 
-                ? (items.find(g => g.name.includes('24-ИСбо-1')) || items.find(g => g.facul === 'ИВИТШ') || items[0])
-                : items[0];
+                ? (items.find(g => g.name && g.name.includes('24-ИСбо-1')) || items.find(g => g.facul === 'ИВИТШ') || items[0])
+                : (items.find(a => a.name && (a.name.includes('Б-') || a.name.includes('Б2'))) || items[0]);
               if (defaultItem) handleSelectItem(defaultItem);
             }
           }
         }
       } catch (err) {
+        console.warn('[ScheduleWidget] Catalog load error:', err);
         if (isMounted) setCatalogLoading(false);
       }
     };
@@ -143,13 +173,22 @@ const ScheduleWidget = () => {
 
   // Handle selecting an item from search dropdown
   const handleSelectItem = (item) => {
-    setSelectedId(item.id);
-    setSelectedName(item.name);
+    const itemId = item.id || item.idName;
+    const targetObj = { id: itemId, name: item.name };
+
+    if (targetType === 'group') {
+      setSelectedGroup(targetObj);
+      localStorage.setItem('portal_sched_group', JSON.stringify(targetObj));
+    } else if (targetType === 'teacher') {
+      setSelectedTeacher(targetObj);
+      localStorage.setItem('portal_sched_teacher', JSON.stringify(targetObj));
+    } else if (targetType === 'aud') {
+      setSelectedAud(targetObj);
+      localStorage.setItem('portal_sched_aud', JSON.stringify(targetObj));
+    }
+
     setIsDropdownOpen(false);
     setSearchQuery('');
-
-    localStorage.setItem('portal_sched_id', item.id);
-    localStorage.setItem('portal_sched_name', item.name);
   };
 
   // Filter catalog items by search query
@@ -157,7 +196,7 @@ const ScheduleWidget = () => {
     if (!searchQuery.trim()) return catalogItems.slice(0, 30);
     const query = searchQuery.toLowerCase().trim();
     return catalogItems.filter(item => 
-      item.name.toLowerCase().includes(query) || 
+      (item.name && item.name.toLowerCase().includes(query)) || 
       (item.facul && item.facul.toLowerCase().includes(query)) ||
       (item.kaf && item.kaf.toLowerCase().includes(query))
     ).slice(0, 40);
@@ -169,25 +208,18 @@ const ScheduleWidget = () => {
     setLessonsLoading(true);
     setError(null);
     try {
-      let paramKey = 'idGroup';
-      if (targetType === 'teacher') paramKey = 'idTeacher';
-      if (targetType === 'aud') paramKey = 'idAud';
-
-      let raspData = [];
-      try {
-        const res = await scheduleApi.getSchedule(
-          targetType === 'group' ? id : null,
-          selectedYear
-        );
-        raspData = res?.data?.rasp || [];
-      } catch (e) {
-        const res = await fetch(`${EIOS_DIRECT_URL}/Rasp?${paramKey}=${id}&year=${encodeURIComponent(selectedYear)}`);
-        const json = await res.json();
-        raspData = json?.data?.rasp || [];
-      }
-
+      const res = await scheduleApi.getSchedule(
+        targetType === 'group' ? id : null,
+        selectedYear,
+        '',
+        targetType === 'teacher' ? id : null,
+        targetType === 'aud' ? id : null
+      );
+      
+      const raspData = res?.data?.rasp || (Array.isArray(res?.data) ? res.data : []);
       setRawLessons(raspData);
     } catch (err) {
+      console.error('[ScheduleWidget] Fetch schedule error:', err);
       setError('Не удалось загрузить расписание.');
       setRawLessons([]);
     } finally {
@@ -196,10 +228,10 @@ const ScheduleWidget = () => {
   };
 
   useEffect(() => {
-    if (selectedId && selectedName) {
-      fetchSchedule(selectedId, selectedName);
+    if (currentTarget?.id) {
+      fetchSchedule(currentTarget.id, currentTarget.name);
     }
-  }, [selectedId, selectedYear, targetType]);
+  }, [currentTarget, selectedYear, targetType]);
 
   // 3. Deduplicate raw EIOS API lessons
   const deduplicatedLessons = useMemo(() => {
@@ -317,7 +349,7 @@ const ScheduleWidget = () => {
         {/* Category Switcher */}
         <div style={{ display: 'flex', background: '#F1F3F5', padding: '4px', borderRadius: '12px', gap: '4px' }}>
           <button 
-            onClick={() => { setTargetType('group'); setSearchQuery(''); }}
+            onClick={() => handleSwitchTargetType('group')}
             style={{
               padding: '7px 14px',
               borderRadius: '8px',
@@ -336,7 +368,7 @@ const ScheduleWidget = () => {
             <GraduationCap size={15} /> Группы
           </button>
           <button 
-            onClick={() => { setTargetType('teacher'); setSearchQuery(''); }}
+            onClick={() => handleSwitchTargetType('teacher')}
             style={{
               padding: '7px 14px',
               borderRadius: '8px',
@@ -355,7 +387,7 @@ const ScheduleWidget = () => {
             <UserCheck size={15} /> Преподаватели
           </button>
           <button 
-            onClick={() => { setTargetType('aud'); setSearchQuery(''); }}
+            onClick={() => handleSwitchTargetType('aud')}
             style={{
               padding: '7px 14px',
               borderRadius: '8px',
@@ -417,7 +449,7 @@ const ScheduleWidget = () => {
                 color: 'var(--text)'
               }}
             />
-            {selectedName && !searchQuery && (
+            {currentTarget?.name && !searchQuery && (
               <span style={{
                 background: 'var(--primary)',
                 color: 'white',
@@ -428,7 +460,7 @@ const ScheduleWidget = () => {
                 marginLeft: '6px',
                 whiteSpace: 'nowrap'
               }}>
-                {selectedName}
+                {currentTarget.name}
               </span>
             )}
             <ChevronDown size={16} style={{ color: '#888', marginLeft: '6px', flexShrink: 0 }} />
@@ -476,7 +508,7 @@ const ScheduleWidget = () => {
                       <strong style={{ color: 'var(--text)' }}>{item.name}</strong>
                       {item.facul && <span style={{ marginLeft: '8px', color: '#666', fontSize: '0.78rem' }}>({item.facul})</span>}
                     </div>
-                    {item.id === Number(selectedId) && (
+                    {Number(item.id) === Number(currentTarget?.id) && (
                       <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: '800' }}>✓ Выбрано</span>
                     )}
                   </div>
@@ -613,7 +645,7 @@ const ScheduleWidget = () => {
       {lessonsLoading ? (
         <div style={{ textAlign: 'center', padding: '45px 0', color: '#666' }}>
           <div className="spinner" style={{ margin: '0 auto 10px auto' }}></div>
-          <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>Загрузка расписания для "{selectedName}"...</span>
+          <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>Загрузка расписания для "{currentTarget?.name || 'выбранного объекта'}"...</span>
         </div>
       ) : error ? (
         <div style={{ textAlign: 'center', padding: '24px', background: '#FFF5F5', borderRadius: '16px', color: '#C53030', border: '1px solid #FEB2B2' }}>

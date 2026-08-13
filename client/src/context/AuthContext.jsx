@@ -34,35 +34,36 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // Secure Authentication via SDO KGU Backend API
+  // Secure Authentication via EIOS KGU Backend API
   const login = async (loginInput, groupInput = '', passwordInput = '') => {
     try {
       const { authApi } = await import('../services/api');
-      const res = await authApi.sdoLogin(loginInput.trim(), passwordInput, groupInput.trim());
+      const res = await authApi.eiosLogin(loginInput.trim(), passwordInput, groupInput.trim());
       if (res && res.user) {
-        const sdoUser = {
+        const eiosUser = {
           id: res.user.id,
           username: res.user.username,
           fullName: res.user.full_name,
           group: res.user.group_number || groupInput.trim() || '24-ИСбо-1',
           role: res.user.role || 'student',
           photoUrl: res.user.userpictureurl || '',
+          isEiosAuth: true,
           isSdoAuth: true,
           courses: res.user.courses || [],
           createdAt: new Date().toISOString()
         };
-        setUser(sdoUser);
+        setUser(eiosUser);
         if (res.access_token) {
           localStorage.setItem('portal_jwt_token', res.access_token);
         }
-        return sdoUser;
+        return eiosUser;
       }
     } catch (err) {
-      console.warn('[SDO Auth] Login error:', err.message);
-      return { error: err.message || 'Ошибка входа через СДО КГУ. Проверьте логин и пароль' };
+      console.warn('[EIOS Auth] Login error:', err.message);
+      return { error: err.message || 'Ошибка входа через ЭИОС КГУ. Проверьте логин и пароль' };
     }
 
-    return { error: 'Не удалось авторизоваться через СДО КГУ' };
+    return { error: 'Не удалось авторизоваться через ЭИОС КГУ' };
   };
 
   // Secure Admin Authentication via Backend API Only
@@ -96,6 +97,10 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('portal_jwt_token');
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    import('../services/api').then(({ authApi }) => {
+      authApi.logout().catch(() => {});
+    }).catch(() => {});
   };
 
   const updateUserProfile = (data = {}) => {

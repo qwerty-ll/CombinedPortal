@@ -194,7 +194,7 @@ const Profile = () => {
               {loginMode === 'staff' ? <UserCheck size={32} /> : <GraduationCap size={32} />}
             </div>
             <h2>{loginMode === 'staff' ? 'Вход для Администрации ИВИТШ' : 'Вход через СДО КГУ'}</h2>
-            <p>{loginMode === 'staff' ? 'Служебная авторизация администраторов и деканата' : 'Авторизация через единый сервис sdo.kosgos.ru'}</p>
+            <p>{loginMode === 'staff' ? 'Служебная авторизация администраторов и деканата' : 'Единая авторизация студентов сдо.kosgos.ru / eios.kosgos.ru'}</p>
           </div>
 
           <form onSubmit={handleLogin} className="login-form">
@@ -202,7 +202,7 @@ const Profile = () => {
               <label>{loginMode === 'staff' ? 'Логин администратора' : 'Логин СДО КГУ'}</label>
               <input 
                 type="text"
-                placeholder={loginMode === 'staff' ? 'Учетная запись деканата' : 'Логин в sdo.kosgos.ru (напр. student)'}
+                placeholder={loginMode === 'staff' ? 'Учетная запись деканата' : 'Логин учетной записи СДО КГУ (напр. 22-isbo-035)'}
                 value={loginForm.username}
                 onChange={e => setLoginForm({ ...loginForm, username: e.target.value })}
                 required
@@ -219,6 +219,11 @@ const Profile = () => {
                 disabled={isLoggingIn}
                 required
               />
+              {loginMode !== 'staff' && (
+                <span style={{ fontSize: '0.78rem', color: '#666', marginTop: '6px', display: 'block', lineHeight: '1.3' }}>
+                  💡 <strong>Подсказка:</strong> Используется единый логин и пароль от аккаунта СДО / ЭИОС КГУ.
+                </span>
+              )}
             </div>
 
             {loginError && <div className="login-error">{loginError}</div>}
@@ -305,7 +310,7 @@ const Profile = () => {
               <h2>{user.fullName}</h2>
               {user.isSdoAuth && (
                 <span style={{ background: '#E6F4EA', color: '#137333', fontSize: '0.75rem', padding: '3px 8px', borderRadius: '8px', fontWeight: '800' }}>
-                  ✓ СДО KOSGOS
+                  ✓ ЭИОС KOSGOS
                 </span>
               )}
             </div>
@@ -317,7 +322,7 @@ const Profile = () => {
             </p>
 
             <button onClick={handleLogout} className="profile-logout-btn">
-              <LogOut size={14} /> Выйти из СДО
+              <LogOut size={14} /> Выйти из аккаунта
             </button>
           </div>
         </motion.section>

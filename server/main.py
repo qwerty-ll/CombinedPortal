@@ -1,4 +1,7 @@
 import os
+import json
+import logging
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
@@ -6,10 +9,9 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 from app.db.database import engine, Base
+import app.models as models  # Explicit top-level import used in seed_database
 import app.core.security as security
 from app.routers import auth, forum, chat, schedule, admin
-
-import logging
 
 load_dotenv()
 
@@ -25,10 +27,68 @@ logger.info("Initializing IVITSH KSU Portal Backend Services...")
 # Initialize DB tables automatically on startup
 Base.metadata.create_all(bind=engine)
 
+
+def seed_database():
+    """
+    Seed the database from JSON files on first startup.
+    FIX (A-05): Each row is inserted in its own transaction with IntegrityError handling
+    to be safe against multi-worker race conditions where two workers both see count=0
+    and try to seed simultaneously.
+    """
+    from app.db.database import SessionLocal
+    from sqlalchemy.exc import IntegrityError
+    db = SessionLocal()
+    seeds_dir = os.path.join(os.path.dirname(__file__), "app", "db", "seeds")
+    try:
+        teachers_file = os.path.join(seeds_dir, "teachers.json")
+        if os.path.exists(teachers_file):
+            with open(teachers_file, "r", encoding="utf-8") as f:
+                teachers_seed = json.load(f)
+            # Always sync teachers from JSON to ensure accurate data
+            db.query(models.Teacher).delete()
+            db.commit()
+            inserted = 0
+            for t in teachers_seed:
+                try:
+                    db.add(models.Teacher(**t))
+                    db.commit()
+                    inserted += 1
+                except IntegrityError:
+                    db.rollback()
+            logger.info(f"[DB SEED] Successfully synced {inserted}/{len(teachers_seed)} teachers from teachers.json")
+
+        subjects_file = os.path.join(seeds_dir, "subjects.json")
+        if db.query(models.Subject).count() == 0 and os.path.exists(subjects_file):
+            with open(subjects_file, "r", encoding="utf-8") as f:
+                subjects_seed = json.load(f)
+            inserted = 0
+            for s in subjects_seed:
+                try:
+                    db.add(models.Subject(**s))
+                    db.commit()
+                    inserted += 1
+                except IntegrityError:
+                    db.rollback()
+            logger.info(f"[DB SEED] Seeded {inserted}/{len(subjects_seed)} subjects from subjects.json")
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"[DB SEED WARN] Could not seed database: {e}")
+    finally:
+        db.close()
+
+
+seed_database()
+
+
+DOCS_ENABLED = os.getenv("DOCS_ENABLED", "true").lower() == "true"
+
 app = FastAPI(
     title="Портал ИВИТШ КГУ API",
     description="Официальный REST API для сайта-портала и гайда адаптации первокурсников Высшей ИТ-Школы КГУ",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url="/docs" if DOCS_ENABLED else None,
+    redoc_url="/redoc" if DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if DOCS_ENABLED else None,
 )
 
 # CORS configuration
@@ -37,6 +97,8 @@ origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin
     "http://localhost:5173",
     "http://localhost:3000",
     "http://127.0.0.1:5173",
+    "https://ivitsh-portal.kosgos.ru",
+    "https://portal.kosgos.ru",
     "https://combined-portal-freshman.vercel.app"
 ]
 
@@ -55,9 +117,12 @@ app.include_router(chat.router)
 app.include_router(schedule.router)
 app.include_router(admin.router)
 
+
 @app.get("/api/v1/health")
 def health_check():
+    """Health check — verifies API is alive. Does not probe DB intentionally (lightweight)."""
     return {"status": "ok", "service": "IVITSH Portal Backend API"}
+
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
@@ -84,6 +149,7 @@ def read_root():
     </html>
     """
 
+
 # Serve static frontend build if folder exists (Production Container)
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
@@ -95,7 +161,7 @@ if os.path.exists(static_dir):
     async def serve_spa(full_path: str):
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="API route not found")
-        
+
         safe_base = os.path.abspath(static_dir)
         requested_path = os.path.abspath(os.path.join(static_dir, full_path))
         if not requested_path.startswith(safe_base):
@@ -104,6 +170,7 @@ if os.path.exists(static_dir):
         if os.path.exists(requested_path) and os.path.isfile(requested_path):
             return FileResponse(requested_path)
         return FileResponse(os.path.join(static_dir, "index.html"))
+
 
 if __name__ == "__main__":
     import uvicorn

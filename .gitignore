@@ -87,3 +87,6 @@ Thumbs.db
 .vercel/
 .cache/
 coverage/
+push_and_merge.py
+*/push_and_merge.py
+scratch/

@@ -1,24 +1,28 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 # --- User & Auth Schemas ---
 class UserCreate(BaseModel):
-    username: str
-    password: str
-    full_name: str
+    username: str = Field(..., min_length=3, max_length=80)
+    password: str = Field(..., min_length=6, max_length=128)
+    full_name: str = Field(..., min_length=1, max_length=200)
     email: Optional[EmailStr] = None
-    group_number: Optional[str] = None
-    role: Optional[str] = "student"
+    group_number: Optional[str] = Field(None, max_length=50)
+    # SECURITY FIX: role field is intentionally not accepted from client.
+    # Role is always assigned as "student" on registration regardless of input.
 
 class UserLogin(BaseModel):
-    username: str
-    password: str
+    username: str = Field(..., min_length=1, max_length=80)
+    password: str = Field(..., min_length=1, max_length=128)
 
-class SdoLoginRequest(BaseModel):
-    username: str
-    password: str
-    group_number: Optional[str] = None
+class EiosLoginRequest(BaseModel):
+    username: str = Field(..., min_length=1, max_length=80)
+    password: str = Field(..., min_length=1, max_length=128)
+    group_number: Optional[str] = Field(None, max_length=50)
+
+class SdoLoginRequest(EiosLoginRequest):
+    pass
 
 class UserResponse(BaseModel):
     id: int
@@ -27,7 +31,6 @@ class UserResponse(BaseModel):
     role: str
     group_number: Optional[str] = None
     email: Optional[str] = None
-    sdo_token: Optional[str] = None
     userpictureurl: Optional[str] = None
     courses: Optional[List[dict]] = None
     created_at: datetime
@@ -45,7 +48,7 @@ class RoleUpdateSchema(BaseModel):
 
 # --- Forum Schemas ---
 class ForumAnswerCreate(BaseModel):
-    content: str
+    content: str = Field(..., min_length=1, max_length=10000)
 
 class ForumAnswerResponse(BaseModel):
     id: int
@@ -60,9 +63,9 @@ class ForumAnswerResponse(BaseModel):
         from_attributes = True
 
 class ForumQuestionCreate(BaseModel):
-    title: str
-    category: str = "Учеба"
-    content: str
+    title: str = Field(..., min_length=3, max_length=300)
+    category: str = Field("Учеба", max_length=100)
+    content: str = Field(..., min_length=10, max_length=20000)
 
 class ForumQuestionResponse(BaseModel):
     id: int
@@ -84,16 +87,24 @@ class ForumQuestionResponse(BaseModel):
 class VoteRequest(BaseModel):
     vote_type: int
 
+    # FIX: Only allow valid vote values: 1 (upvote) or -1 (downvote)
+    @field_validator("vote_type")
+    @classmethod
+    def validate_vote_type(cls, v: int) -> int:
+        if v not in (1, -1):
+            raise ValueError("vote_type must be 1 (upvote) or -1 (downvote)")
+        return v
+
 # --- Admin Content Schemas ---
 class TeacherCreate(BaseModel):
-    name: str
-    department: str
-    role: str
-    email: Optional[str] = None
-    office: Optional[str] = "Б-209"
-    hours: Optional[str] = None
-    courses: Optional[str] = None
-    photo_url: Optional[str] = None
+    name: str = Field(..., min_length=2, max_length=200)
+    department: str = Field(..., max_length=200)
+    role: str = Field(..., max_length=200)
+    email: Optional[str] = Field(None, max_length=200)
+    office: Optional[str] = Field("Б-209", max_length=50)
+    hours: Optional[str] = Field(None, max_length=200)
+    courses: Optional[str] = Field(None, max_length=500)
+    photo_url: Optional[str] = Field(None, max_length=500)
 
 class TeacherResponse(TeacherCreate):
     id: int
@@ -102,8 +113,8 @@ class TeacherResponse(TeacherCreate):
         from_attributes = True
 
 class AnnouncementCreate(BaseModel):
-    title: str
-    content: str
+    title: str = Field(..., min_length=1, max_length=300)
+    content: str = Field(..., min_length=1, max_length=5000)
     is_important: Optional[bool] = False
 
 class AnnouncementResponse(AnnouncementCreate):
@@ -114,9 +125,9 @@ class AnnouncementResponse(AnnouncementCreate):
         from_attributes = True
 
 class FaqItemCreate(BaseModel):
-    question: str
-    answer: str
-    category: Optional[str] = "Общие"
+    question: str = Field(..., min_length=1, max_length=500)
+    answer: str = Field(..., min_length=1, max_length=5000)
+    category: Optional[str] = Field("Общие", max_length=100)
     order_index: Optional[int] = 0
 
 class FaqItemResponse(FaqItemCreate):
@@ -125,14 +136,36 @@ class FaqItemResponse(FaqItemCreate):
     class Config:
         from_attributes = True
 
+class SubjectCreate(BaseModel):
+    subject_code: str = Field(..., min_length=1, max_length=50)
+    name: str = Field(..., min_length=1, max_length=300)
+    short_name: str = Field(..., min_length=1, max_length=100)
+    emoji: Optional[str] = Field("📚", max_length=10)
+    color: Optional[str] = Field("#007AFF", max_length=20)
+    difficulty: Optional[int] = Field(3, ge=1, le=5)
+    hours: Optional[int] = Field(108, ge=1)
+    credits: Optional[int] = Field(3, ge=1)
+    semester: Optional[int] = Field(1, ge=1, le=12)
+    control_type: Optional[str] = Field("Зачет", max_length=50)
+    extra_type: Optional[str] = Field(None, max_length=50)
+    description: str = Field(..., min_length=1, max_length=5000)
+    mascot_hack: Optional[str] = Field(None, max_length=2000)
+    senior_advice: Optional[str] = Field(None, max_length=2000)
+
+class SubjectResponse(SubjectCreate):
+    id: int
+
+    class Config:
+        from_attributes = True
+
 # --- Chatbot Schemas ---
 class ChatMessageTurn(BaseModel):
-    role: str
-    content: str
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str = Field(..., max_length=2000)
 
 class ChatRequest(BaseModel):
-    message: str
-    history: Optional[List[ChatMessageTurn]] = []
+    message: str = Field(..., min_length=1, max_length=500)
+    history: Optional[List[ChatMessageTurn]] = Field(default_factory=list, max_length=20)
 
 class ChatResponse(BaseModel):
     reply: str

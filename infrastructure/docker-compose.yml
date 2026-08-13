@@ -9,7 +9,7 @@ services:
     env_file:
       - ../.env
     environment:
-      - DATABASE_URL=sqlite:///./portal.db
+      - DATABASE_URL=sqlite:////app/server_data/portal.db
       - PYTHONPATH=/app/server
     volumes:
       - sqlite_data:/app/server_data

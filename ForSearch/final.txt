@@ -1,0 +1,1821 @@
+# PROMPT 3 — COMPLETE FROM-ZERO FORENSIC AUDIT / ПОЛНЫЙ ПЕРЕАУДИТ СИСТЕМЫ
+
+Ты выполняешь **ПОЛНЫЙ АУДИТ ПРОЕКТА С НУЛЯ**.
+
+Это не дополнительная проверка предыдущих аудитов.
+
+Это не повторение чеклиста.
+
+Это **полное независимое исследование всей системы**, как будто ты впервые получил проект и вообще не знаешь, что его уже кто-то проверял.
+
+Предыдущие отчеты, найденные баги, исправления, комментарии разработчиков, названия функций и commit messages **НЕ ЯВЛЯЮТСЯ ДОКАЗАТЕЛЬСТВОМ**, что проблема решена.
+
+---
+
+# ГЛАВНАЯ ЦЕЛЬ
+
+Найти **ВСЕ КЛАССЫ проблем**, способные привести к:
+
+* неправильному результату;
+* потере данных;
+* рассинхронизации;
+* повреждению данных;
+* duplicate operations;
+* race condition;
+* deadlock;
+* security breach;
+* unauthorized access;
+* inconsistent state;
+* service outage;
+* cascading failure;
+* memory leak;
+* resource exhaustion;
+* невозможности восстановить систему;
+* неправильному поведению при повторе запроса;
+* неправильному поведению после restart;
+* неправильному поведению при timeout;
+* неправильному поведению при partial failure;
+* неправильному поведению при изменении данных одновременно несколькими пользователями;
+* неправильному поведению при старой/новой версии клиента или сервера.
+
+---
+
+# РЕЖИМ РАБОТЫ
+
+Работай одновременно в ролях:
+
+* Principal Software Architect
+* Staff Backend Engineer
+* Distributed Systems Engineer
+* Database Engineer
+* Security Engineer
+* SRE
+* QA Lead
+* Performance Engineer
+* API Architect
+* Reliability Engineer
+* Code Reviewer
+* Red Team Engineer
+
+Но главное:
+
+> **НЕ ПРОВЕРЯЙ КОД ПО СПИСКУ. ВОССТАНОВИ ЛОГИКУ СИСТЕМЫ И ПОТОМ ПЫТАЙСЯ ЕЁ СЛОМАТЬ.**
+
+---
+
+# 1. ПОЛНОСТЬЮ ИГНОРИРУЙ ПРЕДЫДУЩИЕ ВЫВОДЫ
+
+Начни так, будто:
+
+```text id="lq1dnu"
+Ты никогда не видел этот проект.
+Ты не знаешь, какие баги уже нашли.
+Ты не знаешь, какие fixes были внесены.
+Ты не знаешь, что разработчик считает безопасным.
+```
+
+Только после полного собственного исследования можно сравнить результаты с предыдущими выводами.
+
+---
+
+# 2. СНАЧАЛА ПРОВЕДИ INVENTORY ПРОЕКТА
+
+Построй полный inventory:
+
+```text id="upq1w9"
+Repositories
+Applications
+Services
+Modules
+Packages
+Libraries
+Databases
+Caches
+Queues
+Workers
+Cron jobs
+Background tasks
+External APIs
+Webhooks
+Storage
+Auth systems
+Admin systems
+Monitoring
+Configuration
+Environment variables
+Deployment files
+Infrastructure
+Migrations
+Tests
+CI/CD
+```
+
+Ничего не считай неважным.
+
+Даже маленький utility может участвовать в критическом data flow.
+
+---
+
+# 3. ПОСТРОЙ РЕАЛЬНУЮ АРХИТЕКТУРУ
+
+Не довольствуйся README.
+
+Восстанови по коду:
+
+```text
+USER
+ ↓
+CLIENT
+ ↓
+HTTP/API
+ ↓
+AUTH
+ ↓
+VALIDATION
+ ↓
+BUSINESS LOGIC
+ ↓
+DATABASE
+ ↓
+CACHE
+ ↓
+EVENTS
+ ↓
+QUEUE
+ ↓
+WORKERS
+ ↓
+EXTERNAL SERVICES
+ ↓
+RESULT
+```
+
+Но используй реальную архитектуру проекта.
+
+Для каждого компонента определи:
+
+* кто вызывает;
+* кого вызывает;
+* что читает;
+* что изменяет;
+* где хранится state;
+* кто является source of truth;
+* как передаются данные;
+* как обрабатываются ошибки;
+* как выполняется retry;
+* как происходит rollback;
+* что будет при отказе;
+* кто отвечает за восстановление.
+
+---
+
+# 4. ПРОСЛЕДИ ВСЕ DATA FLOWS
+
+Для каждой важной сущности проследи полный lifecycle:
+
+```text id="bj71qp"
+CREATE
+READ
+UPDATE
+DELETE
+CACHE
+QUEUE
+WORKER
+SYNC
+RETRY
+RECOVERY
+RECONCILIATION
+```
+
+Не анализируй функцию отдельно.
+
+Проследи:
+
+```text
+UI
+→ request
+→ validation
+→ authorization
+→ service
+→ database
+→ cache
+→ event
+→ queue
+→ worker
+→ external service
+→ database
+→ cache
+→ frontend
+```
+
+Проверь весь путь туда и обратно.
+
+---
+
+# 5. СОЗДАЙ ENTITY MAP
+
+Для каждой критической entity:
+
+```text id="1n5ezk"
+Entity:
+Source of truth:
+Readers:
+Writers:
+Copies:
+Cache:
+Queue:
+Events:
+External representations:
+Versions:
+Lifecycle:
+```
+
+После этого ответь:
+
+> Где существует одна и та же информация более чем в одном месте?
+
+Каждая такая точка — потенциальная consistency problem.
+
+---
+
+# 6. СОЗДАЙ STATE MACHINE
+
+Для каждой важной сущности выпиши все возможные состояния.
+
+Например:
+
+```text id="v4en1m"
+NEW
+PROCESSING
+PAID
+COMPLETED
+CANCELLED
+FAILED
+EXPIRED
+DELETED
+```
+
+После этого проверь каждый переход:
+
+```text id="tp9eqa"
+NEW → PROCESSING
+NEW → COMPLETED
+PROCESSING → FAILED
+FAILED → COMPLETED
+CANCELLED → COMPLETED
+DELETED → ACTIVE
+```
+
+Ищи:
+
+* незаконные переходы;
+* пропущенные переходы;
+* повторные переходы;
+* backward transition;
+* concurrent transitions;
+* transition после удаления;
+* transition после expiration.
+
+---
+
+# 7. ВОССТАНОВИ ВСЕ INVARIANTS
+
+Для каждой сущности определи правила, которые **всегда должны быть истинны**.
+
+Например:
+
+```text id="6x8m3d"
+balance >= 0
+
+one payment cannot be charged twice
+
+deleted entity cannot become active
+
+completed operation cannot execute again
+
+one user cannot own another user's object
+```
+
+Затем:
+
+> Попытайся найти код, который может нарушить каждый invariant.
+
+---
+
+# 8. ПРОВЕРКА КАЖДОГО ENDPOINT С НУЛЯ
+
+Для каждого endpoint создай отдельный аудит.
+
+Проверь:
+
+```text
+Route
+Method
+Parameters
+Body
+Headers
+Auth
+Authorization
+Validation
+Business rules
+DB actions
+Transactions
+Cache
+Events
+Queues
+External APIs
+Response
+Errors
+Retries
+Timeouts
+Idempotency
+Rate limits
+Logging
+Metrics
+```
+
+Затем отдельно:
+
+### Happy path
+
+Нормальный запрос.
+
+### Empty path
+
+Пустые значения.
+
+### Invalid path
+
+Некорректные данные.
+
+### Concurrent path
+
+100 одновременно.
+
+### Retry path
+
+Один запрос повторяется.
+
+### Timeout path
+
+Ответ не дошел.
+
+### Failure path
+
+Dependency падает.
+
+### Recovery path
+
+Dependency возвращается.
+
+### Replay path
+
+Старый запрос повторяется через время.
+
+### Authorization path
+
+Другой пользователь.
+
+---
+
+# 9. ПРОВЕРКА КАЖДОЙ MUTATION
+
+Для каждой операции:
+
+```text
+POST
+PUT
+PATCH
+DELETE
+```
+
+запиши:
+
+```text id="t0cnxl"
+Preconditions
+↓
+Read
+↓
+Validation
+↓
+Check
+↓
+Write
+↓
+Side effects
+↓
+Cache
+↓
+Event
+↓
+Response
+```
+
+Потом специально атакуй:
+
+```text
+READ
+↓
+другой процесс меняет данные
+↓
+CHECK
+↓
+WRITE
+```
+
+Если это возможно — ищи race condition / TOCTOU.
+
+---
+
+# 10. ПРОВЕРКА "ЗАПРОС ВЫПОЛНЕН, НО ОТВЕТ НЕ ДОШЕЛ"
+
+Для каждого критического запроса смоделируй:
+
+```text id="3yqczp"
+Client
+→ Server
+→ DB SUCCESS
+→ response
+→ NETWORK FAILURE
+→ Client timeout
+→ Client retry
+```
+
+Проверь:
+
+> Выполнится ли операция второй раз?
+
+Особенно опасно для:
+
+* payment;
+* balance;
+* order;
+* reservation;
+* inventory;
+* messages;
+* notifications;
+* external API calls.
+
+---
+
+# 11. ПРОВЕРКА DUPLICATE EVERYTHING
+
+Сделай duplicate сценарий для всего:
+
+```text
+Duplicate request
+Duplicate webhook
+Duplicate queue message
+Duplicate event
+Duplicate worker
+Duplicate scheduled job
+Duplicate external API call
+Duplicate button click
+Duplicate form submission
+Duplicate sync
+Duplicate reconnect
+```
+
+Для каждого:
+
+> Как система понимает, что это уже было обработано?
+
+Если никак — фиксируй проблему.
+
+---
+
+# 12. ПРОВЕРКА OUT-OF-ORDER EVERYTHING
+
+Проверь:
+
+```text id="uu82sp"
+Event 1
+Event 2
+Event 3
+```
+
+при доставке:
+
+```text
+3
+1
+2
+```
+
+Затем:
+
+```text
+2
+3
+1
+```
+
+Затем:
+
+```text
+1
+3
+2
+```
+
+Проверь:
+
+* данные;
+* state machine;
+* cache;
+* workers;
+* replication;
+* frontend state.
+
+---
+
+# 13. ПОЛНАЯ ПРОВЕРКА СИНХРОНИЗАЦИИ
+
+Для каждого места, где одна информация существует в нескольких копиях:
+
+```text id="s7bsw8"
+Source
+Copy A
+Copy B
+Copy C
+```
+
+ответь:
+
+1. Кто source of truth?
+2. Кто пишет?
+3. Кто читает?
+4. Как данные синхронизируются?
+5. Есть ли version?
+6. Есть ли ordering?
+7. Есть ли conflict resolution?
+8. Есть ли retry?
+9. Есть ли deduplication?
+10. Что при потерянном событии?
+11. Что при duplicate event?
+12. Что при out-of-order event?
+13. Что при crash?
+14. Что при restart?
+15. Что при partial success?
+16. Есть ли reconciliation?
+
+Если нет четкого ответа — фиксируй consistency risk.
+
+---
+
+# 14. ПРОВЕРКА LOST UPDATE
+
+Моделируй:
+
+```text id="y4d0v7"
+A reads X=10
+B reads X=10
+A writes X=20
+B writes X=15
+```
+
+Проверь каждый shared object, который может изменяться параллельно.
+
+---
+
+# 15. ПРОВЕРКА STALE READ
+
+Моделируй:
+
+```text id="h9b2fz"
+WRITE NEW DATA
+↓
+READ OLD DATA
+```
+
+Из-за:
+
+* cache;
+* replica;
+* browser state;
+* local storage;
+* CDN;
+* async worker;
+* queue;
+* delayed event.
+
+Определи последствия.
+
+---
+
+# 16. ПРОВЕРКА PARTIAL FAILURE
+
+Для каждой цепочки:
+
+```text
+A → B → C → D
+```
+
+по очереди ломай:
+
+```text
+A
+B
+C
+D
+```
+
+Затем ломай передачу между ними:
+
+```text
+A success
+A→B fail
+
+B success
+B→C fail
+
+C success
+C→D fail
+```
+
+Проверь итоговое состояние.
+
+---
+
+# 17. ПРОВЕРКА CRASH НА КАЖДОМ ШАГЕ
+
+Возьми критическую операцию:
+
+```text id="88l7jc"
+Step 1
+Step 2
+Step 3
+Step 4
+Step 5
+```
+
+Вообрази crash после каждого шага:
+
+```text
+crash after 1
+crash after 2
+crash after 3
+crash after 4
+crash after 5
+```
+
+Для каждого определи:
+
+* что записалось;
+* что не записалось;
+* что повторится;
+* что потерялось;
+* что осталось неконсистентным.
+
+---
+
+# 18. DATABASE FORENSIC AUDIT
+
+Проверь:
+
+* primary keys;
+* foreign keys;
+* unique constraints;
+* indexes;
+* nullability;
+* defaults;
+* data types;
+* precision;
+* transactions;
+* locking;
+* isolation levels;
+* deadlocks;
+* upserts;
+* concurrent writes;
+* migrations;
+* rollback;
+* replication;
+* read/write split;
+* connection pools;
+* long transactions;
+* N+1.
+
+Особенно ищи:
+
+```text
+SELECT
+CHECK
+INSERT
+```
+
+без защиты от concurrency.
+
+---
+
+# 19. CACHE FORENSIC AUDIT
+
+Проверь:
+
+```text id="mdkiib"
+READ CACHE
+READ DB
+WRITE DB
+INVALIDATE CACHE
+UPDATE CACHE
+```
+
+Проверь все возможные interleavings.
+
+Ищи:
+
+* stale cache;
+* lost invalidation;
+* cache overwrite;
+* stampede;
+* poisoning;
+* wrong TTL;
+* cross-user data leak.
+
+---
+
+# 20. QUEUE FORENSIC AUDIT
+
+Для каждого queue:
+
+```text
+Producer
+Message
+Broker
+Consumer
+Ack
+Retry
+DLQ
+```
+
+Проверь:
+
+* duplicate delivery;
+* lost delivery;
+* out-of-order;
+* poison message;
+* consumer crash;
+* producer crash;
+* broker failure;
+* ack before processing;
+* ack after processing;
+* retry storm.
+
+---
+
+# 21. WORKER FORENSIC AUDIT
+
+Смоделируй:
+
+```text
+worker starts
+job starts
+job partially completes
+worker dies
+worker restarts
+job is retried
+```
+
+Проверь duplicate side effect.
+
+---
+
+# 22. EXTERNAL API FORENSIC AUDIT
+
+Для каждого внешнего API:
+
+```text
+SUCCESS
+TIMEOUT
+500
+429
+401
+403
+404
+invalid response
+partial response
+slow response
+duplicate response
+schema change
+```
+
+Проверь, что делает система в каждом случае.
+
+---
+
+# 23. TIMEOUT FORENSIC AUDIT
+
+Найди все timeout.
+
+Для каждого:
+
+```text
+What timed out?
+What may have already completed?
+What remains running?
+What gets retried?
+What state is persisted?
+What locks remain?
+```
+
+---
+
+# 24. RETRY FORENSIC AUDIT
+
+Для каждого retry:
+
+```text
+Why retry?
+How many times?
+Backoff?
+Jitter?
+Idempotent?
+What if first request succeeded?
+What if dependency remains down?
+```
+
+Проверь retry amplification.
+
+---
+
+# 25. AUTHORIZATION FORENSIC AUDIT
+
+Для каждого объекта с ID:
+
+```text id="a0xwq4"
+User A
+Object B
+```
+
+проверь:
+
+* read;
+* update;
+* delete;
+* action;
+* export;
+* download;
+* restore;
+* admin endpoint;
+* bulk endpoint.
+
+Ищи BOLA/IDOR.
+
+---
+
+# 26. CROSS-USER DATA LEAK
+
+Проверь:
+
+* cache keys;
+* query filters;
+* pagination;
+* search;
+* exports;
+* logs;
+* websocket;
+* background jobs;
+* notifications.
+
+Особенно:
+
+> Может ли состояние одного пользователя попасть в состояние другого?
+
+---
+
+# 27. FRONTEND STATE RACE
+
+Если есть frontend:
+
+моделируй:
+
+```text
+Request A
+Request B
+Request C
+```
+
+при завершении:
+
+```text
+B
+C
+A
+```
+
+Проверь stale response overwrite.
+
+---
+
+# 28. OPTIMISTIC UPDATE AUDIT
+
+Проверь:
+
+```text
+UI updated
+↓
+server fails
+```
+
+Что делает UI?
+
+Если rollback не выполняется — фиксируй consistency issue.
+
+---
+
+# 29. PAGINATION / LIST CONSISTENCY
+
+Проверь:
+
+* offset pagination;
+* cursor pagination;
+* sorting;
+* new records during pagination;
+* deleted records during pagination;
+* duplicate records;
+* skipped records;
+* unstable ordering.
+
+---
+
+# 30. TIME / DATE FORENSIC AUDIT
+
+Проверь:
+
+* UTC;
+* timezone;
+* DST;
+* server/client time;
+* expiration;
+* TTL;
+* scheduled jobs;
+* date comparisons;
+* timestamp ordering.
+
+Ищи clock skew issues.
+
+---
+
+# 31. SECURITY FROM ZERO
+
+Полностью перепроверь:
+
+* authentication;
+* authorization;
+* session;
+* JWT;
+* cookies;
+* CORS;
+* CSRF;
+* SSRF;
+* SQL injection;
+* XSS;
+* command injection;
+* path traversal;
+* IDOR/BOLA;
+* privilege escalation;
+* mass assignment;
+* file upload;
+* secrets;
+* API keys;
+* sensitive logs;
+* rate limiting;
+* enumeration;
+* replay attacks.
+
+Не считай security middleware доказательством безопасности endpoint.
+
+---
+
+# 32. INPUT FUZZING LOGICALLY
+
+Для каждого входного параметра проверь:
+
+```text
+missing
+null
+empty
+0
+negative
+huge
+NaN
+Infinity
+wrong type
+array
+object
+unicode
+emoji
+duplicate field
+unknown field
+malformed encoding
+very large input
+```
+
+---
+
+# 33. RESOURCE EXHAUSTION
+
+Проверь:
+
+```text
+1 request
+100 requests
+1000 requests
+10000 requests
+100000 requests
+```
+
+Что произойдет с:
+
+* DB;
+* memory;
+* CPU;
+* Redis;
+* queue;
+* network;
+* workers;
+* connections;
+* disk.
+
+---
+
+# 34. SCALING FROM ZERO TO MAX
+
+Проверь систему концептуально:
+
+```text
+1 user
+10 users
+1,000 users
+100,000 users
+1,000,000 users
+```
+
+Ищи:
+
+* hot keys;
+* hot rows;
+* connection exhaustion;
+* lock contention;
+* queue buildup;
+* expensive queries;
+* unbounded memory.
+
+---
+
+# 35. DEPLOYMENT FORENSIC AUDIT
+
+Проверь:
+
+```text
+old code + new DB
+new code + old DB
+old worker + new events
+new worker + old events
+old frontend + new API
+new frontend + old API
+```
+
+Проверь rolling deployment.
+
+---
+
+# 36. MIGRATION FORENSIC AUDIT
+
+Проверь:
+
+* backward compatibility;
+* forward compatibility;
+* partial migration;
+* rollback;
+* failed migration;
+* deployment during migration;
+* concurrent writes during migration.
+
+---
+
+# 37. OBSERVABILITY AUDIT
+
+Проверь возможность ответить:
+
+> Что конкретно произошло с конкретным пользователем в момент сбоя?
+
+Должны существовать или быть продуманы:
+
+* request ID;
+* correlation ID;
+* trace ID;
+* structured logs;
+* metrics;
+* error tracking;
+* audit logs;
+* queue visibility;
+* DB visibility.
+
+---
+
+# 38. RECOVERY AUDIT
+
+Проверь не только:
+
+> "Система падает или нет?"
+
+Но:
+
+> **"Что происходит после падения?"**
+
+Проверь:
+
+```text
+restart
+reconnect
+retry
+replay
+reconciliation
+rollback
+recovery
+```
+
+Определи, возвращается ли система в корректное состояние.
+
+---
+
+# 39. RECONCILIATION AUDIT
+
+Очень важно:
+
+Если источники данных рассинхронизировались:
+
+> **Как система обнаружит это?**
+
+И:
+
+> **Как система исправит это?**
+
+Если механизма нет — зафиксируй отдельный reliability/consistency risk.
+
+---
+
+# 40. BUSINESS LOGIC FORENSIC AUDIT
+
+Проверь реальные бизнес-правила:
+
+* limits;
+* quotas;
+* ownership;
+* statuses;
+* permissions;
+* one-time operations;
+* money;
+* inventory;
+* reservation;
+* expiration;
+* retries;
+* cancellation;
+* refunds.
+
+Попытайся нарушить каждое правило через concurrency или альтернативный endpoint.
+
+---
+
+# 41. ПРОВЕРКА ДЕНЕГ И ЧИСЕЛ
+
+Если есть numeric/balance/price:
+
+проверь:
+
+* floating point;
+* rounding;
+* precision;
+* negative values;
+* overflow;
+* currency;
+* units;
+* concurrent modifications;
+* duplicate charge;
+* partial refund.
+
+---
+
+# 42. ПРОВЕРКА "НЕВОЗМОЖНЫХ" СОСТОЯНИЙ
+
+Найди все состояния, которые бизнес считает невозможными.
+
+Затем попытайся получить их через:
+
+* concurrency;
+* retry;
+* stale data;
+* restart;
+* API bypass;
+* malformed input;
+* queue reordering.
+
+---
+
+# 43. ПРОВЕРКА СКРЫТЫХ ENTRY POINTS
+
+Найди неочевидные способы изменить state:
+
+* admin API;
+* internal API;
+* cron;
+* CLI;
+* worker;
+* webhook;
+* migration script;
+* test endpoint;
+* debug endpoint;
+* direct DB job;
+* import/export.
+
+Безопасность должна быть одинаковой по всем entry points.
+
+---
+
+# 44. ПРОВЕРКА CONFIGURATION / ENVIRONMENT
+
+Проверь:
+
+```text
+missing env
+wrong env
+empty env
+default env
+production with development flags
+```
+
+Ищи:
+
+* debug;
+* permissive CORS;
+* disabled auth;
+* insecure defaults;
+* test credentials;
+* unlimited limits.
+
+---
+
+# 45. ПРОВЕРКА CLEANUP
+
+Для каждого:
+
+```text
+open
+connect
+subscribe
+start
+allocate
+lock
+```
+
+проверь обратное:
+
+```text
+close
+disconnect
+unsubscribe
+stop
+free
+unlock
+```
+
+Ищи lifecycle leaks.
+
+---
+
+# 46. ПРОВЕРКА ПОСЛЕ RESTART
+
+Всё, что хранится в memory, проверь после:
+
+```text
+process restart
+container restart
+pod restart
+server restart
+```
+
+Определи, что теряется.
+
+---
+
+# 47. ПРОВЕРКА DURABILITY
+
+Для каждой критической операции:
+
+> Если сервер умер сразу после ответа — данные точно сохранены?
+
+И:
+
+> Если сервер умер перед ответом — что произойдет после retry?
+
+---
+
+# 48. ПРОВЕРКА FAILURE COMBINATIONS
+
+Не проверяй только один сбой.
+
+Проверяй комбинации:
+
+```text
+DB slow + retry
+Cache stale + concurrent update
+Queue duplicate + worker restart
+Replica lag + authorization
+Timeout + retry
+Deploy + old event
+External API failure + DB success
+```
+
+Именно здесь часто находятся самые тяжелые production bugs.
+
+---
+
+# 49. ПОИСК НЕСОВМЕСТИМЫХ ПРЕДПОЛОЖЕНИЙ
+
+Найди места, где один компонент предполагает:
+
+```text id="k64dzr"
+data always exists
+event always arrives
+request always unique
+response always arrives
+cache always fresh
+DB always available
+queue preserves order
+user cannot modify object
+```
+
+а другой компонент это не гарантирует.
+
+Это один из главных источников системных багов.
+
+---
+
+# 50. ПРОВЕРКА ОБРАТНЫХ СЦЕНАРИЕВ
+
+Для каждого процесса проверь reverse path:
+
+```text
+CREATE → DELETE
+START → CANCEL
+PAY → REFUND
+ADD → REMOVE
+ENABLE → DISABLE
+PROCESS → FAIL
+```
+
+Проверь race между forward и reverse operations.
+
+Например:
+
+```text
+START
+CANCEL
+START
+```
+
+---
+
+# 51. ПОЛНАЯ ATTACK CHAIN
+
+Попытайся создать следующие цепочки:
+
+```text
+stale data
+→ authorization bypass
+→ state change
+```
+
+```text
+timeout
+→ retry
+→ duplicate operation
+```
+
+```text
+queue duplicate
+→ worker retry
+→ double side effect
+```
+
+```text
+cache stale
+→ old state
+→ incorrect business decision
+```
+
+```text
+replica lag
+→ incorrect permission
+→ unauthorized operation
+```
+
+---
+
+# 52. ПОСЛЕДНИЙ ПОЛНЫЙ PASS
+
+После всех предыдущих этапов начни заново и спроси:
+
+> Какие участки кода еще не были связаны с конкретным failure scenario?
+
+Каждый существенный участок должен принадлежать хотя бы одному из:
+
+```text
+Happy path
+Error path
+Concurrent path
+Retry path
+Timeout path
+Restart path
+Recovery path
+Security path
+Consistency path
+Scaling path
+Deployment path
+```
+
+Если нет — исследуй его.
+
+---
+
+# 53. КРИТЕРИЙ "Я ДЕЙСТВИТЕЛЬНО ВСЁ ПРОВЕРИЛ"
+
+Не заканчивай аудит только потому, что нашел много багов.
+
+Перед финалом убедись, что проверены:
+
+```text
+Every service
+Every endpoint
+Every mutation
+Every database write
+Every database read
+Every cache
+Every queue
+Every worker
+Every webhook
+Every external API
+Every auth boundary
+Every state transition
+Every critical business invariant
+Every synchronization point
+Every retry
+Every timeout
+Every restart
+Every recovery mechanism
+Every migration
+Every deployment compatibility boundary
+```
+
+---
+
+# 54. ФОРМАТ КАЖДОЙ НАХОДКИ
+
+Для каждой проблемы:
+
+## [CRITICAL / HIGH / MEDIUM / LOW] Название
+
+**Confidence:** CONFIRMED / VERY LIKELY / POTENTIAL
+
+**Component:** ...
+
+**File:** ...
+
+**Lines:** ...
+
+**Entry point:** ...
+
+**Affected entity:** ...
+
+**Root cause:** ...
+
+**Exact execution path:**
+
+```text id="h5x5x6"
+Step 1
+Step 2
+Step 3
+Step 4
+```
+
+**Failure scenario:**
+
+Что именно ломается.
+
+**Why it matters:**
+
+Реальные последствия.
+
+**Data impact:**
+
+Что произойдет с данными.
+
+**Security impact:**
+
+Есть ли security impact.
+
+**Concurrency impact:**
+
+Есть ли race.
+
+**Recovery impact:**
+
+Можно ли восстановиться.
+
+**Fix:**
+
+Конкретное исправление.
+
+**Regression test:**
+
+Как проверить, что проблема действительно исправлена.
+
+---
+
+# 55. ОТДЕЛЬНО СОЗДАЙ FAILURE MATRIX
+
+| Сценарий | Ожидаемое поведение | Реальное поведение | Риск | Recovery |
+| -------- | ------------------- | ------------------ | ---- | -------- |
+
+Обязательно включи:
+
+* duplicate request;
+* timeout after success;
+* timeout before execution;
+* DB failure;
+* cache failure;
+* queue failure;
+* worker crash;
+* server restart;
+* external API timeout;
+* external API success + local DB failure;
+* duplicate event;
+* out-of-order event;
+* stale cache;
+* stale replica;
+* concurrent update;
+* deployment during operation;
+* old client + new backend.
+
+---
+
+# 56. ОТДЕЛЬНО СОЗДАЙ DATA CONSISTENCY MATRIX
+
+| Data | Source of Truth | Copies | Sync mechanism | Versioning | Failure risk | Reconciliation |
+| ---- | --------------- | ------ | -------------- | ---------- | ------------ | -------------- |
+
+---
+
+# 57. ОТДЕЛЬНО СОЗДАЙ CONCURRENCY MATRIX
+
+| Operation | Shared State | Parallel Actors | Race Possible? | Protection | Result |
+| --------- | ------------ | --------------- | -------------- | ---------- | ------ |
+
+---
+
+# 58. ОТДЕЛЬНО СОЗДАЙ ENDPOINT MATRIX
+
+| Endpoint | Auth | Authorization | Validation | Idempotency | Transaction | Retry Safe | Concurrency Safe | Main Risk |
+| -------- | ---- | ------------- | ---------- | ----------- | ----------- | ---------- | ---------------- | --------- |
+
+---
+
+# 59. ОТДЕЛЬНО СОЗДАЙ RECOVERY MATRIX
+
+| Failure | System State | Automatic Recovery | Manual Recovery | Data Loss Possible? | Duplicate Action Possible? |
+| ------- | ------------ | ------------------ | --------------- | ------------------- | -------------------------- |
+
+---
+
+# 60. ПОСЛЕДНИЙ RED TEAM ВОПРОС
+
+Перед завершением ответь:
+
+> **"Если я специально хочу сломать эту систему, какой самый простой способ?"**
+
+Затем:
+
+> **"Какой самый реалистичный способ потерять или испортить данные?"**
+
+Затем:
+
+> **"Какой самый реалистичный способ получить неправильный доступ к чужим данным?"**
+
+Затем:
+
+> **"Какой самый реалистичный способ получить duplicate operation?"**
+
+Затем:
+
+> **"Какой самый реалистичный способ получить рассинхронизацию?"**
+
+Затем:
+
+> **"Какой сценарий произойдет только один раз из тысячи, но будет катастрофическим?"**
+
+Каждый найденный сценарий должен попасть в отчет.
+
+---
+
+# 61. ФИНАЛЬНЫЙ ОТЧЕТ
+
+Заверши аудит следующими разделами:
+
+## 1. SYSTEM OVERVIEW
+
+Как реально устроена система.
+
+## 2. CRITICAL FINDINGS
+
+Самые опасные проблемы.
+
+## 3. HIGH FINDINGS
+
+Высокий риск.
+
+## 4. MEDIUM FINDINGS
+
+Средний риск.
+
+## 5. LOW FINDINGS
+
+Низкий риск.
+
+## 6. DATA CONSISTENCY
+
+Все проблемы синхронизации.
+
+## 7. CONCURRENCY
+
+Все race/locking/transaction issues.
+
+## 8. SECURITY
+
+Полный security assessment.
+
+## 9. API
+
+Полный endpoint assessment.
+
+## 10. DATABASE
+
+Полный DB assessment.
+
+## 11. CACHE
+
+Полный cache assessment.
+
+## 12. QUEUES / EVENTS
+
+Полный event-driven assessment.
+
+## 13. EXTERNAL SERVICES
+
+Все проблемы интеграций.
+
+## 14. FAILURE / RECOVERY
+
+Что происходит при отказах.
+
+## 15. DEPLOYMENT
+
+Что происходит во время release.
+
+## 16. SCALABILITY
+
+Что сломается при росте нагрузки.
+
+## 17. UNKNOWN / UNVERIFIED
+
+Что невозможно доказать из доступного кода.
+
+## 18. TOP 20 PRODUCTION RISKS
+
+Отсортируй по реальному impact.
+
+## 19. MOST DANGEROUS EXECUTION CHAINS
+
+Покажи самые опасные цепочки:
+
+```text id="4m9p4d"
+Trigger
+↓
+Bug
+↓
+Secondary effect
+↓
+Tertiary effect
+↓
+Final damage
+```
+
+## 20. FINAL VERDICT
+
+Оцени:
+
+```text
+Correctness: /100
+Architecture: /100
+Data Consistency: /100
+Concurrency: /100
+Security: /100
+Reliability: /100
+Scalability: /100
+Recovery: /100
+Testing: /100
+Deployment Safety: /100
+
+OVERALL PRODUCTION READINESS: /100
+```
+
+---
+
+# 62. АБСОЛЮТНЫЕ ПРАВИЛА
+
+### Правило 1
+
+Никогда не говори:
+
+> "Всё хорошо."
+
+Пока не проверены failure scenarios.
+
+### Правило 2
+
+Не считай наличие теста доказательством корректности.
+
+### Правило 3
+
+Не считай наличие transaction доказательством consistency.
+
+### Правило 4
+
+Не считай наличие Redis lock доказательством отсутствия race condition.
+
+### Правило 5
+
+Не считай retry безопасным без idempotency.
+
+### Правило 6
+
+Не считай event-driven architecture надежной без обработки duplicate/lost/out-of-order events.
+
+### Правило 7
+
+Не считай auth middleware достаточным доказательством authorization.
+
+### Правило 8
+
+Не считай cache частью source of truth, пока это явно не доказано.
+
+### Правило 9
+
+Не считай network call успешным только потому, что код ожидает response.
+
+### Правило 10
+
+Не останавливайся после первого найденного бага.
+
+---
+
+# 63. ФИНАЛЬНАЯ КОМАНДА
+
+**ПРОВЕРЬ ПРОЕКТ ПОЛНОСТЬЮ С НУЛЯ.**
+
+Не ориентируйся на предыдущие аудиты.
+
+Не пропускай код, который "выглядит простым".
+
+Не анализируй только happy path.
+
+Для каждой критической части обязательно рассматривай:
+
+```text
+normal
+invalid
+concurrent
+duplicate
+retry
+timeout
+partial failure
+out-of-order
+stale state
+restart
+recovery
+deployment
+scale
+security abuse
+data corruption
+```
+
+Главная цель:
+
+> **найти не просто баги, а любые сценарии, при которых система перестает гарантировать правильность, безопасность, целостность, консистентность, доступность или восстановимость.**
+
+Работай до тех пор, пока не проверишь систему одновременно как:
+
+**разработчик + злоумышленник + пользователь + оператор + база данных + очередь + сеть + случайный failure generator.**
+
+Не делай поверхностный review.
+
+**Это forensic-аудит всего проекта с нуля.**

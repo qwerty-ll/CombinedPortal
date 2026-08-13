@@ -1,169 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Mail, Users as UsersIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-
-export const OFFICIAL_IVITSH_TEACHERS = [
-  {
-    id: 1,
-    name: "Киприна Людмила Юрьевна",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Заведующая кафедрой, кандидат технических наук, доцент",
-    email: "L_kiprina@Kosgos.ru",
-    office: "г. Кострома, ул. Ивановская, 24А, каб.214",
-    hours: "Тел. 63-49-00 (доб. 8120)",
-    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/kiprina_lyu.jpg"
-  },
-  {
-    id: 2,
-    name: "Барило Илья Иванович",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Доцент кафедры, кандидат технических наук, доцент",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/barilo_ii.jpg"
-  },
-  {
-    id: 3,
-    name: "Лустгартен Юрий Леонидович",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Доцент кафедры, кандидат технических наук, доцент",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/lusgarten_yl.jpg"
-  },
-  {
-    id: 4,
-    name: "Красавина Мария Сергеевна",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Доцент кафедры, кандидат технических наук, доцент",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/krasavina.jpg"
-  },
-  {
-    id: 5,
-    name: "Прядкина Нина Олеговна",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Доцент кафедры, кандидат технических наук, доцент",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IST/PPS/pryadkina_no.jpg"
-  },
-  {
-    id: 6,
-    name: "Смирнова Светлана Геннадьевна",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Доцент кафедры, кандидат технических наук, доцент",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/smirnova_sg.jpg"
-  },
-  {
-    id: 7,
-    name: "Демчинова Елена Александровна",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Старший преподаватель кафедры",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/demchinova.jpg"
-  },
-  {
-    id: 8,
-    name: "Дорохова Жанна Викторовна",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Старший преподаватель кафедры",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/dorohova.jpg"
-  },
-  {
-    id: 9,
-    name: "Орлов Александр Валерьевич",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Доцент кафедры, кандидат технических наук, доцент",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/orlov.jpg"
-  },
-  {
-    id: 10,
-    name: "Мозохин Александр Евгеньевич",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Доцент кафедры, кандидат технических наук, доцент",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/nophoto.jpg"
-  },
-  {
-    id: 11,
-    name: "Логинова Анна Александровна",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Ассистент кафедры",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/loginova_aa.jpg"
-  },
-  {
-    id: 12,
-    name: "Силенок Юрий Викторович",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Программист ООО 'Экзактпро'",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IST/PPS/silenok_yv.jpg"
-  },
-  {
-    id: 13,
-    name: "Иваницкий Виталий Викторович",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Доцент кафедры, кандидат технических наук, доцент",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IST/PPS/ivanickiy_vv.jpg"
-  },
-  {
-    id: 14,
-    name: "Денисов Артем Руфимович",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Доцент кафедры, доктор технических наук, доцент",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IiVT/denisov.jpg"
-  },
-  {
-    id: 15,
-    name: "Дружинина Анна Григорьевна",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Доцент кафедры, кандидат технических наук, доцент",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/druzhinina.jpg"
-  },
-  {
-    id: 16,
-    name: "Кириллова Екатерина Сергеевна",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Доцент кафедры, кандидат технических наук, доцент",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/kirillova.jpg"
-  },
-  {
-    id: 17,
-    name: "Чувиляева Александра Сергеевна",
-    department: "Высшая ИТ-школа КГУ",
-    role: "Доцент кафедры, кандидат технических наук, доцент",
-    email: "",
-    office: "Корпус Б",
-    photo: "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/chuvilyaeva.jpg"
-  }
-];
+import { teachersApi } from '../services/api';
 
 const Teachers = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [teachersList, setTeachersList] = useState([]);
 
-  const teachersList = OFFICIAL_IVITSH_TEACHERS;
+  useEffect(() => {
+    teachersApi.getTeachers().then(res => {
+      if (Array.isArray(res) && res.length > 0) {
+        setTeachersList(res.map(t => ({
+          id: t.id,
+          name: t.name,
+          department: t.department,
+          role: t.role,
+          email: t.email || '',
+          office: t.office || 'Корпус Б',
+          hours: t.hours || '',
+          courses: t.courses ? t.courses.split(',') : [],
+          photo: t.photo_url || 'https://kosgos.ru/images/INSTITUTS/nophoto.jpg'
+        })));
+      }
+    }).catch(e => console.warn('Using static teachers fallback:', e));
+  }, []);
 
   const filteredTeachers = teachersList.filter(teacher => 
     teacher.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

@@ -7,13 +7,13 @@ import {
   Lightbulb, Trophy, ThumbsUp, RefreshCw, X
 } from 'lucide-react';
 import MascotMessage from '../components/MascotMessage';
-import { SUBJECTS } from '../data/subjectsData';
 import RoadmapSection, { ROADMAP_STEPS } from '../components/RoadmapSection';
 import { StepFoundation, StepRoadmap, StepChatbot } from '../components/StepIntroCards';
 import QuizModal from '../components/QuizModal';
 import ChecklistModal from '../components/ChecklistModal';
 import FunLayerModal from '../components/FunLayerModal';
 import RewardsModal from '../components/RewardsModal';
+import { subjectsApi } from '../services/api';
 
 // Disciplines Card Component (Styled for 2-column grid with color accents)
 const DisciplineCard = ({ subject }) => {
@@ -147,6 +147,31 @@ const FreshmanGuide = () => {
       return saved ? JSON.parse(saved) : [0];
     } catch { return [0]; }
   });
+
+  const [subjectsList, setSubjectsList] = useState([]);
+
+  useEffect(() => {
+    subjectsApi.getSubjects().then(res => {
+      if (Array.isArray(res) && res.length > 0) {
+        setSubjectsList(res.map(s => ({
+          id: s.subject_code || `sub-${s.id}`,
+          name: s.name,
+          shortName: s.short_name,
+          emoji: s.emoji || '📚',
+          color: s.color || '#007AFF',
+          difficulty: s.difficulty || 3,
+          hours: s.hours || 108,
+          credits: s.credits || 3,
+          semester: s.semester || 1,
+          type: s.control_type || 'Зачет',
+          extraType: s.extra_type,
+          description: s.description,
+          mascotHack: s.mascot_hack,
+          seniorAdvice: s.senior_advice
+        })));
+      }
+    }).catch(e => console.warn('Using static subjects fallback:', e));
+  }, []);
 
   const [activeStepModal, setActiveStepModal] = useState(null); // stepId 0..8 or null
   const [isRewardsOpen, setIsRewardsOpen] = useState(false);
@@ -307,7 +332,7 @@ const FreshmanGuide = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
           <div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: 0, color: 'var(--text)' }}>
-              Дисциплины ИВИТШ КГУ ({SUBJECTS.filter(s => s.semester === selectedSemester).length})
+              Дисциплины ИВИТШ КГУ ({subjectsList.filter(s => s.semester === selectedSemester).length})
             </h3>
             <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: '#777' }}>
               Нажми на дисциплину, чтобы увидеть советы и хаки ВИТШика
@@ -340,7 +365,7 @@ const FreshmanGuide = () => {
 
         {/* 2-Column Responsive Grid */}
         <div className="disciplines-grid-container">
-          {SUBJECTS.filter(s => s.semester === selectedSemester).map(subject => (
+          {subjectsList.filter(s => s.semester === selectedSemester).map(subject => (
             <DisciplineCard key={subject.id} subject={subject} />
           ))}
         </div>

@@ -8,6 +8,7 @@ import { searchKnowledgeBase, mapImageNameToPath } from './data/knowledgeData';
 // Components
 import Sidebar from './components/Sidebar';
 import BackgroundDecor from './components/BackgroundDecor';
+import { chatApi } from './services/api';
 
 // Lazy Loaded Pages for Optimal Bundle Splitting
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -112,19 +113,11 @@ function App() {
         content: m.text
       }));
 
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: messageToSend, history: historyPayload })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.reply) {
-          setChatMessages(prev => [...prev, { text: data.reply, sender: 'bot' }]);
-          setIsTyping(false);
-          return;
-        }
+      const data = await chatApi.sendMessage(messageToSend, historyPayload);
+      if (data && data.reply) {
+        setChatMessages(prev => [...prev, { text: data.reply, sender: 'bot' }]);
+        setIsTyping(false);
+        return;
       }
     } catch (e) {
       console.warn("GigaChat API call failed, falling back to local RAG:", e);

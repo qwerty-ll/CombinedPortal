@@ -7,6 +7,7 @@ import {
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import ScheduleWidget from '../components/ScheduleWidget';
+import { adminApi } from '../services/api';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -32,7 +33,7 @@ const Dashboard = () => {
     setGroupSaved(false);
   };
 
-  // --- Announcements from localStorage (admin-managed only) ---
+  // --- Announcements from backend / localStorage fallback ---
   const [announcements, setAnnouncements] = useState(() => {
     try {
       const saved = localStorage.getItem('portal_announcements');
@@ -40,6 +41,19 @@ const Dashboard = () => {
     } catch { return []; }
   });
   const [expandedAdIds, setExpandedAdIds] = useState([]);
+
+  useEffect(() => {
+    adminApi.getAnnouncements().then(res => {
+      if (Array.isArray(res) && res.length > 0) {
+        setAnnouncements(res.map(a => ({
+          id: a.id,
+          title: a.title,
+          text: a.content,
+          time: new Date(a.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+        })));
+      }
+    }).catch(e => console.warn('Failed to load DB announcements on Dashboard:', e));
+  }, []);
 
   // Onboarding tasks definition
   const initialTasks = [
