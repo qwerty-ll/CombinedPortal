@@ -41,9 +41,12 @@ def seed_database():
     seeds_dir = os.path.join(os.path.dirname(__file__), "app", "db", "seeds")
     try:
         teachers_file = os.path.join(seeds_dir, "teachers.json")
-        if db.query(models.Teacher).count() == 0 and os.path.exists(teachers_file):
+        if os.path.exists(teachers_file):
             with open(teachers_file, "r", encoding="utf-8") as f:
                 teachers_seed = json.load(f)
+            # Always sync teachers from JSON to ensure accurate data
+            db.query(models.Teacher).delete()
+            db.commit()
             inserted = 0
             for t in teachers_seed:
                 try:
@@ -51,8 +54,8 @@ def seed_database():
                     db.commit()
                     inserted += 1
                 except IntegrityError:
-                    db.rollback()  # Duplicate from concurrent worker — skip safely
-            logger.info(f"[DB SEED] Seeded {inserted}/{len(teachers_seed)} teachers from teachers.json")
+                    db.rollback()
+            logger.info(f"[DB SEED] Successfully synced {inserted}/{len(teachers_seed)} teachers from teachers.json")
 
         subjects_file = os.path.join(seeds_dir, "subjects.json")
         if db.query(models.Subject).count() == 0 and os.path.exists(subjects_file):

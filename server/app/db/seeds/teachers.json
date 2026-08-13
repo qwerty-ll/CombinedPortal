@@ -3,7 +3,7 @@
     "name": "Киприна Людмила Юрьевна",
     "department": "Высшая ИТ-школа КГУ",
     "role": "Заведующая кафедрой, кандидат технических наук, доцент",
-    "email": "L_kiprina@Kosgos.ru",
+    "email": "L_kiprina@Kosgos.ru, ivt@kosgos.ru",
     "office": "г. Кострома, ул. Ивановская, 24А, каб.214",
     "hours": "Тел. 63-49-00 (доб. 8120)",
     "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/kiprina_lyu.jpg"
@@ -45,7 +45,16 @@
     "photo_url": "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IST/PPS/pryadkina_no.jpg"
   },
   {
-    "name": "Демчинова Екатерина Игоревна",
+    "name": "Смирнова Светлана Геннадьевна",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Доцент кафедры, кандидат технических наук, доцент",
+    "email": "",
+    "office": "Корпус Б",
+    "hours": "",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/smirnova_sg.jpg"
+  },
+  {
+    "name": "Демчинова Елена Александровна",
     "department": "Высшая ИТ-школа КГУ",
     "role": "Старший преподаватель кафедры",
     "email": "",
@@ -54,7 +63,7 @@
     "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/demchinova.jpg"
   },
   {
-    "name": "Дорохова Жанна Викторовна",
+    "name": "Дорохова Жана Викторовна",
     "department": "Высшая ИТ-школа КГУ",
     "role": "Старший преподаватель кафедры",
     "email": "",
@@ -96,10 +105,28 @@
     "email": "",
     "office": "Корпус Б",
     "hours": "",
-    "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/silenok.jpg"
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IST/PPS/silenok_yv.jpg"
   },
   {
-    "name": "Дружинина Ольга Васильевна",
+    "name": "Иваницкий Витайлий Викторович",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Доцент, кандидат технических наук, доцент",
+    "email": "",
+    "office": "Корпус Б",
+    "hours": "",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IST/PPS/ivanickiy_vv.jpg"
+  },
+  {
+    "name": "Денисов Артем Руфимович",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Доцент кафедры, доктор технических наук, доцент",
+    "email": "",
+    "office": "Корпус Б",
+    "hours": "",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IiVT/denisov.jpg"
+  },
+  {
+    "name": "Дружинина Анна Григорьевна",
     "department": "Высшая ИТ-школа КГУ",
     "role": "Доцент кафедры, кандидат технических наук, доцент",
     "email": "",
