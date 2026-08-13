@@ -77,10 +77,15 @@ def seed_database():
 seed_database()
 
 
+DOCS_ENABLED = os.getenv("DOCS_ENABLED", "true").lower() == "true"
+
 app = FastAPI(
     title="Портал ИВИТШ КГУ API",
     description="Официальный REST API для сайта-портала и гайда адаптации первокурсников Высшей ИТ-Школы КГУ",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url="/docs" if DOCS_ENABLED else None,
+    redoc_url="/redoc" if DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if DOCS_ENABLED else None,
 )
 
 # CORS configuration
@@ -89,6 +94,8 @@ origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin
     "http://localhost:5173",
     "http://localhost:3000",
     "http://127.0.0.1:5173",
+    "https://ivitsh-portal.kosgos.ru",
+    "https://portal.kosgos.ru",
     "https://combined-portal-freshman.vercel.app"
 ]
 

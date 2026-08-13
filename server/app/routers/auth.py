@@ -22,8 +22,10 @@ logger.setLevel(logging.INFO)
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
 # Protected admin usernames that can never be role-changed by other admins.
-# FIX (M-04): Removed hardcoded developer username — all protected names from env or system-level only.
-_PROTECTED_ADMIN_USERNAMES = frozenset({os.getenv("ADMIN_USERNAME", "ivitsh_admin").lower(), "admin"})
+# Dynamically constructed from env ADMIN_USERNAME and system admin.
+_PROTECTED_ADMIN_USERNAMES = frozenset(
+    filter(None, [os.getenv("ADMIN_USERNAME", "").lower(), "admin"])
+)
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:
@@ -73,16 +75,17 @@ def register(user_in: schemas.UserCreate, response: Response, db: Session = Depe
 
 @router.post("/admin-login", response_model=schemas.TokenResponse)
 def admin_login(user_in: schemas.UserLogin, response: Response, db: Session = Depends(get_db)):
-    admin_user_env = os.getenv("ADMIN_USERNAME", "ivitsh_admin")
-    admin_pass_env = os.getenv("ADMIN_PASSWORD")
+    admin_user_env = os.getenv("ADMIN_USERNAME", "").strip()
+    admin_pass_env = os.getenv("ADMIN_PASSWORD", "").strip()
 
     username_clean = user_in.username.strip().lower()
-    # SECURITY: is_env_admin requires ALL three conditions:
-    # 1) ADMIN_PASSWORD is set in env
+    # SECURITY: is_env_admin requires ALL conditions:
+    # 1) BOTH ADMIN_USERNAME and ADMIN_PASSWORD are explicitly set in env (NO default stock credentials!)
     # 2) username exactly matches ADMIN_USERNAME from env
-    # 3) password matches ADMIN_PASSWORD exactly (constant-time not needed since this is server env)
+    # 3) password matches ADMIN_PASSWORD exactly
     is_env_admin = (
-        bool(admin_pass_env)
+        bool(admin_user_env)
+        and bool(admin_pass_env)
         and username_clean == admin_user_env.lower()
         and user_in.password == admin_pass_env
     )
