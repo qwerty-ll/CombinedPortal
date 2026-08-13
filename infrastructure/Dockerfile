@@ -19,8 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy backend requirements
 COPY server/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir httpx psycopg2-binary passlib[bcrypt]
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend application code
 COPY server ./server
