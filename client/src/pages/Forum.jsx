@@ -1,151 +1,183 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Search, Plus, MessageSquare, ThumbsUp, ThumbsDown, X, User, Trash2, LogIn, Shield
+import {
+  Search, Plus, MessageSquare, ThumbsUp, ThumbsDown, X, User, Trash2, LogIn, RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { forumApi } from '../services/api';
 
 const Forum = () => {
   const navigate = useNavigate();
   const { user, isLoggedIn, canModerate } = useAuth();
   const toast = useToast();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Все');
   const [isAskModalOpen, setIsAskModalOpen] = useState(false);
-
-  // Form states for a new question
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState('Учеба');
   const [newText, setNewText] = useState('');
   const [errors, setErrors] = useState({});
 
-  const defaultQuestions = [];
+  // API-backed state — no localStorage
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [questions, setQuestions] = useState(() => {
-    try {
-      const saved = localStorage.getItem('forum_questions');
-      return saved ? JSON.parse(saved) : defaultQuestions;
-    } catch (e) {
-      return defaultQuestions;
-    }
-  });
+  const categories = ['Все', 'Учеба', 'Расписание', 'Общежитие', 'Стипендия', 'Организационное'];
+
+  // ── Load questions from API ──────────────────────────────────────────────
+  const loadQuestions = useCallback(() => {
+    setLoading(true);
+    forumApi.getQuestions(
+      selectedCategory !== 'Все' ? selectedCategory : '',
+      searchQuery.trim(),
+      50
+    )
+      .then(res => {
+        if (Array.isArray(res)) setQuestions(res);
+      })
+      .catch(err => {
+        console.warn('[Forum] Failed to load questions:', err.message);
+        toast.show('Не удалось загрузить вопросы форума', 'warning');
+      })
+      .finally(() => setLoading(false));
+  }, [selectedCategory, searchQuery]);
 
   useEffect(() => {
-    localStorage.setItem('forum_questions', JSON.stringify(questions));
-  }, [questions]);
+    // Debounce search to avoid excessive API calls while typing
+    const timer = setTimeout(loadQuestions, searchQuery ? 400 : 0);
+    return () => clearTimeout(timer);
+  }, [loadQuestions]);
 
-  // Handle voting
-  const handleVote = (id, type, e) => {
+  // ── Voting (API) ─────────────────────────────────────────────────────────
+  const handleVote = async (id, type, e) => {
     e.stopPropagation();
     if (!isLoggedIn) {
       toast.show('Войдите через ЭИОС КГУ, чтобы голосовать', 'warning');
       return;
     }
-    setQuestions(prev => prev.map(q => {
-      if (q.id === id) {
+    const voteType = type === 'like' ? 1 : -1;
+    try {
+      await forumApi.vote(id, voteType);
+      // Optimistic update for current user's vote + rating
+      setQuestions(prev => prev.map(q => {
+        if (q.id !== id) return q;
+        const prevUserVote = q.user_vote || 0;
         let diff = 0;
-        let nextVote = null;
-
-        if (type === 'like') {
-          if (q.userVote === 'like') { diff = -1; nextVote = null; }
-          else if (q.userVote === 'dislike') { diff = 2; nextVote = 'like'; }
-          else { diff = 1; nextVote = 'like'; }
-        } else if (type === 'dislike') {
-          if (q.userVote === 'dislike') { diff = 1; nextVote = null; }
-          else if (q.userVote === 'like') { diff = -2; nextVote = 'dislike'; }
-          else { diff = -1; nextVote = 'dislike'; }
+        let nextVote = voteType;
+        if (prevUserVote === voteType) {
+          // Toggle off
+          diff = -voteType;
+          nextVote = 0;
+        } else if (prevUserVote !== 0) {
+          // Switch direction
+          diff = voteType * 2;
+        } else {
+          diff = voteType;
         }
-        return { ...q, rating: q.rating + diff, userVote: nextVote };
-      }
-      return q;
-    }));
+        return { ...q, votes_count: (q.votes_count || 0) + diff, user_vote: nextVote };
+      }));
+    } catch (err) {
+      toast.show(err.message || 'Ошибка при голосовании', 'warning');
+    }
   };
 
-  // Add a new question
-  const handleCreateQuestion = (e) => {
+  // ── Create Question (API) ────────────────────────────────────────────────
+  const handleCreateQuestion = async (e) => {
     e.preventDefault();
-    
+
     const tempErrors = {};
     if (newTitle.trim().length < 10) {
       tempErrors.title = 'Заголовок должен содержать минимум 10 символов';
-    } else if (newTitle.length > 100) {
-      tempErrors.title = 'Заголовок не должен превышать 100 символов';
+    } else if (newTitle.length > 300) {
+      tempErrors.title = 'Заголовок не должен превышать 300 символов';
     }
-
     if (newText.trim().length < 20) {
       tempErrors.text = 'Описание должно содержать минимум 20 символов';
-    } else if (newText.length > 2000) {
-      tempErrors.text = 'Описание не должно превышать 2000 символов';
+    } else if (newText.length > 10000) {
+      tempErrors.text = 'Описание не должно превышать 10 000 символов';
     }
-
     if (Object.keys(tempErrors).length > 0) {
       setErrors(tempErrors);
       return;
     }
 
-    const authorName = user ? user.fullName.split(' ').map((w, i) => i === 0 ? w : w[0] + '.').join(' ') : 'Аноним';
-    
-    const newQuestion = {
-      id: Date.now(),
-      title: newTitle.trim(),
-      text: newText.trim(),
-      category: newCategory,
-      author: { 
-        name: authorName, 
-        group: user?.group || '', 
-        course: 1, 
-        photo: user?.photo || 'profile.png',
-        role: user?.role || 'student',
-        userId: user?.id || null
-      },
-      created_at: 'Только что',
-      rating: 0,
-      userVote: null,
-      answersCount: 0
-    };
-
-    setQuestions([newQuestion, ...questions]);
-    setIsAskModalOpen(false);
-    setNewTitle('');
-    setNewText('');
-    setNewCategory('Учеба');
-    setErrors({});
-    toast.show('Вопрос опубликован!', 'success');
-  };
-
-  // Delete question (own or as moderator)
-  const handleDeleteQuestion = (id, e) => {
-    e.stopPropagation();
-    if (window.confirm('Вы действительно хотите удалить этот вопрос?')) {
-      setQuestions(prev => prev.filter(q => q.id !== id));
-      toast.show('Вопрос удалён', 'info');
+    setSubmitting(true);
+    try {
+      const created = await forumApi.createQuestion({
+        title: newTitle.trim(),
+        category: newCategory,
+        content: newText.trim()
+      });
+      // Normalise API response to UI shape
+      setQuestions(prev => [normaliseQuestion(created), ...prev]);
+      setIsAskModalOpen(false);
+      setNewTitle('');
+      setNewText('');
+      setNewCategory('Учеба');
+      setErrors({});
+      toast.show('Вопрос опубликован!', 'success');
+    } catch (err) {
+      toast.show(err.message || 'Ошибка при публикации вопроса', 'warning');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  // Check if current user owns a question
-  const isOwnPost = (q) => {
-    if (!user) return false;
-    return q.author.userId === user.id;
+  // ── Delete Question (API) ───────────────────────────────────────────────────
+  const handleDeleteQuestion = async (id, e) => {
+    e.stopPropagation();
+    if (!window.confirm('Удалить вопрос с форума?')) return;
+    try {
+      await forumApi.deleteQuestion(id);
+      setQuestions(prev => prev.filter(q => q.id !== id));
+      toast.show('Вопрос удалён с сервера', 'info');
+    } catch (err) {
+      toast.show(err.message || 'Ошибка удаления вопроса', 'warning');
+    }
   };
 
-  // Helper to highlight search term
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  /** Normalise API ForumQuestionResponse to a UI-friendly shape */
+  const normaliseQuestion = (q) => ({
+    ...q,
+    // Map API fields to UI fields used in the render
+    author: {
+      name: q.author_name || 'Студент',
+      role: 'student',
+      group: '',
+      photo: 'profile.png',
+    },
+    text: q.content || '',
+    rating: q.votes_count ?? 0,
+    answersCount: q.answers_count ?? 0,
+    userVote: q.user_vote === 1 ? 'like' : q.user_vote === -1 ? 'dislike' : null,
+  });
+
+  const normalisedQuestions = questions.map(normaliseQuestion);
+
+  const isOwnPost = (q) => {
+    if (!user) return false;
+    return q.author_id === user.id;
+  };
+
   const highlightText = (text, query) => {
-    if (!query) return text;
+    if (!query || !text) return text;
     const parts = text.split(new RegExp(`(${query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi'));
     return (
       <span>
-        {parts.map((part, index) => 
-          part.toLowerCase() === query.toLowerCase() 
-            ? <mark key={index}>{part}</mark> 
+        {parts.map((part, index) =>
+          part.toLowerCase() === query.toLowerCase()
+            ? <mark key={index}>{part}</mark>
             : part
         )}
       </span>
     );
   };
 
-  // Role badge helper
   const getRoleBadge = (role) => {
     if (role === 'admin') return <span className="role-badge admin">Админ</span>;
     if (role === 'moderator') return <span className="role-badge moderator">Модератор</span>;
@@ -153,19 +185,20 @@ const Forum = () => {
     return null;
   };
 
-  const categories = ['Все', 'Учеба', 'Расписание', 'Общежитие', 'Стипендия', 'Организационное'];
-
-  const filteredQuestions = questions.filter(q => {
-    const matchesCategory = selectedCategory === 'Все' || q.category === selectedCategory;
-    const matchesSearch = q.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          q.text.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      return new Date(dateStr).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+    } catch { return dateStr; }
+  };
 
   return (
     <div className="container">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
         <h1>Форум студентов</h1>
+        <button onClick={loadQuestions} title="Обновить" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}>
+          <RefreshCw size={18} />
+        </button>
       </div>
 
       {/* AUTH GATE BANNER */}
@@ -188,9 +221,9 @@ const Forum = () => {
       <div className="forum-search-bar">
         <div className="search-input-wrapper">
           <Search size={18} className="search-icon-inside" />
-          <input 
-            type="text" 
-            placeholder="Поиск по форуму..." 
+          <input
+            type="text"
+            placeholder="Поиск по форуму..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -201,8 +234,8 @@ const Forum = () => {
       <div className="forum-controls">
         <div className="category-filter-scroll">
           {categories.map(cat => (
-            <button 
-              key={cat} 
+            <button
+              key={cat}
               className={`filter-badge ${selectedCategory === cat ? 'active' : ''}`}
               onClick={() => setSelectedCategory(cat)}
             >
@@ -220,11 +253,16 @@ const Forum = () => {
 
       {/* DISCUSSIONS FEED */}
       <div className="posts-feed">
-        {filteredQuestions.length > 0 ? (
-          filteredQuestions.map((q) => {
+        {loading ? (
+          <div className="empty-state-card">
+            <MessageSquare size={48} strokeWidth={1.5} />
+            <h4>Загрузка вопросов...</h4>
+          </div>
+        ) : normalisedQuestions.length > 0 ? (
+          normalisedQuestions.map((q) => {
             const canDelete = isOwnPost(q) || canModerate;
             return (
-              <motion.div 
+              <motion.div
                 key={q.id}
                 className="post-card-container"
                 onClick={() => navigate(`/forum/question/${q.id}`)}
@@ -235,29 +273,21 @@ const Forum = () => {
                 <div className="post-top-row">
                   <div className="post-author-badge">
                     <div className="post-author-avatar" style={{ background: '#E0F2FE', color: '#0369A1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', overflow: 'hidden', flexShrink: 0 }}>
-                      {q.author.photoUrl || (q.author.photo && q.author.photo !== 'profile.png') ? (
-                        <img 
-                          src={q.author.photoUrl || `/img/${q.author.photo}`} 
-                          alt="avatar" 
-                          onError={(e) => { e.target.style.display = 'none'; }}
-                        />
-                      ) : (
-                        <User size={18} />
-                      )}
+                      <User size={18} />
                     </div>
                     <div className="post-author-meta">
                       <h5>
                         {q.author.name}
                         {getRoleBadge(q.author.role)}
                       </h5>
-                      <span>{q.author.group}{q.author.group && ' • '}{q.author.course} курс</span>
+                      <span>{q.author.group}{q.author.group && ' • '}{q.category}</span>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span className="post-time-ago">{q.created_at}</span>
+                    <span className="post-time-ago">{formatDate(q.created_at)}</span>
                     {canDelete && (
-                      <button 
-                        className="vote-action-btn dislike" 
+                      <button
+                        className="vote-action-btn dislike"
                         style={{ padding: '4px', height: 'auto', width: 'auto', borderRadius: '4px' }}
                         onClick={(e) => handleDeleteQuestion(q.id, e)}
                         title="Удалить вопрос"
@@ -269,7 +299,7 @@ const Forum = () => {
                 </div>
 
                 <h3>{highlightText(q.title, searchQuery)}</h3>
-                <p className="post-excerpt">{highlightText(q.text.length > 150 ? `${q.text.slice(0, 150)}...` : q.text, searchQuery)}</p>
+                <p className="post-excerpt">{highlightText((q.text || '').length > 150 ? `${(q.text || '').slice(0, 150)}...` : (q.text || ''), searchQuery)}</p>
 
                 <div className="post-bottom-row">
                   <span className="post-tag-badge">{q.category}</span>
@@ -278,7 +308,7 @@ const Forum = () => {
                       <MessageSquare size={14} /> {q.answersCount} ответов
                     </span>
                     <div className="post-voting-buttons">
-                      <button 
+                      <button
                         className={`vote-action-btn like ${q.userVote === 'like' ? 'active' : ''}`}
                         onClick={(e) => handleVote(q.id, 'like', e)}
                         title="Нравится"
@@ -286,7 +316,7 @@ const Forum = () => {
                         <ThumbsUp size={14} />
                       </button>
                       <span className="vote-count-number">{q.rating}</span>
-                      <button 
+                      <button
                         className={`vote-action-btn dislike ${q.userVote === 'dislike' ? 'active' : ''}`}
                         onClick={(e) => handleVote(q.id, 'dislike', e)}
                         title="Не нравится"
@@ -315,33 +345,27 @@ const Forum = () => {
             <div className="auth-modal" onClick={(e) => e.stopPropagation()} style={{ width: '500px' }}>
               <button className="close-modal" onClick={() => setIsAskModalOpen(false)}><X size={20} /></button>
               <h3 style={{ fontWeight: '800' }}>Новый вопрос на форум</h3>
-              
+
               <form onSubmit={handleCreateQuestion} className="ask-form-modal" style={{ marginTop: '20px' }}>
                 <div className="form-group-modal" style={{ display: 'flex', flexDirection: 'column' }}>
                   <label>Заголовок вопроса</label>
-                  <input 
-                    type="text" 
-                    placeholder="Сформулируйте ваш вопрос кратко..." 
+                  <input
+                    type="text"
+                    placeholder="Сформулируйте ваш вопрос кратко..."
                     value={newTitle}
-                    onChange={(e) => {
-                      setNewTitle(e.target.value);
-                      if (errors.title) setErrors(prev => ({ ...prev, title: null }));
-                    }}
-                    maxLength={100}
+                    onChange={(e) => { setNewTitle(e.target.value); if (errors.title) setErrors(prev => ({ ...prev, title: null })); }}
+                    maxLength={300}
                     required
                   />
                   <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                    {errors.title ? <span className="form-field-error">{errors.title}</span> : <span></span>}
-                    <span className="form-char-counter">{newTitle.length} / 100</span>
+                    {errors.title ? <span className="form-field-error">{errors.title}</span> : <span />}
+                    <span className="form-char-counter">{newTitle.length} / 300</span>
                   </div>
                 </div>
 
                 <div className="form-group-modal">
                   <label>Категория</label>
-                  <select 
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value)}
-                  >
+                  <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
                     <option value="Учеба">Учеба</option>
                     <option value="Расписание">Расписание</option>
                     <option value="Общежитие">Общежитие</option>
@@ -352,23 +376,22 @@ const Forum = () => {
 
                 <div className="form-group-modal" style={{ display: 'flex', flexDirection: 'column' }}>
                   <label>Подробное описание</label>
-                  <textarea 
-                    placeholder="Опишите детали вашего вопроса..." 
+                  <textarea
+                    placeholder="Опишите детали вашего вопроса..."
                     value={newText}
-                    onChange={(e) => {
-                      setNewText(e.target.value);
-                      if (errors.text) setErrors(prev => ({ ...prev, text: null }));
-                    }}
-                    maxLength={2000}
+                    onChange={(e) => { setNewText(e.target.value); if (errors.text) setErrors(prev => ({ ...prev, text: null })); }}
+                    maxLength={10000}
                     required
                   />
                   <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                    {errors.text ? <span className="form-field-error">{errors.text}</span> : <span></span>}
-                    <span className="form-char-counter">{newText.length} / 2000</span>
+                    {errors.text ? <span className="form-field-error">{errors.text}</span> : <span />}
+                    <span className="form-char-counter">{newText.length} / 10000</span>
                   </div>
                 </div>
 
-                <button type="submit" className="btn-auth" style={{ marginTop: '10px' }}>Опубликовать</button>
+                <button type="submit" className="btn-auth" style={{ marginTop: '10px' }} disabled={submitting}>
+                  {submitting ? 'Публикуем...' : 'Опубликовать'}
+                </button>
               </form>
             </div>
           </div>

@@ -1,7 +1,13 @@
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey
+from datetime import datetime, timezone
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.db.database import Base
+
+
+def _utcnow():
+    """Timezone-aware UTC datetime. Replaces deprecated datetime.utcnow()."""
+    return datetime.now(timezone.utc)
+
 
 class User(Base):
     __tablename__ = "users"
@@ -11,14 +17,15 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=True)
     full_name = Column(String, nullable=False)
     hashed_password = Column(String, nullable=False)
-    role = Column(String, default="student") # "student" | "moderator" | "admin"
+    role = Column(String, default="student")  # "student" | "curator" | "moderator" | "admin"
     group_number = Column(String, nullable=True)
     sdo_id = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=_utcnow)
 
     questions = relationship("ForumQuestion", back_populates="author", cascade="all, delete-orphan")
     answers = relationship("ForumAnswer", back_populates="author", cascade="all, delete-orphan")
     votes = relationship("Vote", back_populates="user", cascade="all, delete-orphan")
+
 
 class ForumQuestion(Base):
     __tablename__ = "forum_questions"
@@ -30,11 +37,12 @@ class ForumQuestion(Base):
     content = Column(Text, nullable=False)
     views_count = Column(Integer, default=0)
     is_pinned = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=_utcnow)
 
     author = relationship("User", back_populates="questions")
     answers = relationship("ForumAnswer", back_populates="question", cascade="all, delete-orphan")
     votes = relationship("Vote", back_populates="question", cascade="all, delete-orphan")
+
 
 class ForumAnswer(Base):
     __tablename__ = "forum_answers"
@@ -44,10 +52,11 @@ class ForumAnswer(Base):
     author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     content = Column(Text, nullable=False)
     is_solution = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=_utcnow)
 
     question = relationship("ForumQuestion", back_populates="answers")
     author = relationship("User", back_populates="answers")
+
 
 class Vote(Base):
     __tablename__ = "votes"
@@ -55,10 +64,16 @@ class Vote(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     question_id = Column(Integer, ForeignKey("forum_questions.id"), nullable=False)
-    vote_type = Column(Integer, nullable=False) # 1 for Up, -1 for Down
+    vote_type = Column(Integer, nullable=False)  # 1 = upvote, -1 = downvote
+
+    # FIX: Unique constraint prevents duplicate votes (one user — one vote per question)
+    __table_args__ = (
+        UniqueConstraint("user_id", "question_id", name="uq_vote_user_question"),
+    )
 
     user = relationship("User", back_populates="votes")
     question = relationship("ForumQuestion", back_populates="votes")
+
 
 class Teacher(Base):
     __tablename__ = "teachers"
@@ -73,6 +88,7 @@ class Teacher(Base):
     courses = Column(String, nullable=True)
     photo_url = Column(String, nullable=True)
 
+
 class Announcement(Base):
     __tablename__ = "announcements"
 
@@ -80,7 +96,8 @@ class Announcement(Base):
     title = Column(String, nullable=False)
     content = Column(Text, nullable=False)
     is_important = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=_utcnow)
+
 
 class FaqItem(Base):
     __tablename__ = "faq_items"
@@ -91,13 +108,15 @@ class FaqItem(Base):
     category = Column(String, default="Общие")
     order_index = Column(Integer, default=0)
 
+
 class AnalyticsQuestion(Base):
     __tablename__ = "analytics_questions"
 
     id = Column(Integer, primary_key=True, index=True)
     question_text = Column(String, unique=True, index=True, nullable=False)
     ask_count = Column(Integer, default=1)
-    last_asked = Column(DateTime, default=datetime.utcnow)
+    last_asked = Column(DateTime(timezone=True), default=_utcnow)
+
 
 class Subject(Base):
     __tablename__ = "subjects"
@@ -117,3 +136,12 @@ class Subject(Base):
     description = Column(Text, nullable=False)
     mascot_hack = Column(Text, nullable=True)
     senior_advice = Column(Text, nullable=True)
+
+
+class RevokedToken(Base):
+    __tablename__ = "revoked_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    jti = Column(String, unique=True, index=True, nullable=False)
+    revoked_at = Column(DateTime(timezone=True), default=_utcnow)
+

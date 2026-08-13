@@ -10,12 +10,12 @@ from app.services.rag_service import generate_chatbot_reply
 router = APIRouter(prefix="/api/v1/chat", tags=["Chatbot"])
 
 @router.post("", response_model=schemas.ChatResponse)
-def chat_with_mascot(req: schemas.ChatRequest, db: Session = Depends(get_db)):
+async def chat_with_mascot(req: schemas.ChatRequest, db: Session = Depends(get_db)):
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="Сообщение не может быть пустым")
 
     history_list = [h.dict() for h in (req.history or [])]
-    reply = generate_chatbot_reply(req.message, history_list, db)
+    reply = await generate_chatbot_reply(req.message, history_list, db)
     return schemas.ChatResponse(reply=reply)
 
 @router.get("/top-questions", response_model=List[str])

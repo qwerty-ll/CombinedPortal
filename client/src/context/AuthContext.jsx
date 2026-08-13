@@ -97,6 +97,10 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('portal_jwt_token');
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    import('../services/api').then(({ authApi }) => {
+      authApi.logout().catch(() => {});
+    }).catch(() => {});
   };
 
   const updateUserProfile = (data = {}) => {

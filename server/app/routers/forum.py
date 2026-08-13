@@ -1,7 +1,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.db.database import get_db
 import app.models as models
@@ -10,24 +10,37 @@ import app.core.security as security
 
 router = APIRouter(prefix="/api/v1/forum", tags=["Forum"])
 
+# Max search query length to prevent DB abuse
+_MAX_SEARCH_LEN = 200
+
+
 @router.get("/questions", response_model=List[schemas.ForumQuestionResponse])
 def get_forum_questions(
     category: Optional[str] = Query(None),
-    search: Optional[str] = Query(None),
+    search: Optional[str] = Query(None, max_length=_MAX_SEARCH_LEN),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     current_user: Optional[models.User] = Depends(security.get_current_user),
     db: Session = Depends(get_db)
 ):
-    query = db.query(models.ForumQuestion)
+    # FIX: Use joinedload to avoid N+1 queries when accessing q.author.full_name
+    query = db.query(models.ForumQuestion).options(joinedload(models.ForumQuestion.author))
     if category and category != "Все":
         query = query.filter(models.ForumQuestion.category == category)
     if search:
         safe_search = search.replace("%", "\\%").replace("_", "\\_")
         query = query.filter(
-            (models.ForumQuestion.title.ilike(f"%{safe_search}%")) | 
+            (models.ForumQuestion.title.ilike(f"%{safe_search}%")) |
             (models.ForumQuestion.content.ilike(f"%{safe_search}%"))
         )
 
-    questions = query.order_by(models.ForumQuestion.is_pinned.desc(), models.ForumQuestion.created_at.desc()).all()
+    questions = (
+        query
+        .order_by(models.ForumQuestion.is_pinned.desc(), models.ForumQuestion.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+        .all()
+    )
 
     q_ids = [q.id for q in questions]
     votes_dict = {}
@@ -80,6 +93,7 @@ def get_forum_questions(
         ))
     return result
 
+
 @router.post("/questions", response_model=schemas.ForumQuestionResponse)
 def create_question(
     q_in: schemas.ForumQuestionCreate,
@@ -111,18 +125,28 @@ def create_question(
         created_at=new_q.created_at
     )
 
+
 @router.get("/questions/{question_id}", response_model=schemas.ForumQuestionResponse)
 def get_question_detail(
     question_id: int,
     current_user: Optional[models.User] = Depends(security.get_current_user),
     db: Session = Depends(get_db)
 ):
-    q = db.query(models.ForumQuestion).filter(models.ForumQuestion.id == question_id).first()
+    q = (
+        db.query(models.ForumQuestion)
+        .options(joinedload(models.ForumQuestion.author))
+        .filter(models.ForumQuestion.id == question_id)
+        .first()
+    )
     if not q:
         raise HTTPException(status_code=404, detail="Вопрос не найден")
 
-    q.views_count += 1
+    # FIX: Use SQL-level update to avoid lost-update race condition on views_count
+    db.query(models.ForumQuestion).filter(models.ForumQuestion.id == question_id).update(
+        {models.ForumQuestion.views_count: models.ForumQuestion.views_count + 1}
+    )
     db.commit()
+    db.refresh(q)
 
     upvotes = db.query(models.Vote).filter(models.Vote.question_id == q.id, models.Vote.vote_type == 1).count()
     downvotes = db.query(models.Vote).filter(models.Vote.question_id == q.id, models.Vote.vote_type == -1).count()
@@ -149,9 +173,23 @@ def get_question_detail(
         created_at=q.created_at
     )
 
+
 @router.get("/questions/{question_id}/answers", response_model=List[schemas.ForumAnswerResponse])
-def get_question_answers(question_id: int, db: Session = Depends(get_db)):
-    answers = db.query(models.ForumAnswer).filter(models.ForumAnswer.question_id == question_id).order_by(models.ForumAnswer.created_at.asc()).all()
+def get_question_answers(
+    question_id: int,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
+    answers = (
+        db.query(models.ForumAnswer)
+        .options(joinedload(models.ForumAnswer.author))
+        .filter(models.ForumAnswer.question_id == question_id)
+        .order_by(models.ForumAnswer.created_at.asc())
+        .limit(limit)
+        .offset(offset)
+        .all()
+    )
     return [
         schemas.ForumAnswerResponse(
             id=a.id,
@@ -164,6 +202,7 @@ def get_question_answers(question_id: int, db: Session = Depends(get_db)):
         )
         for a in answers
     ]
+
 
 @router.post("/questions/{question_id}/answers", response_model=schemas.ForumAnswerResponse)
 def post_answer(
@@ -195,6 +234,7 @@ def post_answer(
         created_at=new_ans.created_at
     )
 
+
 @router.post("/questions/{question_id}/vote")
 def vote_question(
     question_id: int,
@@ -202,7 +242,15 @@ def vote_question(
     current_user: models.User = Depends(security.require_current_user),
     db: Session = Depends(get_db)
 ):
-    vote = db.query(models.Vote).filter(models.Vote.question_id == question_id, models.Vote.user_id == current_user.id).first()
+    # Check question exists
+    q = db.query(models.ForumQuestion).filter(models.ForumQuestion.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Вопрос не найден")
+
+    vote = db.query(models.Vote).filter(
+        models.Vote.question_id == question_id,
+        models.Vote.user_id == current_user.id
+    ).first()
     if vote:
         if vote.vote_type == req.vote_type:
             db.delete(vote)
@@ -211,5 +259,28 @@ def vote_question(
     else:
         new_vote = models.Vote(user_id=current_user.id, question_id=question_id, vote_type=req.vote_type)
         db.add(new_vote)
-    db.commit()
+    from sqlalchemy.exc import IntegrityError
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
     return {"status": "ok"}
+
+
+@router.delete("/questions/{question_id}", status_code=200)
+def delete_question(
+    question_id: int,
+    current_user: models.User = Depends(security.require_current_user),
+    db: Session = Depends(get_db)
+):
+    q = db.query(models.ForumQuestion).filter(models.ForumQuestion.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Вопрос не найден")
+    
+    if q.author_id != current_user.id and current_user.role not in ("admin", "moderator"):
+        raise HTTPException(status_code=403, detail="Недостаточно прав для удаления этого вопроса")
+    
+    db.delete(q)
+    db.commit()
+    return {"status": "deleted"}
+
