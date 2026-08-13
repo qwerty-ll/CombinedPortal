@@ -7,7 +7,6 @@ import {
   Lightbulb, Trophy, ThumbsUp, RefreshCw, X
 } from 'lucide-react';
 import MascotMessage from '../components/MascotMessage';
-import { SUBJECTS } from '../data/subjectsData';
 import RoadmapSection, { ROADMAP_STEPS } from '../components/RoadmapSection';
 import { StepFoundation, StepRoadmap, StepChatbot } from '../components/StepIntroCards';
 import QuizModal from '../components/QuizModal';
@@ -149,7 +148,7 @@ const FreshmanGuide = () => {
     } catch { return [0]; }
   });
 
-  const [subjectsList, setSubjectsList] = useState(SUBJECTS);
+  const [subjectsList, setSubjectsList] = useState([]);
 
   useEffect(() => {
     subjectsApi.getSubjects().then(res => {

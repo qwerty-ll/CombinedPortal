@@ -1,0 +1,128 @@
+[
+  {
+    "name": "Киприна Людмила Юрьевна",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Заведующая кафедрой, кандидат технических наук, доцент",
+    "email": "L_kiprina@Kosgos.ru",
+    "office": "г. Кострома, ул. Ивановская, 24А, каб.214",
+    "hours": "Тел. 63-49-00 (доб. 8120)",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/kiprina_lyu.jpg"
+  },
+  {
+    "name": "Барило Илья Иванович",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Доцент кафедры, кандидат технических наук, доцент",
+    "email": "",
+    "office": "Корпус Б",
+    "hours": "",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/barilo_ii.jpg"
+  },
+  {
+    "name": "Лустгартен Юрий Леонидович",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Доцент кафедры, кандидат технических наук, доцент",
+    "email": "",
+    "office": "Корпус Б",
+    "hours": "",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/lusgarten_yl.jpg"
+  },
+  {
+    "name": "Красавина Мария Сергеевна",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Доцент кафедры, кандидат технических наук, доцент",
+    "email": "",
+    "office": "Корпус Б",
+    "hours": "",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/krasavina.jpg"
+  },
+  {
+    "name": "Прядкина Нина Олеговна",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Доцент кафедры, кандидат технических наук, доцент",
+    "email": "",
+    "office": "Корпус Б",
+    "hours": "",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IST/PPS/pryadkina_no.jpg"
+  },
+  {
+    "name": "Демчинова Екатерина Игоревна",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Старший преподаватель кафедры",
+    "email": "",
+    "office": "Корпус Б",
+    "hours": "",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/demchinova.jpg"
+  },
+  {
+    "name": "Дорохова Жанна Викторовна",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Старший преподаватель кафедры",
+    "email": "",
+    "office": "Корпус Б",
+    "hours": "",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/dorohova.jpg"
+  },
+  {
+    "name": "Орлов Александр Валерьевич",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Доцент кафедры, кандидат технических наук, доцент",
+    "email": "",
+    "office": "Корпус Б",
+    "hours": "",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/orlov.jpg"
+  },
+  {
+    "name": "Мозохин Александр Евгеньевич",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Доцент кафедры, кандидат технических наук, доцент",
+    "email": "",
+    "office": "Корпус Б",
+    "hours": "",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/nophoto.jpg"
+  },
+  {
+    "name": "Логинова Анна Александровна",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Ассистент кафедры",
+    "email": "",
+    "office": "Корпус Б",
+    "hours": "",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/loginova_aa.jpg"
+  },
+  {
+    "name": "Силенок Юрий Викторович",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Программист ООО 'Экзактпро'",
+    "email": "",
+    "office": "Корпус Б",
+    "hours": "",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/silenok.jpg"
+  },
+  {
+    "name": "Дружинина Ольга Васильевна",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Доцент кафедры, кандидат технических наук, доцент",
+    "email": "",
+    "office": "Корпус Б",
+    "hours": "",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/druzhinina.jpg"
+  },
+  {
+    "name": "Кириллова Екатерина Сергеевна",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Доцент кафедры, кандидат технических наук, доцент",
+    "email": "",
+    "office": "Корпус Б",
+    "hours": "",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/kirillova.jpg"
+  },
+  {
+    "name": "Чувиляева Александра Сергеевна",
+    "department": "Высшая ИТ-школа КГУ",
+    "role": "Доцент кафедры, кандидат технических наук, доцент",
+    "email": "",
+    "office": "Корпус Б",
+    "hours": "",
+    "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/chuvilyaeva.jpg"
+  }
+]

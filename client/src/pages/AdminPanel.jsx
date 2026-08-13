@@ -8,7 +8,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { adminApi, subjectsApi, teachersApi } from '../services/api';
-import { OFFICIAL_IVITSH_TEACHERS } from './Teachers';
 
 // --- Data access helpers (future: replace with API calls) ---
 const getFromStorage = (key, fallback = []) => {
@@ -59,25 +58,27 @@ const AdminPanel = () => {
     saveToStorage('portal_announcements', data);
   };
 
-  const handleAddAnnouncement = (e) => {
+  const handleAddAnnouncement = async (e) => {
     e.preventDefault();
     if (!annForm.title.trim() || !annForm.text.trim()) return;
 
-    if (editingAnnId) {
-      const updated = announcements.map(a =>
-        a.id === editingAnnId ? { ...a, title: annForm.title.trim(), text: annForm.text.trim() } : a
-      );
-      saveAnnouncements(updated);
-      toast.show('Объявление обновлено', 'success');
-      setEditingAnnId(null);
-    } else {
-      const newAnn = {
-        id: Date.now(),
+    try {
+      const created = await adminApi.createAnnouncement({
         title: annForm.title.trim(),
-        text: annForm.text.trim(),
-        time: new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }),
+        content: annForm.text.trim(),
+        is_important: false
+      });
+      const newAnn = {
+        id: created.id,
+        title: created.title,
+        text: created.content,
+        time: new Date(created.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }),
         read: false
       };
+      saveAnnouncements([newAnn, ...announcements]);
+      toast.show('Объявление создано и сохранено на сервере', 'success');
+    } catch (err) {
+      const newAnn = { id: Date.now(), title: annForm.title.trim(), text: annForm.text.trim() };
       saveAnnouncements([newAnn, ...announcements]);
       toast.show('Объявление создано', 'success');
     }
@@ -97,7 +98,7 @@ const AdminPanel = () => {
   };
 
   // --- TEACHERS ---
-  const [teachers, setTeachers] = useState(() => getFromStorage('portal_teachers', OFFICIAL_IVITSH_TEACHERS));
+  const [teachers, setTeachers] = useState([]);
   const [teacherForm, setTeacherForm] = useState({
     name: '', department: '', role: '', email: '', office: '', hours: '', courses: '', photo: ''
   });

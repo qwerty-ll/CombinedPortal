@@ -26,44 +26,28 @@ logger.info("Initializing IVITSH KSU Portal Backend Services...")
 Base.metadata.create_all(bind=engine)
 
 def seed_database():
+    import json
     from app.db.database import SessionLocal
     db = SessionLocal()
+    seeds_dir = os.path.join(os.path.dirname(__file__), "app", "db", "seeds")
     try:
-        if db.query(models.Teacher).count() == 0:
-            teachers_seed = [
-                {"name": "Киприна Людмила Юрьевна", "department": "Высшая ИТ-школа КГУ", "role": "Заведующая кафедрой, кандидат технических наук, доцент", "email": "L_kiprina@Kosgos.ru", "office": "г. Кострома, ул. Ивановская, 24А, каб.214", "hours": "Тел. 63-49-00 (доб. 8120)", "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/kiprina_lyu.jpg"},
-                {"name": "Барило Илья Иванович", "department": "Высшая ИТ-школа КГУ", "role": "Доцент кафедры, кандидат технических наук, доцент", "email": "", "office": "Корпус Б", "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/barilo_ii.jpg"},
-                {"name": "Лустгартен Юрий Леонидович", "department": "Высшая ИТ-школа КГУ", "role": "Доцент кафедры, кандидат технических наук, доцент", "email": "", "office": "Корпус Б", "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/lusgarten_yl.jpg"},
-                {"name": "Красавина Мария Сергеевна", "department": "Высшая ИТ-школа КГУ", "role": "Доцент кафедры, кандидат технических наук, доцент", "email": "", "office": "Корпус Б", "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/krasavina.jpg"},
-                {"name": "Прядкина Нина Олеговна", "department": "Высшая ИТ-школа КГУ", "role": "Доцент кафедры, кандидат технических наук, доцент", "email": "", "office": "Корпус Б", "photo_url": "https://kosgos.ru/images/INSTITUTS/IAST/Kaf_IST/PPS/pryadkina_no.jpg"},
-                {"name": "Демчинова Екатерина Игоревна", "department": "Высшая ИТ-школа КГУ", "role": "Старший преподаватель кафедры", "email": "", "office": "Корпус Б", "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/demchinova.jpg"},
-                {"name": "Дорохова Жанна Викторовна", "department": "Высшая ИТ-школа КГУ", "role": "Старший преподаватель кафедры", "email": "", "office": "Корпус Б", "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/dorohova.jpg"},
-                {"name": "Орлов Александр Валерьевич", "department": "Высшая ИТ-школа КГУ", "role": "Доцент кафедры, кандидат технических наук, доцент", "email": "", "office": "Корпус Б", "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/orlov.jpg"},
-                {"name": "Мозохин Александр Евгеньевич", "department": "Высшая ИТ-школа КГУ", "role": "Доцент кафедры, кандидат технических наук, доцент", "email": "", "office": "Корпус Б", "photo_url": "https://kosgos.ru/images/INSTITUTS/nophoto.jpg"},
-                {"name": "Логинова Анна Александровна", "department": "Высшая ИТ-школа КГУ", "role": "Ассистент кафедры", "email": "", "office": "Корпус Б", "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/loginova_aa.jpg"},
-                {"name": "Силенок Юрий Викторович", "department": "Высшая ИТ-школа КГУ", "role": "Программист ООО 'Экзактпро'", "email": "", "office": "Корпус Б", "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/silenok.jpg"},
-                {"name": "Дружинина Ольга Васильевна", "department": "Высшая ИТ-школа КГУ", "role": "Доцент кафедры, кандидат технических наук, доцент", "email": "", "office": "Корпус Б", "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/druzhinina.jpg"},
-                {"name": "Кириллова Екатерина Сергеевна", "department": "Высшая ИТ-школа КГУ", "role": "Доцент кафедры, кандидат технических наук, доцент", "email": "", "office": "Корпус Б", "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/kirillova.jpg"},
-                {"name": "Чувиляева Александра Сергеевна", "department": "Высшая ИТ-школа КГУ", "role": "Доцент кафедры, кандидат технических наук, доцент", "email": "", "office": "Корпус Б", "photo_url": "https://kosgos.ru/images/INSTITUTS/Vysshaya_IT-shkola/kafedry/IST/chuvilyaeva.jpg"}
-            ]
+        teachers_file = os.path.join(seeds_dir, "teachers.json")
+        if db.query(models.Teacher).count() == 0 and os.path.exists(teachers_file):
+            with open(teachers_file, "r", encoding="utf-8") as f:
+                teachers_seed = json.load(f)
             for t in teachers_seed:
                 db.add(models.Teacher(**t))
             db.commit()
-            logger.info(f"[DB SEED] Seeded {len(teachers_seed)} initial teachers into DB")
+            logger.info(f"[DB SEED] Seeded {len(teachers_seed)} teachers from teachers.json")
 
-        if db.query(models.Subject).count() == 0:
-            subjects_seed = [
-                {"subject_code": "s1-algo", "name": "Алгоритмизация и программирование", "short_name": "Алгоритмы", "emoji": "⚙️", "color": "#34C759", "difficulty": 4, "hours": 144, "credits": 4, "semester": 1, "control_type": "Экзамен", "description": "Основы алгоритмического мышления, блок-схемы, базовые структуры управления и первые программы на C/Python.", "mascot_hack": "Мяу! Рисуй блок-схему ПЕРЕД тем, как писать код — это не трата времени, это экономия нервов 😸", "senior_advice": "Не пропускай практики — именно там разбирают задачи, которые потом будут на экзамене. Сдавай лабы вовремя."},
-                {"subject_code": "s1-it", "name": "Информационные технологии", "short_name": "ИТ", "emoji": "🖥️", "color": "#007AFF", "difficulty": 3, "hours": 144, "credits": 4, "semester": 1, "control_type": "Экзамен", "extra_type": "Курсовая", "description": "Архитектура ПК, операционные системы, офисные пакеты, основы работы с сетями и базами данных.", "mascot_hack": "Курсовую начинай на 3-й неделе, а не за 3 дня до сдачи. Я видел, как студенты не спали 48 часов — не повторяй их ошибку 🙀", "senior_advice": "Курсовая работа — это твой первый серьёзный проект. Выбери тему, которая тебе интересна, и будет легче."},
-                {"subject_code": "s1-informatics", "name": "Теоретические основы информатики", "short_name": "ТОИ", "emoji": "🔢", "color": "#5856D6", "difficulty": 4, "hours": 144, "credits": 4, "semester": 1, "control_type": "Экзамен", "description": "Системы счисления, булева алгебра, теория информации, кодирование и сжатие данных.", "mascot_hack": "Перевод из двоичной в шестнадцатеричную — через группы по 4 бита. Запомни это и половина задач решена! 😹", "senior_advice": "Этот предмет — фундамент. Не игнорируй теорию: она всплывёт на 2-м курсе в самый неожиданный момент."},
-                {"subject_code": "s1-calculus", "name": "Математический анализ", "short_name": "Матан", "emoji": "∫", "color": "#007AFF", "difficulty": 5, "hours": 108, "credits": 3, "semester": 1, "control_type": "Зачет", "description": "Пределы, производные, интегралы. Фундамент высшей математики и основа для машинного обучения.", "mascot_hack": "Выучи таблицу производных наизусть — это 40% задач. Остальное выводится из правил дифференцирования 😹", "senior_advice": "Решай задачи каждый день — хотя бы по 3 штуки. Не копи долги до сессии, иначе будет очень больно."},
-                {"subject_code": "s2-algods", "name": "Алгоритмы и структуры данных", "short_name": "АиСД", "emoji": "🌳", "color": "#34C759", "difficulty": 5, "hours": 144, "credits": 4, "semester": 2, "control_type": "Экзамен", "description": "Сортировки, деревья, графы, хэш-таблицы, сложность алгоритмов O(n). Основа для любых собеседований.", "mascot_hack": "O(n log n) — это быстрая сортировка. Запомни: если задача про поиск — думай про бинарный поиск первым 🐱‍💻", "senior_advice": "Это самый важный предмет для карьеры программиста. Решай задачи на LeetCode параллельно с учёбой."},
-                {"subject_code": "s2-linalg", "name": "Линейная алгебра", "short_name": "Линал", "emoji": "🔢", "color": "#5856D6", "difficulty": 4, "hours": 144, "credits": 4, "semester": 2, "control_type": "Экзамен", "description": "Матрицы, определители, собственные значения, линейные пространства. Основа для ML и компьютерной графики.", "mascot_hack": "Определитель 2×2 — это ad-bc. Визуализируй матрицы как трансформации пространства — сразу станет понятнее 😹", "senior_advice": "Смотри 3Blue1Brown «Essence of Linear Algebra» на YouTube — лучшее объяснение в мире, бесплатно."}
-            ]
+        subjects_file = os.path.join(seeds_dir, "subjects.json")
+        if db.query(models.Subject).count() == 0 and os.path.exists(subjects_file):
+            with open(subjects_file, "r", encoding="utf-8") as f:
+                subjects_seed = json.load(f)
             for s in subjects_seed:
                 db.add(models.Subject(**s))
             db.commit()
-            logger.info(f"[DB SEED] Seeded {len(subjects_seed)} initial subjects into DB")
+            logger.info(f"[DB SEED] Seeded {len(subjects_seed)} subjects from subjects.json")
     except Exception as e:
         logger.warning(f"[DB SEED WARN] Could not seed database: {e}")
     finally:
