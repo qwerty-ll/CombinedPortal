@@ -19,15 +19,8 @@ def _fetch_eios(endpoint: str, params: dict, timeout: int = 12):
             return None
         return resp.json()
     except Exception as e:
-        logger.warning(f"[EIOS SSL RETRY] Primary request failed: {e}. Retrying with verify=False...")
-        try:
-            resp = requests.get(url, params=params, timeout=timeout, verify=False)
-            if resp.status_code == 451 or "отключите vpn" in resp.text.lower():
-                return None
-            return resp.json()
-        except Exception as ex:
-            logger.error(f"[EIOS FETCH ERROR] Connection error for {url}: {ex}")
-            return None
+        logger.error(f"[EIOS FETCH ERROR] Strict TLS connection error for {url}: {e}")
+        return None
 
 @router.get("/years")
 def get_eios_years():

@@ -45,22 +45,14 @@ def get_access_token(force_refresh: bool = False) -> str:
     }
     payload = {"scope": "GIGACHAT_API_PERS"}
 
-    verify_setting = VERIFY_SSL
     try:
-        resp = requests.post(OAUTH_URL, headers=headers, data=payload, verify=verify_setting, timeout=10)
+        resp = requests.post(OAUTH_URL, headers=headers, data=payload, verify=VERIFY_SSL, timeout=10)
         resp.raise_for_status()
     except Exception as e:
-        logger.warning(f"[GIGACHAT SSL WARN] Initial OAuth connection failed with verify={verify_setting}: {e}")
-        # Retry with verify=False for Sberbank Russian Trusted Root CA support
-        try:
-            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-            resp = requests.post(OAUTH_URL, headers=headers, data=payload, verify=False, timeout=10)
-            resp.raise_for_status()
-        except Exception as retry_err:
-            token_cache["access_token"] = ""
-            token_cache["expires_at"] = 0
-            logger.error(f"[GIGACHAT AUTH FAILED] Could not authenticate with GigaChat: {retry_err}")
-            raise RuntimeError(f"GigaChat Auth Failed: {retry_err}")
+        token_cache["access_token"] = ""
+        token_cache["expires_at"] = 0
+        logger.error(f"[GIGACHAT AUTH FAILED] Could not authenticate with GigaChat under strict TLS: {e}")
+        raise RuntimeError(f"GigaChat Auth Failed: {e}")
 
     data = resp.json()
     token_cache["access_token"] = data["access_token"]
@@ -221,20 +213,13 @@ def generate_chatbot_reply(user_message: str, history: list, db: Session) -> str
             "max_tokens": 250
         }
         
-        try:
-            resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=VERIFY_SSL, timeout=15)
-        except Exception:
-            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-            resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=False, timeout=15)
+        resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=VERIFY_SSL, timeout=15)
 
         if resp.status_code in (401, 402):
             token_cache["access_token"] = ""
             token = get_access_token(force_refresh=True)
             headers["Authorization"] = f"Bearer {token}"
-            try:
-                resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=VERIFY_SSL, timeout=15)
-            except Exception:
-                resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=False, timeout=15)
+            resp = requests.post(CHAT_URL, headers=headers, json=payload, verify=VERIFY_SSL, timeout=15)
 
         resp.raise_for_status()
         reply = resp.json()["choices"][0]["message"]["content"]

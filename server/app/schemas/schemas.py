@@ -30,8 +30,6 @@ class UserResponse(BaseModel):
     role: str
     group_number: Optional[str] = None
     email: Optional[str] = None
-    eios_token: Optional[str] = None
-    sdo_token: Optional[str] = None
     userpictureurl: Optional[str] = None
     courses: Optional[List[dict]] = None
     created_at: datetime

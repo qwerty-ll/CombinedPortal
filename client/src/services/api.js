@@ -11,6 +11,7 @@ export const apiFetch = async (endpoint, options = {}) => {
 
   try {
     const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+      credentials: 'include',
       ...options,
       headers,
     });
@@ -31,6 +32,7 @@ export const authApi = {
   eiosLogin: (username, password, groupNumber = '') => apiFetch('/api/v1/auth/eios-login', { method: 'POST', body: JSON.stringify({ username, password, group_number: groupNumber }) }),
   sdoLogin: (username, password, groupNumber = '') => apiFetch('/api/v1/auth/eios-login', { method: 'POST', body: JSON.stringify({ username, password, group_number: groupNumber }) }),
   adminLogin: (username, password) => apiFetch('/api/v1/auth/admin-login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  logout: () => apiFetch('/api/v1/auth/logout', { method: 'POST' }),
   register: (userData) => apiFetch('/api/v1/auth/register', { method: 'POST', body: JSON.stringify(userData) }),
   getMe: () => apiFetch('/api/v1/auth/me'),
 };

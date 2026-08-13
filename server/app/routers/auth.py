@@ -1,6 +1,6 @@
 import os
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -19,7 +19,7 @@ logger.setLevel(logging.INFO)
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
 @router.post("/register", response_model=schemas.TokenResponse)
-def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
+def register(user_in: schemas.UserCreate, response: Response, db: Session = Depends(get_db)):
     username_clean = user_in.username.strip()
     if not username_clean or len(username_clean) < 3:
         raise HTTPException(status_code=400, detail="Логин должен содержать минимум 3 символа")
@@ -44,11 +44,12 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
 
     token = security.create_access_token(data={"sub": new_user.username})
+    response.set_cookie(key="portal_token", value=token, httponly=True, samesite="lax", max_age=86400 * 7)
     logger.info(f"[REGISTER SUCCESS] New user registered: {new_user.username}")
     return schemas.TokenResponse(access_token=token, user=new_user)
 
 @router.post("/admin-login", response_model=schemas.TokenResponse)
-def admin_login(user_in: schemas.UserLogin, db: Session = Depends(get_db)):
+def admin_login(user_in: schemas.UserLogin, response: Response, db: Session = Depends(get_db)):
     admin_user_env = os.getenv("ADMIN_USERNAME", "ivitsh_admin")
     admin_pass_env = os.getenv("ADMIN_PASSWORD")
 
@@ -84,12 +85,13 @@ def admin_login(user_in: schemas.UserLogin, db: Session = Depends(get_db)):
             db.refresh(db_user)
 
     token = security.create_access_token(data={"sub": db_user.username})
+    response.set_cookie(key="portal_token", value=token, httponly=True, samesite="lax", max_age=86400 * 7)
     logger.info(f"[ADMIN LOGIN SUCCESS] Admin logged in: {db_user.username}")
     return schemas.TokenResponse(access_token=token, user=db_user)
 
 @router.post("/eios-login", response_model=schemas.TokenResponse)
 @router.post("/sdo-login", response_model=schemas.TokenResponse)
-async def eios_login(sdo_req: schemas.EiosLoginRequest, db: Session = Depends(get_db)):
+async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: Session = Depends(get_db)):
     username = sdo_req.username.strip()
     password = sdo_req.password.strip()
 
@@ -133,30 +135,18 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, db: Session = Depends(ge
             )
 
     import requests as sync_requests
-    import urllib3
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     try:
-        # First attempt with standard SSL verification setting
-        resp = sync_requests.get(token_url, params=token_params, verify=verify_ssl_setting, timeout=8.0)
+        resp = sync_requests.get(token_url, params=token_params, verify=security.VERIFY_SSL, timeout=12.0)
         token_data = process_token_response(resp)
     except HTTPException:
         raise
-    except Exception as first_err:
-        logger.warning(f"[EIOS/SDO CONN WARN] Direct connection with verify={verify_ssl_setting} failed ({first_err}). Retrying with verify=False...")
-        try:
-            # Second attempt with verify=False (supports internal KSU network & custom CA)
-            resp = sync_requests.get(token_url, params=token_params, verify=False, timeout=8.0)
-            token_data = process_token_response(resp)
-            verify_ssl_setting = False
-        except HTTPException:
-            raise
-        except Exception as retry_err:
-            logger.error(f"[EIOS/SDO CONN FAILED] Both SSL verified and insecure attempts failed: {retry_err}")
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Сервер ЭИОС КГУ (eios.kosgos.ru / sdo.kosgos.ru) недоступен из сети виртуальной машины: {str(retry_err)}"
-            )
+    except Exception as conn_err:
+        logger.error(f"[EIOS/SDO CONN FAILED] Strict TLS connection error: {conn_err}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Сервер ЭИОС КГУ (eios.kosgos.ru / sdo.kosgos.ru) недоступен из сети виртуальной машины: {str(conn_err)}"
+        )
 
     if not token_data or "error" in token_data or "token" not in token_data:
         err_msg = token_data.get("error", "Неверный логин или пароль ЭИОС / СДО КГУ") if token_data else "Неверный ответ сервера ЭИОС КГУ"
@@ -179,7 +169,7 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, db: Session = Depends(ge
     department_name = ""
     courses_list = []
 
-    async with httpx.AsyncClient(verify=verify_ssl_setting, timeout=12.0) as client:
+    async with httpx.AsyncClient(verify=security.VERIFY_SSL, timeout=12.0) as client:
         try:
             info_resp = await client.post(rest_url, data=info_params)
             info_data = info_resp.json()
@@ -290,6 +280,7 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, db: Session = Depends(ge
         db.commit()
 
     jwt_token = security.create_access_token(data={"sub": db_user.username})
+    response.set_cookie(key="portal_token", value=jwt_token, httponly=True, samesite="lax", max_age=86400 * 7)
 
     user_resp = schemas.UserResponse(
         id=db_user.id,
@@ -298,7 +289,6 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, db: Session = Depends(ge
         role=db_user.role,
         group_number=db_user.group_number,
         email=db_user.email,
-        sdo_token=wstoken,
         userpictureurl=userpictureurl,
         courses=courses_list,
         created_at=db_user.created_at
@@ -310,3 +300,8 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, db: Session = Depends(ge
 @router.get("/me", response_model=schemas.UserResponse)
 def get_me(current_user: models.User = Depends(security.require_current_user)):
     return current_user
+
+@router.post("/logout")
+def logout(response: Response):
+    response.delete_cookie("portal_token")
+    return {"message": "Успешный выход из системы"}
