@@ -2,7 +2,7 @@
 
 **Проект:** Официальный Портал и Гайд первокурсника Высшей ИТ-Школы КГУ  
 **Архитектура:** React (Vite SPA) + FastAPI (REST API) + Standalone SQLite WAL + Nginx Reverse Proxy  
-**Домен проекта (3-й уровень):** `ivitshGuide.kosgos.ru` (альтернативно: `portal.kosgos.ru` / `ivitsh.kosgos.ru`)  
+**Домен проекта (3-й уровень):** `ivitsh-portal.kosgos.ru` (альтернативно: `portal.kosgos.ru` / `itschool.kosgos.ru`)  
 **Способ развертывания:** Docker Compose (2 отдельных контейнера: `client` и `backend`)
 
 ---
@@ -17,15 +17,15 @@
 
 ---
 
-## 🌐 2. Домен и Инфраструктура КГУ (`ivitshGuide.kosgos.ru`)
+## 🌐 2. Домен и Инфраструктура КГУ (`ivitsh-portal.kosgos.ru`)
 
 Для развертывания проекта в локальной сети / интернете КГУ закреплен официальный домен 3-го уровня:
-👉 **`ivitshGuide.kosgos.ru`** (альтернативно: `portal.kosgos.ru` / `ivitsh.kosgos.ru`).
+👉 **`ivitsh-portal.kosgos.ru`** (альтернативно: `portal.kosgos.ru` / `itschool.kosgos.ru`).
 
 Nginx проксирует трафик следующим образом:
-- **`http://portal.kosgos.ru/`** — Фронтенд (React SPA)
-- **`http://portal.kosgos.ru/api/v1/*`** — FastAPI REST API Бэкенд
-- **`http://portal.kosgos.ru/docs`** — Документация Swagger UI
+- **`https://ivitsh-portal.kosgos.ru/`** — Фронтенд (React SPA)
+- **`https://ivitsh-portal.kosgos.ru/api/v1/*`** — FastAPI REST API Бэкенд
+- **`https://ivitsh-portal.kosgos.ru/docs`** — Документация Swagger UI (активна при `DOCS_ENABLED=true`)
 
 ---
 
@@ -42,7 +42,13 @@ cd CombinedPortal
 ```bash
 cp .env.example .env
 ```
-*(При необходимости укажите пароли или ключи в созданном `.env` файле).*
+Укажите в `.env` файле учетные данные администратора и настройки:
+```env
+ADMIN_USERNAME=ivitsh_admin
+ADMIN_PASSWORD=Ваш_Сложный_Пароль_2026!
+SECRET_KEY=Ваш_Секретный_JWT_Ключ
+DOCS_ENABLED=true
+```
 
 ### Шаг 3: Переход в папку `infrastructure` и запуск контейнеров
 ```bash
@@ -66,9 +72,8 @@ docker compose up -d --build
 
 ## 🔐 5. Учетные данные Администратора
 
-- **Вкладка авторизации**: **Личный кабинет** -> **Сотрудник ИВИТШ**
-- **Логин**: `ivitsh_admin` (или `admin` / `smirnovmakar`)
-- **Пароль**: `KGU_IVITSH_Admin_2026!`
+- **Вкладка авторизации**: **Личный кабинет** -> **Авторизоваться**
+- **Управление доступом**: Все стандартные фолбэки выключены в целях безопасности. Логин и пароль администратора считываются строго из файла `.env` (`ADMIN_USERNAME` и `ADMIN_PASSWORD`).
 
 ---
 
@@ -76,7 +81,8 @@ docker compose up -d --build
 
 1. База создается при первом старте в изолированном томе `sqlite_data`.
 2. База работает в режиме **SQLite WAL (Write-Ahead Logging)** для высокой производительности.
-3. **Бэкап базы данных**:
+3. При старте бэкенд автоматически сидирует список **17 официальных преподавателей ИВИТШ КГУ**.
+4. **Бэкап базы данных**:
    ```bash
    docker cp ivitsh_portal_backend:/app/portal.db ./backup_portal_$(date +%Y%m%d).db
    ```
@@ -85,10 +91,9 @@ docker compose up -d --build
 
 ## 🔄 7. Команды обновления и управления
 
-- **Обновление из Git**:
+- **Автоматический пуш и мердж**:
   ```bash
-  git pull origin main
-  cd infrastructure && docker compose up -d --build
+  python3 push_and_merge.py
   ```
 - **Просмотреть логи**: `docker compose logs -f`
 - **Остановить сервер**: `docker compose down`
