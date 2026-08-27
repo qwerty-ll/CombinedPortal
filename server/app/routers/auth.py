@@ -21,10 +21,9 @@ logger.setLevel(logging.INFO)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
-# Protected admin usernames that can never be role-changed by other admins.
-# Dynamically constructed from env ADMIN_USERNAME and system admin.
-_PROTECTED_ADMIN_USERNAMES = frozenset(
-    filter(None, [os.getenv("ADMIN_USERNAME", "").lower(), "admin"])
+# Protected admin usernames that can never be registered publicly.
+_RESERVED_USERNAMES = frozenset(
+    filter(None, [os.getenv("ADMIN_USERNAME", "").strip().lower(), "admin", "administrator", "ivitsh_admin", "root", "system", "moderator", "superuser"])
 )
 
 
@@ -42,15 +41,23 @@ def _set_auth_cookie(response: Response, token: str) -> None:
 
 @router.post("/register", response_model=schemas.TokenResponse)
 def register(user_in: schemas.UserCreate, response: Response, db: Session = Depends(get_db)):
-    username_clean = user_in.username.strip()
-    if not username_clean or len(username_clean) < 3:
+    username_raw = user_in.username.strip()
+    username_normalized = username_raw.lower()
+    if not username_normalized or len(username_normalized) < 3:
         raise HTTPException(status_code=400, detail="Логин должен содержать минимум 3 символа")
     if not user_in.password or len(user_in.password) < 6:
         raise HTTPException(status_code=400, detail="Пароль должен быть длиной не менее 6 символов")
 
+    # M-SEC-01: Prevent registration of reserved/admin usernames
+    if username_normalized in _RESERVED_USERNAMES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Данное имя пользователя зарезервировано для администрации системы"
+        )
+
     hashed_pw = security.get_password_hash(user_in.password)
     new_user = models.User(
-        username=username_clean,
+        username=username_raw,
         full_name=user_in.full_name,
         email=user_in.email,
         group_number=user_in.group_number,
@@ -102,9 +109,6 @@ def admin_login(user_in: schemas.UserLogin, response: Response, db: Session = De
             raise HTTPException(status_code=400, detail="Неверный логин или пароль Администратора ИВИТШ")
     else:
         # Env-admin path: credentials verified against environment config.
-        # FIX (A-02 regression): If the DB user exists but has a non-admin role,
-        # we explicitly set role=admin. This is safe because all 3 env conditions
-        # are already verified above — only the configured env-admin triggers this.
         if not db_user:
             hashed_pw = security.get_password_hash(user_in.password)
             db_user = models.User(
@@ -118,8 +122,7 @@ def admin_login(user_in: schemas.UserLogin, response: Response, db: Session = De
             db.commit()
             db.refresh(db_user)
         elif db_user.role != "admin":
-            # Env-admin user exists with wrong role (e.g., was registered as student via EIOS)
-            # Env credentials are the authoritative proof → upgrade to admin
+            # Env-admin user exists with wrong role
             db_user.role = "admin"
             db.commit()
             logger.info(f"[ADMIN LOGIN] Upgraded existing user {db_user.username} to admin via env credentials")
@@ -142,7 +145,7 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
         raise HTTPException(status_code=400, detail="Логин и пароль обязательны для входа через ЭИОС КГУ")
 
     token_url = "https://sdo.kosgos.ru/login/token.php"
-    token_params = {
+    token_payload = {
         "username": username,
         "password": password,
         "service": "moodle_mobile_app"
@@ -178,13 +181,11 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
                 detail="Сервер ЭИОС КГУ вернул некорректный ответ."
             )
 
-    # FIX (C-02): All external HTTP calls use async httpx.AsyncClient.
-    # Previously, the first token fetch used sync requests.get() inside an async def,
-    # which blocked the entire asyncio event loop for up to 12s per concurrent EIOS login.
+    # M-SEC-03: Use POST payload (data=token_payload) instead of GET query string (params=token_params)
     async with httpx.AsyncClient(verify=security.VERIFY_SSL, timeout=12.0) as client:
-        # Step 1: Fetch EIOS token (async — was blocking)
+        # Step 1: Fetch EIOS token (async POST body)
         try:
-            resp = await client.get(token_url, params=token_params)
+            resp = await client.post(token_url, data=token_payload)
             token_data = process_token_response(resp)
         except HTTPException:
             raise
