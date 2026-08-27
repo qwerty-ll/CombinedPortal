@@ -72,7 +72,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         except Exception:
             return False
     sha256_hash = hashlib.sha256((plain_password or "").encode("utf-8")).hexdigest()
-    return sha256_hash == hashed_password
+    return secrets.compare_digest(sha256_hash, hashed_password)
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password or "")
@@ -117,9 +117,17 @@ def require_current_user(user: Optional[models.User] = Depends(get_current_user)
     return user
 
 def require_admin(user: models.User = Depends(require_current_user)) -> models.User:
+    if user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Необходимы права Администратора",
+        )
+    return user
+
+def require_moderator(user: models.User = Depends(require_current_user)) -> models.User:
     if user.role not in ("admin", "moderator"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Недостаточно прав доступа",
+            detail="Необходимы права Модератора или Администратора",
         )
     return user
