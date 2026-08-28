@@ -44,6 +44,17 @@ const AdminPanel = () => {
     }
   };
 
+  const handleDeleteUser = async (userId, username) => {
+    if (!window.confirm(`Вы уверены, что хотите удалить пользователя "${username}"?`)) return;
+    try {
+      await adminApi.deleteUser(userId);
+      setUsersList(prev => prev.filter(u => u.id !== userId));
+      toast.show(`Пользователь "${username}" успешно удалён из базы`, 'success');
+    } catch (err) {
+      toast.show(err.message || 'Ошибка удаления пользователя', 'warning');
+    }
+  };
+
   // ============================================================
   // ANNOUNCEMENTS — fully server-side, no localStorage
   // ============================================================
@@ -695,19 +706,41 @@ const AdminPanel = () => {
                           Администратор ИВИТШ
                         </span>
                       ) : (
-                        <select
-                          value={u.role}
-                          onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                          style={{
-                            padding: '6px 12px', borderRadius: '8px', border: '1px solid #CED4DA',
-                            fontSize: '0.85rem', fontWeight: '700',
-                            color: u.role === 'admin' ? '#059669' : u.role === 'moderator' ? '#007FFF' : '#495057'
-                          }}
-                        >
-                          <option value="student">Студент</option>
-                          <option value="moderator">Модератор</option>
-                          <option value="admin">Администратор</option>
-                        </select>
+                        <>
+                          <select
+                            value={u.role}
+                            onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                            style={{
+                              padding: '6px 12px', borderRadius: '8px', border: '1px solid #CED4DA',
+                              fontSize: '0.85rem', fontWeight: '700',
+                              color: u.role === 'admin' ? '#059669' : u.role === 'moderator' ? '#007FFF' : '#495057'
+                            }}
+                          >
+                            <option value="student">Студент</option>
+                            <option value="moderator">Модератор</option>
+                            <option value="admin">Администратор</option>
+                          </select>
+                          <button
+                            onClick={() => handleDeleteUser(u.id, u.username)}
+                            title="Удалить пользователя"
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.1)',
+                              color: '#EF4444',
+                              border: 'none',
+                              borderRadius: '8px',
+                              padding: '7px 10px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '0.8rem',
+                              fontWeight: '700',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <Trash2 size={15} /> Удалить
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>

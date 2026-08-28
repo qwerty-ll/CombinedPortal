@@ -51,6 +51,27 @@ def update_user_role(
     return target_user
 
 
+@router.delete("/admin/users/{user_id}", status_code=200)
+def delete_user(
+    user_id: int,
+    current_user: models.User = Depends(security.require_admin),
+    db: Session = Depends(get_db)
+):
+    target_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    if target_user.id == current_user.id or target_user.username.lower() == current_user.username.lower():
+        raise HTTPException(status_code=400, detail="Нельзя удалить собственного администратора")
+
+    if target_user.username.lower() in ("ivitsh_admin", "admin"):
+        raise HTTPException(status_code=400, detail="Нельзя удалять Главного Администратора ИВИТШ")
+
+    db.delete(target_user)
+    db.commit()
+    return {"status": "deleted", "id": user_id}
+
+
 @router.post("/adaptation", response_model=schemas.UserAdaptationResponse)
 def save_user_adaptation(
     req: schemas.UserAdaptationUpdate,

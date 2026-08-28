@@ -148,6 +148,8 @@ export const adminApi = {
     apiFetch(`/api/v1/admin/users?limit=${limit}&offset=${offset}`),
   updateUserRole: (userId, role) =>
     apiFetch(`/api/v1/admin/users/${userId}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+  deleteUser: (userId) =>
+    apiFetch(`/api/v1/admin/users/${userId}`, { method: 'DELETE' }),
   getAdaptations: () =>
     apiFetch('/api/v1/admin/adaptations'),
 
