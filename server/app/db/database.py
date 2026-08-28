@@ -17,7 +17,17 @@ if DATABASE_URL.startswith("sqlite"):
 else:
     connect_args = {}
 
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(DATABASE_URL, connect_args=connect_args)
+else:
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args=connect_args,
+        pool_size=30,
+        max_overflow=50,
+        pool_timeout=30,
+        pool_pre_ping=True
+    )
 
 if DATABASE_URL.startswith("sqlite"):
     @event.listens_for(engine, "connect")
