@@ -307,34 +307,28 @@ const FreshmanGuide = () => {
                 )}
                 {activeTab === 'study' && (
                   <>
-                    <li><a href="https://kosgos.ru/files/op_info/plan/279/1/Ucheb_plan_09.03.02.01_2026_1_is.pdf" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Учебный план ИСТ (1 курс)</a></li>
-                    <li><a href="https://kosgos.ru/files/op_info/plan/164/1/Ucheb_plan_10.03.01_2026_1_ib.pdf" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Учебный план ИБ (1 курс)</a></li>
-                    <li><a href="https://kosgos.ru/files/op_info/plan/168/1/Ucheb_plan_01.03.02_2026_1.pdf" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Учебный план ПМ (1 курс)</a></li>
-                    <li><a href="https://lib.kosgos.ru" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Библиотека ВУЗа</a></li>
-                    <li><a href="https://eios.kosgos.ru" target="_blank" rel="noopener noreferrer"><Zap size={16}/> Электронные курсы</a></li>
-                    <li><a href="https://science.kosgos.ru" target="_blank" rel="noopener noreferrer"><Sparkles size={16}/> Научные работы</a></li>
+                    <li><a href="/plans/is_2026.pdf" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Учебный план ИСТ (1 курс)</a></li>
+                    <li><a href="/plans/ib_2026.pdf" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Учебный план ИБ (1 курс)</a></li>
+                    <li><a href="/plans/pm_2026.pdf" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Учебный план ПМ (1 курс)</a></li>
+                    <li><a href="https://eios.kosgos.ru" target="_blank" rel="noopener noreferrer"><Zap size={16}/> Электронные курсы СДО</a></li>
                   </>
                 )}
                 {activeTab === 'school' && (
                   <>
                     <li><a href="https://kosgos.ru/svedeniya-ob-organizatsii/struktura-i-organy-upravleniya/instituty/institut-vysshaya-it-shkola.html" target="_blank" rel="noopener noreferrer"><Users size={16}/> Дирекция ИВИТШ (Б-209)</a></li>
-                    <li><a href="https://vk.com/ivitsh" target="_blank" rel="noopener noreferrer"><Send size={16}/> Официальный чат ИВИТШ</a></li>
-                    <li><a href="https://vk.com/ivitsh" target="_blank" rel="noopener noreferrer"><Heart size={16}/> Группа VK ИВИТШ</a></li>
+                    <li><a href="https://vk.ru/vitshmedia" target="_blank" rel="noopener noreferrer"><Heart size={16}/> Группа VK ИВИТШ</a></li>
                   </>
                 )}
                 {activeTab === 'life' && (
                   <>
-                    <li><a href="https://vk.com/studsovet_kosgos" target="_blank" rel="noopener noreferrer"><Users size={16} /> Студенческий совет КГУ</a></li>
-                    <li><a href="https://vk.com/profkom_kosgos" target="_blank" rel="noopener noreferrer"><Heart size={16} /> Профком студентов</a></li>
-                    <li><a href="https://vk.com/sport_kosgos" target="_blank" rel="noopener noreferrer"><Zap size={16} /> Спортивный клуб</a></li>
-                    <li><a href="https://vk.com/creative_kosgos" target="_blank" rel="noopener noreferrer"><Sparkles size={16} /> Творческие объединения</a></li>
+                    <li><a href="https://vk.ru/osoksu" target="_blank" rel="noopener noreferrer"><Users size={16} /> Студенческий совет КГУ</a></li>
                   </>
                 )}
                 {activeTab === 'support' && (
                   <>
                     <li><a href="https://kosgos.ru/svedeniya-ob-organizatsii/struktura-i-organy-upravleniya/voennoe-obuchenie/voennyj-uchebnyj-tsentr.html?ysclid=mte14ombvd622350198" target="_blank" rel="noopener noreferrer"><GraduationCap size={16} /> ВУЦ КГУ (Военно-учебный центр)</a></li>
-                    <li><a href="https://kosgos.ru/studentam/stipendii/" target="_blank" rel="noopener noreferrer"><GraduationCap size={16} /> Стипендии и выплаты</a></li>
-                    <li><a href="https://kosgos.ru/studentam/obshchezhitiya/" target="_blank" rel="noopener noreferrer"><LifeBuoy size={16} /> Общежития и заселение</a></li>
+                    <li><a href="https://kosgos.ru/svedeniya-ob-organizatsii/dopolnitelnaya-informatsiya/stipendii-i-inye-vidy-sotsialnoj-podderzhki.html?ysclid=mth3qazqhx932846281" target="_blank" rel="noopener noreferrer"><GraduationCap size={16} /> Стипендии и выплаты</a></li>
+                    <li><a href="https://vk.ru/ssokgu?ysclid=mth3rh6eq5543794961" target="_blank" rel="noopener noreferrer"><LifeBuoy size={16} /> Общежития и заселение</a></li>
                     <li><a href="https://kosgos.ru/studentam/psikhologicheskaya-pomoshch/" target="_blank" rel="noopener noreferrer"><Heart size={16} /> Психологическая помощь</a></li>
                     <li><a href="https://kosgos.ru/kontakty/" target="_blank" rel="noopener noreferrer"><Sparkles size={16} /> Приёмная комиссия</a></li>
                   </>

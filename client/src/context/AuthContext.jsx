@@ -15,23 +15,44 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     if (user) {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-      // Verify JWT token with backend /api/v1/auth/me on app load
-      import('../services/api').then(({ authApi }) => {
-        authApi.getMe().then(res => {
-          if (res && res.role) {
-            setUser(prev => prev ? { ...prev, role: res.role, fullName: res.full_name || prev.fullName } : null);
-          }
-        }).catch(() => {
-          // Token invalid or tampered -> clear session
-          setUser(null);
-          localStorage.removeItem('portal_jwt_token');
-          localStorage.removeItem(AUTH_STORAGE_KEY);
-        });
-      }).catch(() => {});
-    } else {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
+      try {
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+      } catch (e) {}
     }
+  }, [user]);
+
+  // Restore & verify session on app load
+  useEffect(() => {
+    import('../services/api').then(({ authApi }) => {
+      authApi.getMe().then(res => {
+        if (res && res.id) {
+          const updatedUser = {
+            id: res.id,
+            username: res.username,
+            fullName: res.full_name || res.username,
+            group: res.group_number || '24-ИСбо-1',
+            role: res.role || 'student',
+            photoUrl: res.userpictureurl || '',
+            isEiosAuth: true,
+            courses: res.courses || []
+          };
+          setUser(updatedUser);
+          try {
+            localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedUser));
+          } catch (e) {}
+        }
+      }).catch(err => {
+        // Only clear session if backend explicitly rejects authentication (401 Unauthorized)
+        if (err.message && (err.message.includes('401') | err.message.includes('авторизация'))) {
+          console.info('[AuthContext] Session expired or invalid, clearing local state');
+          setUser(null);
+          localStorage.removeItem(AUTH_STORAGE_KEY);
+          localStorage.removeItem('portal_jwt_token');
+        } else {
+          console.warn('[AuthContext] Network warning on getMe, retaining cached user profile');
+        }
+      });
+    }).catch(() => {});
   }, []);
 
   // Secure Authentication via EIOS KGU Backend API
@@ -40,6 +61,9 @@ export const AuthProvider = ({ children }) => {
       const { authApi } = await import('../services/api');
       const res = await authApi.eiosLogin(loginInput.trim(), passwordInput, groupInput.trim());
       if (res && res.user) {
+        if (res.access_token) {
+          localStorage.setItem('portal_jwt_token', res.access_token);
+        }
         const eiosUser = {
           id: res.user.id,
           username: res.user.username,
@@ -53,6 +77,7 @@ export const AuthProvider = ({ children }) => {
           createdAt: new Date().toISOString()
         };
         setUser(eiosUser);
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(eiosUser));
         return eiosUser;
       }
     } catch (err) {
@@ -69,6 +94,9 @@ export const AuthProvider = ({ children }) => {
       const { authApi } = await import('../services/api');
       const res = await authApi.adminLogin(username.trim(), password);
       if (res && res.user) {
+        if (res.access_token) {
+          localStorage.setItem('portal_jwt_token', res.access_token);
+        }
         const adminUser = {
           id: res.user.id,
           username: res.user.username,
@@ -79,6 +107,7 @@ export const AuthProvider = ({ children }) => {
           createdAt: new Date().toISOString()
         };
         setUser(adminUser);
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(adminUser));
         return adminUser;
       }
     } catch (err) {
@@ -91,6 +120,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem(AUTH_STORAGE_KEY);
+    localStorage.removeItem('portal_jwt_token');
     import('../services/api').then(({ authApi }) => {
       authApi.logout().catch(() => {});
     }).catch(() => {});
