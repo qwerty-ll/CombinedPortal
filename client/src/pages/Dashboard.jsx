@@ -80,10 +80,15 @@ const Dashboard = () => {
   }, [completedTaskIds]);
 
   const handleTaskClick = (task) => {
+    let nextTaskIds = completedTaskIds;
     if (!completedTaskIds.includes(task.id)) {
-      setCompletedTaskIds(prev => [...prev, task.id]);
+      nextTaskIds = [...completedTaskIds, task.id];
+      setCompletedTaskIds(nextTaskIds);
+      try {
+        localStorage.setItem('onboarding_completed_tasks', JSON.stringify(nextTaskIds));
+      } catch (e) {}
     }
-    
+
     if (task.route) {
       navigate(task.route);
     } else if (task.isScheduleTrigger) {
@@ -97,7 +102,11 @@ const Dashboard = () => {
 
   const toggleAdExpansion = (ad) => {
     if (!completedTaskIds.includes('ads')) {
-      setCompletedTaskIds(prev => [...prev, 'ads']);
+      const nextTaskIds = [...completedTaskIds, 'ads'];
+      setCompletedTaskIds(nextTaskIds);
+      try {
+        localStorage.setItem('onboarding_completed_tasks', JSON.stringify(nextTaskIds));
+      } catch (e) {}
     }
     setExpandedAdIds(prev => 
       prev.includes(ad.id) ? prev.filter(id => id !== ad.id) : [...prev, ad.id]

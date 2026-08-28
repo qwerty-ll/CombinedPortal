@@ -188,6 +188,10 @@ class ChatResponse(BaseModel):
     reply: str
 
 
+class UserAdaptationUpdate(BaseModel):
+    completed_steps: List[int] = Field(..., max_length=20)
+
+
 class UserAdaptationResponse(BaseModel):
     user_id: int
     username: str

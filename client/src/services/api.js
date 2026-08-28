@@ -132,6 +132,13 @@ export const forumApi = {
     apiFetch(`/api/v1/forum/questions/${id}`, { method: 'DELETE' }),
 };
 
+export const adaptationApi = {
+  saveProgress: (completedSteps) =>
+    apiFetch('/api/v1/adaptation', { method: 'POST', body: JSON.stringify({ completed_steps: completedSteps }) }),
+  getMyProgress: () =>
+    apiFetch('/api/v1/adaptation/me'),
+};
+
 // Admin Services (single consolidated object — no duplicates)
 export const adminApi = {
   // Users

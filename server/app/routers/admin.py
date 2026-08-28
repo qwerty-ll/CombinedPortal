@@ -51,13 +51,80 @@ def update_user_role(
     return target_user
 
 
+@router.post("/adaptation", response_model=schemas.UserAdaptationResponse)
+def save_user_adaptation(
+    req: schemas.UserAdaptationUpdate,
+    current_user: models.User = Depends(security.require_current_user),
+    db: Session = Depends(get_db)
+):
+    import json
+    from datetime import datetime
+
+    adaptation = db.query(models.UserAdaptation).filter(models.UserAdaptation.user_id == current_user.id).first()
+    steps_json = json.dumps(req.completed_steps)
+
+    if not adaptation:
+        adaptation = models.UserAdaptation(
+            user_id=current_user.id,
+            completed_steps=steps_json,
+            last_updated=datetime.utcnow()
+        )
+        db.add(adaptation)
+    else:
+        adaptation.completed_steps = steps_json
+        adaptation.last_updated = datetime.utcnow()
+
+    db.commit()
+    db.refresh(adaptation)
+
+    progress = round((len(req.completed_steps) / 9.0) * 100.0, 1)
+    return schemas.UserAdaptationResponse(
+        user_id=current_user.id,
+        username=current_user.username,
+        full_name=current_user.full_name,
+        group_number=current_user.group_number,
+        completed_steps=req.completed_steps,
+        progress_percent=progress,
+        last_updated=adaptation.last_updated
+    )
+
+
+@router.get("/adaptation/me", response_model=schemas.UserAdaptationResponse)
+def get_my_adaptation(
+    current_user: models.User = Depends(security.require_current_user),
+    db: Session = Depends(get_db)
+):
+    import json
+    adaptation = db.query(models.UserAdaptation).filter(models.UserAdaptation.user_id == current_user.id).first()
+    steps = [0]
+    last_upd = current_user.created_at
+    if adaptation and adaptation.completed_steps:
+        try:
+            steps = json.loads(adaptation.completed_steps)
+        except Exception:
+            steps = [0]
+        if adaptation.last_updated:
+            last_upd = adaptation.last_updated
+
+    progress = round((len(steps) / 9.0) * 100.0, 1)
+    return schemas.UserAdaptationResponse(
+        user_id=current_user.id,
+        username=current_user.username,
+        full_name=current_user.full_name,
+        group_number=current_user.group_number,
+        completed_steps=steps,
+        progress_percent=progress,
+        last_updated=last_upd
+    )
+
+
 @router.get("/admin/adaptations", response_model=List[schemas.UserAdaptationResponse])
 def get_student_adaptations(
     current_user: models.User = Depends(security.require_moderator),
     db: Session = Depends(get_db)
 ):
     import json
-    users = db.query(models.User).filter(models.User.role == "student").all()
+    users = db.query(models.User).order_by(models.User.created_at.desc()).all()
     res = []
     for u in users:
         adaptation = db.query(models.UserAdaptation).filter(models.UserAdaptation.user_id == u.id).first()

@@ -13,9 +13,8 @@ import QuizModal from '../components/QuizModal';
 import ChecklistModal from '../components/ChecklistModal';
 import FunLayerModal from '../components/FunLayerModal';
 import RewardsModal from '../components/RewardsModal';
-import { subjectsApi } from '../services/api';
+import { subjectsApi, adaptationApi } from '../services/api';
 
-// Disciplines Card Component (Styled for 2-column grid with color accents)
 const DisciplineCard = ({ subject }) => {
   const [isOpen, setIsOpen] = useState(false);
   const accentColor = subject.color || '#007AFF';
@@ -186,11 +185,26 @@ const FreshmanGuide = () => {
     }
   };
 
+  useEffect(() => {
+    adaptationApi.getMyProgress().then(res => {
+      if (res && Array.isArray(res.completed_steps) && res.completed_steps.length > 0) {
+        setCompletedSteps(prev => {
+          const merged = Array.from(new Set([...prev, ...res.completed_steps]));
+          localStorage.setItem('freshman_roadmap_completed', JSON.stringify(merged));
+          return merged;
+        });
+      }
+    }).catch(e => console.warn('Adaptation load notice:', e));
+  }, []);
+
   const completeStep = (stepId) => {
     if (!completedSteps.includes(stepId)) {
       const next = [...completedSteps, stepId];
       setCompletedSteps(next);
-      localStorage.setItem('freshman_roadmap_completed', JSON.stringify(next));
+      try {
+        localStorage.setItem('freshman_roadmap_completed', JSON.stringify(next));
+      } catch (e) {}
+      adaptationApi.saveProgress(next).catch(e => console.warn('Failed to sync adaptation to DB:', e));
     }
   };
 
