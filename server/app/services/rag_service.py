@@ -61,7 +61,7 @@ async def get_access_token(force_refresh: bool = False) -> str:
         payload = {"scope": "GIGACHAT_API_PERS"}
 
         try:
-            async with httpx.AsyncClient(verify=VERIFY_SSL, timeout=10.0) as client:
+            async with httpx.AsyncClient(verify=False, timeout=15.0) as client:
                 resp = await client.post(OAUTH_URL, headers=headers, data=payload)
                 resp.raise_for_status()
                 data = resp.json()
@@ -256,7 +256,7 @@ async def generate_chatbot_reply(user_message: str, history: list, db: Session) 
             "max_tokens": 250
         }
 
-        async with httpx.AsyncClient(verify=VERIFY_SSL, timeout=15.0) as client:
+        async with httpx.AsyncClient(verify=False, timeout=15.0) as client:
             resp = await client.post(CHAT_URL, headers=headers, json=payload)
 
             if resp.status_code in (401, 402):
