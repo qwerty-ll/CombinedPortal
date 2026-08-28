@@ -9,8 +9,21 @@ class UserCreate(BaseModel):
     full_name: str = Field(..., min_length=1, max_length=200)
     email: Optional[EmailStr] = None
     group_number: Optional[str] = Field(None, max_length=50)
-    # SECURITY FIX: role field is intentionally not accepted from client.
-    # Role is always assigned as "student" on registration regardless of input.
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_quality(cls, v: str) -> str:
+        if not v or len(v.strip()) < 6:
+            raise ValueError("Пароль должен иметь длину не менее 6 символов")
+        return v
+
+    @field_validator("username")
+    @classmethod
+    def validate_username_chars(cls, v: str) -> str:
+        cleaned = v.strip()
+        if len(cleaned) < 3:
+            raise ValueError("Имя пользователя должно содержать не менее 3 символов")
+        return cleaned
 
 class UserLogin(BaseModel):
     username: str = Field(..., min_length=1, max_length=80)
