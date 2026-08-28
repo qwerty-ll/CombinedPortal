@@ -2,10 +2,8 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export const apiFetch = async (endpoint, options = {}) => {
-  const token = localStorage.getItem('portal_jwt_token');
   const headers = {
     'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...options.headers,
   };
 
