@@ -126,23 +126,29 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
             eios_resp = await client.post(eios_api_token_url, json=eios_payload)
             if eios_resp.status_code == 200:
                 eios_data = eios_resp.json()
-                if eios_data.get("state") == 1 or "accessToken" in eios_data:
-                    eios_auth_success = True
-                    user_info = eios_data.get("data", {}).get("user", {})
-                    last_name = user_info.get("lastName") or user_info.get("lastname") or ""
-                    first_name = user_info.get("firstName") or user_info.get("firstname") or ""
-                    combined_fio = f"{last_name} {first_name}".strip()
+                if isinstance(eios_data, dict):
+                    user_info = (eios_data.get("data") or {}).get("user") or {}
+                    has_token = bool(eios_data.get("accessToken") or eios_data.get("token") or (eios_data.get("data") or {}).get("token"))
+                    has_valid_user = bool(user_info.get("id") or user_info.get("username") or user_info.get("lastName") or user_info.get("fullName"))
+                    
+                    if (eios_data.get("state") == 1 and (has_token or has_valid_user)) or (has_token and has_valid_user):
+                        eios_auth_success = True
+                        last_name = user_info.get("lastName") or user_info.get("lastname") or ""
+                        first_name = user_info.get("firstName") or user_info.get("firstname") or ""
+                        combined_fio = f"{last_name} {first_name}".strip()
 
-                    fullname = (
-                        user_info.get("shortFIO")
-                        or user_info.get("fullName")
-                        or user_info.get("full_name")
-                        or user_info.get("fio")
-                        or user_info.get("name")
-                        or combined_fio
-                        or username
-                    )
-                    logger.info(f"[EIOS REST AUTH SUCCESS] Authenticated user {username} ({fullname}) via eios.kosgos.ru/api/tokenauth")
+                        fullname = (
+                            user_info.get("shortFIO")
+                            or user_info.get("fullName")
+                            or user_info.get("full_name")
+                            or user_info.get("fio")
+                            or user_info.get("name")
+                            or combined_fio
+                            or username
+                        )
+                        logger.info(f"[EIOS REST AUTH SUCCESS] Authenticated user {username} ({fullname}) via eios.kosgos.ru/api/tokenauth")
+                    else:
+                        logger.warning(f"[EIOS REST AUTH REJECTED] EIOS response lacked token or valid user: {eios_data}")
         except Exception as eios_err:
             logger.warning(f"[EIOS REST AUTH NOTICE] eios.kosgos.ru/api/tokenauth unavailable: {eios_err}")
 
