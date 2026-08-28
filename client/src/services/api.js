@@ -36,8 +36,6 @@ export const authApi = {
     apiFetch('/api/v1/auth/admin-login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   logout: () =>
     apiFetch('/api/v1/auth/logout', { method: 'POST' }),
-  register: (userData) =>
-    apiFetch('/api/v1/auth/register', { method: 'POST', body: JSON.stringify(userData) }),
   getMe: () =>
     apiFetch('/api/v1/auth/me'),
 };

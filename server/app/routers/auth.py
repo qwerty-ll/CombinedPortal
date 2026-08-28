@@ -39,47 +39,6 @@ def _set_auth_cookie(response: Response, token: str) -> None:
     )
 
 
-@router.post("/register", response_model=schemas.TokenResponse)
-def register(user_in: schemas.UserCreate, response: Response, db: Session = Depends(get_db)):
-    username_raw = user_in.username.strip()
-    username_normalized = username_raw.lower()
-    if not username_normalized or len(username_normalized) < 3:
-        raise HTTPException(status_code=400, detail="Логин должен содержать минимум 3 символа")
-    if not user_in.password or len(user_in.password) < 6:
-        raise HTTPException(status_code=400, detail="Пароль должен быть длиной не менее 6 символов")
-
-    # M-SEC-01: Prevent registration of reserved/admin usernames
-    if username_normalized in _RESERVED_USERNAMES:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Данное имя пользователя зарезервировано для администрации системы"
-        )
-
-    hashed_pw = security.get_password_hash(user_in.password)
-    new_user = models.User(
-        username=username_raw,
-        full_name=user_in.full_name,
-        email=user_in.email,
-        group_number=user_in.group_number,
-        hashed_password=hashed_pw,
-        role="student"
-    )
-    # FIX (C-01): Wrap INSERT in try/except IntegrityError to handle concurrent
-    # registration with the same username (TOCTOU). Previously returned HTTP 500.
-    try:
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=400, detail="Пользователь с таким логином уже существует")
-
-    token = security.create_access_token(data={"sub": new_user.username})
-    _set_auth_cookie(response, token)
-    logger.info(f"[REGISTER SUCCESS] New user registered: {new_user.username}")
-    return schemas.TokenResponse(access_token=token, user=new_user)
-
-
 @router.post("/admin-login", response_model=schemas.TokenResponse)
 def admin_login(user_in: schemas.UserLogin, response: Response, db: Session = Depends(get_db)):
     admin_user_env = os.getenv("ADMIN_USERNAME", "").strip()
