@@ -129,10 +129,48 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
                 if eios_data.get("state") == 1 or "accessToken" in eios_data:
                     eios_auth_success = True
                     user_info = eios_data.get("data", {}).get("user", {})
-                    fullname = user_info.get("shortFIO") or user_info.get("fullName") or username
-                    logger.info(f"[EIOS REST AUTH SUCCESS] Authenticated user {username} via eios.kosgos.ru/api/tokenauth")
+                    last_name = user_info.get("lastName") or user_info.get("lastname") or ""
+                    first_name = user_info.get("firstName") or user_info.get("firstname") or ""
+                    combined_fio = f"{last_name} {first_name}".strip()
+
+                    fullname = (
+                        user_info.get("shortFIO")
+                        or user_info.get("fullName")
+                        or user_info.get("full_name")
+                        or user_info.get("fio")
+                        or user_info.get("name")
+                        or combined_fio
+                        or username
+                    )
+                    logger.info(f"[EIOS REST AUTH SUCCESS] Authenticated user {username} ({fullname}) via eios.kosgos.ru/api/tokenauth")
         except Exception as eios_err:
             logger.warning(f"[EIOS REST AUTH NOTICE] eios.kosgos.ru/api/tokenauth unavailable: {eios_err}")
+
+        # If EIOS REST auth succeeded but name is still equal to username, enrich name from SDO webservice
+        if eios_auth_success and (not fullname or fullname.lower() == username.lower()):
+            try:
+                sdo_resp = await client.post(sdo_token_url, data={
+                    "username": username,
+                    "password": password,
+                    "service": "moodle_mobile_app"
+                })
+                if sdo_resp.status_code == 200:
+                    t_data = sdo_resp.json()
+                    if t_data and "token" in t_data:
+                        ws_tok = t_data["token"]
+                        info_r = await client.post(sdo_rest_url, data={
+                            "wstoken": ws_tok,
+                            "moodlewsrestformat": "json",
+                            "wsfunction": "core_webservice_get_site_info"
+                        })
+                        info_d = info_r.json()
+                        sdo_fn = info_d.get("fullname", "").strip()
+                        if sdo_fn and sdo_fn.lower() != username.lower():
+                            fullname = sdo_fn
+                        if info_d.get("userpictureurl"):
+                            userpictureurl = info_d.get("userpictureurl")
+            except Exception as name_enrich_err:
+                logger.warning(f"[SDO NAME ENRICH WARN] Could not fetch full name from SDO: {name_enrich_err}")
 
         # 2. Fallback Authentication Path: SDO KOSGOS Moodle Mobile Service
         if not eios_auth_success:
