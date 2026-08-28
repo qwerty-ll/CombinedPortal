@@ -180,6 +180,12 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
     if not detected_group:
         detected_group = department_name or "КГУ ИВИТШ"
 
+    import re
+    # Format fullname if it equals username or is a raw login string (e.g. 24-isbo-085)
+    formatted_fullname = fullname
+    if not formatted_fullname or formatted_fullname.lower() == username.lower() or re.match(r"^\d{2}-[a-zа-я]+-\d+", formatted_fullname, re.IGNORECASE):
+        formatted_fullname = f"Студент {username}"
+
     db_user = db.query(models.User).filter(models.User.username == username).first()
     if not db_user:
         # SECURITY: Store a random local password, NOT the real EIOS password.
@@ -188,7 +194,7 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
         try:
             db_user = models.User(
                 username=username,
-                full_name=fullname,
+                full_name=formatted_fullname,
                 group_number=detected_group,
                 hashed_password=hashed_pw,
                 role="student"
@@ -203,8 +209,10 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
             if not db_user:
                 raise HTTPException(status_code=500, detail="Ошибка создания пользователя. Попробуйте ещё раз.")
     else:
-        if fullname and db_user.full_name != fullname:
+        if fullname and fullname.lower() != username.lower() and not re.match(r"^\d{2}-[a-zа-я]+-\d+", fullname, re.IGNORECASE):
             db_user.full_name = fullname
+        elif not db_user.full_name or db_user.full_name.lower() == username.lower() or re.match(r"^\d{2}-[a-zа-я]+-\d+", db_user.full_name, re.IGNORECASE):
+            db_user.full_name = formatted_fullname
         if detected_group and db_user.group_number != detected_group:
             db_user.group_number = detected_group
         db.commit()
@@ -224,12 +232,27 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
         created_at=db_user.created_at
     )
 
-    logger.info(f"[SDO LOGIN COMPLETE] User {username} ({fullname}) successfully logged in")
+    logger.info(f"[SDO LOGIN COMPLETE] User {username} ({db_user.full_name}) successfully logged in")
     return schemas.TokenResponse(access_token=jwt_token, user=user_resp)
 
 
 @router.get("/me", response_model=schemas.UserResponse)
 def get_me(current_user: models.User = Depends(security.require_current_user)):
+    return current_user
+
+
+@router.patch("/me", response_model=schemas.UserResponse)
+def update_my_profile(
+    req: schemas.UserUpdateProfile,
+    current_user: models.User = Depends(security.require_current_user),
+    db: Session = Depends(get_db)
+):
+    if req.full_name and req.full_name.strip():
+        current_user.full_name = req.full_name.strip()
+    if req.group_number is not None and req.group_number.strip():
+        current_user.group_number = req.group_number.strip()
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 

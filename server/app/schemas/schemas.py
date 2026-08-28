@@ -37,6 +37,10 @@ class EiosLoginRequest(BaseModel):
 class SdoLoginRequest(EiosLoginRequest):
     pass
 
+class UserUpdateProfile(BaseModel):
+    full_name: Optional[str] = Field(None, min_length=2, max_length=200)
+    group_number: Optional[str] = Field(None, max_length=50)
+
 class UserResponse(BaseModel):
     id: int
     username: str
