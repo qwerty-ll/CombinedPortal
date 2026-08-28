@@ -195,6 +195,7 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
                 logger.info(f"[SDO MOODLE AUTH SUCCESS] Token obtained for {username}")
 
                 # Step 2b: Fetch profile info from SDO
+                userid = None
                 try:
                     info_resp = await client.post(sdo_rest_url, data={
                         "wstoken": wstoken,
@@ -203,9 +204,32 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
                     })
                     info_data = info_resp.json()
                     fullname = info_data.get("fullname", "").strip() or info_data.get("username", "").strip() or username
+                    userid = info_data.get("userid")
                     userpictureurl = info_data.get("userpictureurl", "")
                 except Exception as info_err:
                     logger.warning(f"[SDO SITE INFO WARN] Could not fetch site info: {info_err}")
+
+                # Step 2c: Query detailed user fields by userid to get real ФИО (e.g. Смирнов Макар Андреевич)
+                if userid:
+                    try:
+                        u_resp = await client.post(sdo_rest_url, data={
+                            "wstoken": wstoken,
+                            "moodlewsrestformat": "json",
+                            "wsfunction": "core_user_get_users_by_field",
+                            "field": "id",
+                            "values[0]": userid
+                        })
+                        u_json = u_resp.json()
+                        if isinstance(u_json, list) and len(u_json) > 0:
+                            u_item = u_json[0]
+                            u_fn = u_item.get("fullname") or f"{u_item.get('lastname', '')} {u_item.get('firstname', '')}".strip()
+                            if u_fn and u_fn.lower() != username.lower():
+                                fullname = u_fn
+                                logger.info(f"[SDO FULL NAME EXTRACT] Found full name for {username}: {fullname}")
+                            if u_item.get("profileimageurl"):
+                                userpictureurl = u_item.get("profileimageurl")
+                    except Exception as u_err:
+                        logger.warning(f"[SDO USER DETAILS WARN] Could not fetch user details: {u_err}")
             except HTTPException:
                 raise
             except Exception as conn_err:
@@ -232,7 +256,7 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
         try:
             db_user = models.User(
                 username=username,
-                full_name=formatted_fullname,
+                full_name=fullname if (fullname and fullname.lower() != username.lower()) else formatted_fullname,
                 group_number=detected_group,
                 hashed_password=hashed_pw,
                 role="student"
@@ -247,9 +271,10 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
             if not db_user:
                 raise HTTPException(status_code=500, detail="Ошибка создания пользователя. Попробуйте ещё раз.")
     else:
-        if fullname and fullname.lower() != username.lower() and not re.match(r"^\d{2}-[a-zа-я]+-\d+", fullname, re.IGNORECASE):
+        # Always update db_user.full_name with the real full name from SDO/EIOS!
+        if fullname and fullname.lower() != username.lower():
             db_user.full_name = fullname
-        elif not db_user.full_name or db_user.full_name.lower() == username.lower() or re.match(r"^\d{2}-[a-zа-я]+-\d+", db_user.full_name, re.IGNORECASE):
+        elif not db_user.full_name or db_user.full_name.lower() == username.lower():
             db_user.full_name = formatted_fullname
         if detected_group and db_user.group_number != detected_group:
             db_user.group_number = detected_group
