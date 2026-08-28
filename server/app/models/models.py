@@ -145,3 +145,15 @@ class RevokedToken(Base):
     jti = Column(String, unique=True, index=True, nullable=False)
     revoked_at = Column(DateTime(timezone=True), default=_utcnow)
 
+
+class UserAdaptation(Base):
+    __tablename__ = "user_adaptations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    completed_steps = Column(String, default="[0]")
+    last_updated = Column(DateTime(timezone=True), default=_utcnow)
+
+    user = relationship("User")
+
+

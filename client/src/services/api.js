@@ -71,6 +71,8 @@ export const adminApi = {
     apiFetch(`/api/v1/admin/users?limit=${limit}&offset=${offset}`),
   updateUserRole: (userId, role) =>
     apiFetch(`/api/v1/admin/users/${userId}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+  getAdaptations: () =>
+    apiFetch('/api/v1/admin/adaptations'),
 
   // Teachers
   getTeachers: () => apiFetch('/api/v1/teachers'),

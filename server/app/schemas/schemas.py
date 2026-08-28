@@ -169,3 +169,17 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+
+
+class UserAdaptationResponse(BaseModel):
+    user_id: int
+    username: str
+    full_name: str
+    group_number: Optional[str] = None
+    completed_steps: List[int]
+    progress_percent: float
+    last_updated: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
