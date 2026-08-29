@@ -2,8 +2,9 @@ import os
 import json
 import logging
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
@@ -91,7 +92,13 @@ app = FastAPI(
     openapi_url="/openapi.json" if DOCS_ENABLED else None,
 )
 
-# CORS configuration
+# Enable GZip Response Compression for Mobile / Low-Bandwidth Networks (>500 bytes)
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
+# CORS Configuration (Security Hardening)
+# - Explicitly whitelist allowed origins for dev and prod environments.
+# - Can be overridden dynamically via ALLOWED_ORIGINS environment variable.
+# - Credentials (cookies/headers) allowed only for trusted origins.
 allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
 origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()] if allowed_origins_env else [
     "http://localhost:5173",
@@ -107,7 +114,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
 )
 
 # Include Router Modules
@@ -125,7 +132,8 @@ def health_check():
 
 
 @app.get("/", response_class=HTMLResponse)
-def read_root():
+def read_root(current_user: models.User = Depends(security.require_current_user)):
+    """Root landing page — returns API portal card for authenticated users."""
     return """
     <!DOCTYPE html>
     <html lang="ru">

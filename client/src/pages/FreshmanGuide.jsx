@@ -293,6 +293,9 @@ const FreshmanGuide = () => {
                 )}
                 {activeTab === 'study' && (
                   <>
+                    <li><a href="https://kosgos.ru/files/op_info/plan/279/1/Ucheb_plan_09.03.02.01_2026_1_is.pdf" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Учебный план ИСТ (1 курс)</a></li>
+                    <li><a href="https://kosgos.ru/files/op_info/plan/164/1/Ucheb_plan_10.03.01_2026_1_ib.pdf" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Учебный план ИБ (1 курс)</a></li>
+                    <li><a href="https://kosgos.ru/files/op_info/plan/168/1/Ucheb_plan_01.03.02_2026_1.pdf" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Учебный план ПМ (1 курс)</a></li>
                     <li><a href="https://lib.kosgos.ru" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Библиотека ВУЗа</a></li>
                     <li><a href="https://eios.kosgos.ru" target="_blank" rel="noopener noreferrer"><Zap size={16}/> Электронные курсы</a></li>
                     <li><a href="https://science.kosgos.ru" target="_blank" rel="noopener noreferrer"><Sparkles size={16}/> Научные работы</a></li>
@@ -315,6 +318,7 @@ const FreshmanGuide = () => {
                 )}
                 {activeTab === 'support' && (
                   <>
+                    <li><a href="https://kosgos.ru/svedeniya-ob-organizatsii/struktura-i-organy-upravleniya/voennoe-obuchenie/voennyj-uchebnyj-tsentr.html?ysclid=mte14ombvd622350198" target="_blank" rel="noopener noreferrer"><GraduationCap size={16} /> ВУЦ КГУ (Военно-учебный центр)</a></li>
                     <li><a href="https://kosgos.ru/studentam/stipendii/" target="_blank" rel="noopener noreferrer"><GraduationCap size={16} /> Стипендии и выплаты</a></li>
                     <li><a href="https://kosgos.ru/studentam/obshchezhitiya/" target="_blank" rel="noopener noreferrer"><LifeBuoy size={16} /> Общежития и заселение</a></li>
                     <li><a href="https://kosgos.ru/studentam/psikhologicheskaya-pomoshch/" target="_blank" rel="noopener noreferrer"><Heart size={16} /> Психологическая помощь</a></li>

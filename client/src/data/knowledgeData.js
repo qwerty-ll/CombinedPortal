@@ -44,7 +44,10 @@ export const KNOWLEDGE_TEXT = `
 
 === ПОЛЕЗНЫЕ ССЫЛКИ ===
 ЭИОС КГУ (портал, расписание, портфолио) - https://eios.kosgos.ru/
-Учебный план - https://kosgos.ru/files/op_info/plan/352/1/Ucheb_plan_09.03.02.02_2025_1_it.pdf
+ВУЦ КГУ (Военно-учебный центр) - https://kosgos.ru/svedeniya-ob-organizatsii/struktura-i-organy-upravleniya/voennoe-obuchenie/voennyj-uchebnyj-tsentr.html?ysclid=mte14ombvd622350198
+Учебный план ИСТ (1 курс) - https://kosgos.ru/files/op_info/plan/279/1/Ucheb_plan_09.03.02.01_2026_1_is.pdf
+Учебный план ИБ (1 курс) - https://kosgos.ru/files/op_info/plan/164/1/Ucheb_plan_10.03.01_2026_1_ib.pdf
+Учебный план ПМ (1 курс) - https://kosgos.ru/files/op_info/plan/168/1/Ucheb_plan_01.03.02_2026_1.pdf
 Контакты администрации ИВИТШ - https://itschool.kosgos.ru/contacts
 Сайт ИВИТШ - https://itschool.kosgos.ru
 ЭИОС (Портфолио, расписание занятий, электронная зачетка, библиотека, календарь) - https://eios.kosgos.ru

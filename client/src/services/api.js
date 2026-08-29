@@ -1,29 +1,97 @@
 // Unified API Client for FastAPI backend & Vercel serverless
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
+// Helper for local SWR cache key generation
+const getCacheKey = (endpoint) => `portal_swr_cache_${endpoint}`;
+
 export const apiFetch = async (endpoint, options = {}) => {
-  const token = localStorage.getItem('portal_jwt_token');
+  const method = (options.method || 'GET').toUpperCase();
   const headers = {
     'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...options.headers,
   };
 
-  try {
-    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-      credentials: 'include',
-      ...options,
-      headers,
-    });
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Ошибка сервера: ${res.status}`);
+  const isGet = method === 'GET';
+  const maxRetries = options.retries !== undefined ? options.retries : (isGet ? 2 : 0);
+  const timeoutMs = options.timeout || 12000;
+  const enableCache = options.useCache !== false && isGet && !endpoint.includes('/admin/users');
+
+  let attempt = 0;
+  let lastError = null;
+
+  while (attempt <= maxRetries) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+        credentials: 'include',
+        ...options,
+        signal: controller.signal,
+        headers,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Ошибка сервера: ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      // Cache successful GET responses in localStorage for offline / slow network fallback
+      if (enableCache) {
+        try {
+          localStorage.setItem(getCacheKey(endpoint), JSON.stringify({
+            timestamp: Date.now(),
+            data,
+          }));
+        } catch (e) {
+          // Ignore quota errors in localStorage
+        }
+      }
+
+      return data;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      lastError = err;
+      const isAbort = err.name === 'AbortError';
+      const isNetworkError = isAbort || err.message.includes('Failed to fetch') || err.message.includes('NetworkError');
+
+      // Retry GET requests on network glitches or timeouts
+      if (isGet && attempt < maxRetries && isNetworkError) {
+        attempt++;
+        const backoffMs = attempt * 1000;
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        continue;
+      }
+      break;
     }
-    return await res.json();
-  } catch (err) {
-    console.warn(`[API] Error for ${endpoint}:`, err.message);
-    throw err;
   }
+
+  // Fallback to SWR local storage cache for GET requests if network fails completely
+  if (enableCache) {
+    try {
+      const cachedRaw = localStorage.getItem(getCacheKey(endpoint));
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        if (cached && cached.data) {
+          console.info(`[API SWR Cache Fallback] Served cached data for ${endpoint}`);
+          return cached.data;
+        }
+      }
+    } catch (cacheErr) {
+      // Ignore cache read errors
+    }
+  }
+
+  const errMsg = lastError?.name === 'AbortError' 
+    ? 'Превышено время ожидания ответа сервера (слабое соединение). Попробуйте позже.'
+    : (lastError?.message || 'Ошибка сети');
+  
+  console.warn(`[API Error] ${method} ${endpoint}:`, errMsg);
+  throw new Error(errMsg);
 };
 
 // Auth Services
@@ -38,8 +106,6 @@ export const authApi = {
     apiFetch('/api/v1/auth/admin-login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   logout: () =>
     apiFetch('/api/v1/auth/logout', { method: 'POST' }),
-  register: (userData) =>
-    apiFetch('/api/v1/auth/register', { method: 'POST', body: JSON.stringify(userData) }),
   getMe: () =>
     apiFetch('/api/v1/auth/me'),
 };
@@ -73,6 +139,8 @@ export const adminApi = {
     apiFetch(`/api/v1/admin/users?limit=${limit}&offset=${offset}`),
   updateUserRole: (userId, role) =>
     apiFetch(`/api/v1/admin/users/${userId}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+  getAdaptations: () =>
+    apiFetch('/api/v1/admin/adaptations'),
 
   // Teachers
   getTeachers: () => apiFetch('/api/v1/teachers'),

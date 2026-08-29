@@ -15,6 +15,8 @@ import app.models as models
 
 load_dotenv()
 
+import asyncio
+
 logger = logging.getLogger("ivitsh_portal.rag")
 logger.setLevel(logging.INFO)
 
@@ -28,9 +30,8 @@ SECRET = os.getenv("GIGACHAT_SECRET", "")
 OAUTH_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
 CHAT_URL = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
 
-# FIX: Thread-safe token cache with a lock to prevent thundering herd
-# when multiple concurrent requests all see an expired token simultaneously.
-_token_lock = threading.Lock()
+# M-REL-01 FIX: Use asyncio.Lock instead of threading.Lock to avoid blocking the event loop during await
+_token_lock = asyncio.Lock()
 _token_cache = {
     "access_token": "",
     "expires_at": 0
@@ -47,7 +48,7 @@ async def get_access_token(force_refresh: bool = False) -> str:
     if not force_refresh and _token_cache["access_token"] and now < _token_cache["expires_at"] - 60:
         return _token_cache["access_token"]
 
-    with _token_lock:
+    async with _token_lock:
         now = time.time()
         if _token_cache["access_token"] and now < _token_cache["expires_at"] - 60:
             return _token_cache["access_token"]

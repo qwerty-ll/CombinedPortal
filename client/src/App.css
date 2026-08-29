@@ -4638,6 +4638,13 @@ mark {
     width: 100% !important;
     justify-content: flex-start !important;
   }
+
+  .disciplines-grid-container {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    width: 100% !important;
+  }
 }
 
 

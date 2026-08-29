@@ -51,6 +51,39 @@ def update_user_role(
     return target_user
 
 
+@router.get("/admin/adaptations", response_model=List[schemas.UserAdaptationResponse])
+def get_student_adaptations(
+    current_user: models.User = Depends(security.require_moderator),
+    db: Session = Depends(get_db)
+):
+    import json
+    users = db.query(models.User).filter(models.User.role == "student").all()
+    res = []
+    for u in users:
+        adaptation = db.query(models.UserAdaptation).filter(models.UserAdaptation.user_id == u.id).first()
+        steps = [0]
+        last_upd = u.created_at
+        if adaptation and adaptation.completed_steps:
+            try:
+                steps = json.loads(adaptation.completed_steps)
+            except Exception:
+                steps = [0]
+            if adaptation.last_updated:
+                last_upd = adaptation.last_updated
+
+        progress = round((len(steps) / 9.0) * 100.0, 1)
+        res.append(schemas.UserAdaptationResponse(
+            user_id=u.id,
+            username=u.username,
+            full_name=u.full_name,
+            group_number=u.group_number,
+            completed_steps=steps,
+            progress_percent=progress,
+            last_updated=last_upd
+        ))
+    return res
+
+
 # --- Teachers ---
 @router.get("/teachers", response_model=List[schemas.TeacherResponse])
 def get_teachers(

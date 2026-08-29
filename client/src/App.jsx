@@ -30,6 +30,8 @@ const PageLoader = () => (
   </div>
 );
 
+import { scheduleDailyActivityReminder } from './utils/notifications';
+
 function App() {
   const location = useLocation();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -38,9 +40,10 @@ function App() {
   const [isChatActive, setIsChatActive] = useState(false);
   const [zoomedImage, setZoomedImage] = useState(null);
 
-  // Scroll to top on route change
+  // Scroll to top on route change & initialize daily notifications
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
+    scheduleDailyActivityReminder();
   }, [location.pathname]);
 
   // Chat States

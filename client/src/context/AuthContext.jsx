@@ -53,9 +53,6 @@ export const AuthProvider = ({ children }) => {
           createdAt: new Date().toISOString()
         };
         setUser(eiosUser);
-        if (res.access_token) {
-          localStorage.setItem('portal_jwt_token', res.access_token);
-        }
         return eiosUser;
       }
     } catch (err) {
@@ -82,9 +79,6 @@ export const AuthProvider = ({ children }) => {
           createdAt: new Date().toISOString()
         };
         setUser(adminUser);
-        if (res.access_token) {
-          localStorage.setItem('portal_jwt_token', res.access_token);
-        }
         return adminUser;
       }
     } catch (err) {
@@ -96,7 +90,6 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('portal_jwt_token');
     localStorage.removeItem(AUTH_STORAGE_KEY);
     import('../services/api').then(({ authApi }) => {
       authApi.logout().catch(() => {});

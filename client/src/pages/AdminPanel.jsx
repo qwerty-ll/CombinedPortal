@@ -337,6 +337,18 @@ const AdminPanel = () => {
     });
   }, [isAdmin]);
 
+  // --- ADAPTATIONS ---
+  const [adaptationsList, setAdaptationsList] = useState([]);
+  const loadAdaptations = useCallback(() => {
+    adminApi.getAdaptations()
+      .then(res => { if (Array.isArray(res)) setAdaptationsList(res); })
+      .catch(e => console.warn('Failed to load adaptations:', e));
+  }, []);
+
+  useEffect(() => {
+    if (isAdmin) loadAdaptations();
+  }, [isAdmin, loadAdaptations]);
+
   const handleDeleteForumQuestion = (id) => {
     // Forum delete via API not implemented yet — show informative message
     toast.show('Удаление тем форума через API в разработке. Используйте БД напрямую.', 'info');
@@ -351,6 +363,7 @@ const AdminPanel = () => {
     { id: 'faq', label: 'FAQ', icon: <HelpCircle size={18} />, count: faqItems.length },
     { id: 'forum', label: 'Модерация форума', icon: <MessageSquare size={18} />, count: forumQuestions.length },
     { id: 'users', label: 'Пользователи', icon: <UserCheck size={18} />, count: usersList.length },
+    { id: 'adaptations', label: 'Адаптация студентов', icon: <UserCheck size={18} />, count: adaptationsList.length },
   ];
 
   return (
@@ -700,6 +713,44 @@ const AdminPanel = () => {
                   </div>
                 );
               })}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ADAPTATIONS TAB */}
+        {activeTab === 'adaptations' && (
+          <motion.div key="adaptations" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+            <div className="admin-section-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3>Прогресс адаптации первокурсников</h3>
+                <button onClick={loadAdaptations} title="Обновить" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#007FFF' }}>
+                  <RefreshCw size={16} />
+                </button>
+              </div>
+              <p style={{ color: '#666', fontSize: '0.9rem', margin: 0 }}>
+                Отслеживайте прохождение 9 этапов адаптации студентами ИВИТШ КГУ.
+              </p>
+            </div>
+
+            <div className="admin-items-list">
+              {adaptationsList.length === 0 ? (
+                <div className="admin-empty">Нет данных по адаптации студентов.</div>
+              ) : adaptationsList.map(a => (
+                <div key={a.user_id} className="admin-item-row" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div className="admin-item-info">
+                    <h4 style={{ margin: 0 }}>{a.full_name || a.username}</h4>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#777' }}>
+                      Логин: <strong>{a.username}</strong> • Группа: {a.group_number || 'Не указана'}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '0.95rem', fontWeight: '800', color: 'var(--primary)' }}>{a.progress_percent}%</span>
+                      <span style={{ fontSize: '0.78rem', color: '#888', display: 'block' }}>Пройдено шагов: {a.completed_steps.length} из 9</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </motion.div>
         )}

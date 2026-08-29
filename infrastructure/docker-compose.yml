@@ -1,5 +1,24 @@
 services:
-  # 1. FastAPI Backend Service
+  # 1. PostgreSQL Database Service
+  db:
+    image: postgres:16-alpine
+    container_name: ivitsh_portal_db
+    restart: always
+    environment:
+      POSTGRES_DB: portal_db
+      POSTGRES_USER: portal_user
+      POSTGRES_PASSWORD: portal_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portal_user -d portal_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - portal_network
+
+  # 2. FastAPI Backend Service
   backend:
     build:
       context: ..
@@ -9,17 +28,17 @@ services:
     env_file:
       - ../.env
     environment:
-      - DATABASE_URL=sqlite:////app/server_data/portal.db
+      - DATABASE_URL=postgresql://portal_user:portal_password@db:5432/portal_db
       - PYTHONPATH=/app/server
     volumes:
       - sqlite_data:/app/server_data
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - portal_network
 
-  # 2. Nginx Web Server & React Client SPA
+  # 3. Nginx Web Server & React Client SPA
   client:
     build:
       context: ..
@@ -36,6 +55,7 @@ services:
 
 volumes:
   sqlite_data:
+  postgres_data:
 
 networks:
   portal_network:
