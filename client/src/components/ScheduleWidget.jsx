@@ -338,7 +338,7 @@ const ScheduleWidget = () => {
       margin: '0 auto'
     }}>
       {/* 1. TOP BAR: TITLE & TYPE SWITCHER */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '20px' }}>
+      <div className="schedule-widget-header">
         <div>
           <h3 style={{ margin: 0, fontSize: '1.35rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text)' }}>
             <CalendarDays size={22} style={{ color: 'var(--primary)' }} />
@@ -347,91 +347,51 @@ const ScheduleWidget = () => {
         </div>
 
         {/* Category Switcher */}
-        <div style={{ display: 'flex', background: '#F1F3F5', padding: '4px', borderRadius: '12px', gap: '4px' }}>
+        <div className="schedule-target-tabs">
           <button 
+            type="button"
             onClick={() => handleSwitchTargetType('group')}
-            style={{
-              padding: '7px 14px',
-              borderRadius: '8px',
-              border: 'none',
-              background: targetType === 'group' ? 'white' : 'transparent',
-              color: targetType === 'group' ? 'var(--primary)' : '#666',
-              fontWeight: targetType === 'group' ? '800' : '600',
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              boxShadow: targetType === 'group' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
+            className={`schedule-target-tab-btn ${targetType === 'group' ? 'active' : ''}`}
           >
-            <GraduationCap size={15} /> Группы
+            <GraduationCap size={15} /> <span>Группы</span>
           </button>
           <button 
+            type="button"
             onClick={() => handleSwitchTargetType('teacher')}
-            style={{
-              padding: '7px 14px',
-              borderRadius: '8px',
-              border: 'none',
-              background: targetType === 'teacher' ? 'white' : 'transparent',
-              color: targetType === 'teacher' ? 'var(--primary)' : '#666',
-              fontWeight: targetType === 'teacher' ? '800' : '600',
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              boxShadow: targetType === 'teacher' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
+            className={`schedule-target-tab-btn ${targetType === 'teacher' ? 'active' : ''}`}
           >
-            <UserCheck size={15} /> Преподаватели
+            <UserCheck size={15} /> <span>Преподаватели</span>
           </button>
           <button 
+            type="button"
             onClick={() => handleSwitchTargetType('aud')}
-            style={{
-              padding: '7px 14px',
-              borderRadius: '8px',
-              border: 'none',
-              background: targetType === 'aud' ? 'white' : 'transparent',
-              color: targetType === 'aud' ? 'var(--primary)' : '#666',
-              fontWeight: targetType === 'aud' ? '800' : '600',
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              boxShadow: targetType === 'aud' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
+            className={`schedule-target-tab-btn ${targetType === 'aud' ? 'active' : ''}`}
           >
-            <Building2 size={15} /> Аудитории
+            <Building2 size={15} /> <span>Аудитории</span>
           </button>
         </div>
       </div>
 
       {/* 2. UNIFIED SEARCH COMBOBOX & ACADEMIC YEAR SELECT */}
-      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px', position: 'relative' }} ref={dropdownRef}>
+      <div className="schedule-search-year-row" ref={dropdownRef}>
         
         {/* Search Combobox Input */}
-        <div style={{ position: 'relative', flex: '1 1 260px' }}>
+        <div className="schedule-search-box-wrap">
           <div 
             onClick={() => setIsDropdownOpen(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              background: '#F8F9FA',
-              border: isDropdownOpen ? '2px solid var(--primary)' : '1px solid #DEE2E6',
-              borderRadius: '14px',
-              padding: '10px 14px',
-              cursor: 'text'
-            }}
+            className={`schedule-search-input-box ${isDropdownOpen ? 'focused' : ''}`}
           >
-            <Search size={16} style={{ color: 'var(--primary)', marginRight: '8px', flexShrink: 0 }} />
+            <Search size={16} className="schedule-search-icon" />
             <input 
               type="text" 
               placeholder={
-                targetType === 'group' ? 'Поиск группы (напр. 24-ИСбо-1)...' :
-                targetType === 'teacher' ? 'Поиск ФИО преподавателя...' :
-                'Поиск кабинета (напр. Б-304)...'
+                currentTarget?.name 
+                  ? (isDropdownOpen ? 'Поиск другого...' : 'Поиск...')
+                  : (
+                    targetType === 'group' ? 'Поиск группы (напр. 24-ИСбо-1)...' :
+                    targetType === 'teacher' ? 'Поиск ФИО преподавателя...' :
+                    'Поиск кабинета (напр. Б-304)...'
+                  )
               }
               value={searchQuery}
               onChange={(e) => {
@@ -439,31 +399,14 @@ const ScheduleWidget = () => {
                 setIsDropdownOpen(true);
               }}
               onFocus={() => setIsDropdownOpen(true)}
-              style={{
-                width: '100%',
-                border: 'none',
-                background: 'transparent',
-                outline: 'none',
-                fontSize: '0.9rem',
-                fontWeight: '600',
-                color: 'var(--text)'
-              }}
+              className="schedule-search-input"
             />
             {currentTarget?.name && !searchQuery && (
-              <span style={{
-                background: 'var(--primary)',
-                color: 'white',
-                padding: '4px 10px',
-                borderRadius: '16px',
-                fontSize: '0.8rem',
-                fontWeight: '800',
-                marginLeft: '6px',
-                whiteSpace: 'nowrap'
-              }}>
+              <span className="schedule-target-badge" title={currentTarget.name}>
                 {currentTarget.name}
               </span>
             )}
-            <ChevronDown size={16} style={{ color: '#888', marginLeft: '6px', flexShrink: 0 }} />
+            <ChevronDown size={16} className="schedule-chevron-icon" />
           </div>
 
           {/* Floating Results Card */}
@@ -484,7 +427,7 @@ const ScheduleWidget = () => {
               padding: '4px 0'
             }}>
               {catalogLoading ? (
-                <div style={{ padding: '14px', textCenter: 'center', color: '#888', fontSize: '0.85rem' }}>
+                <div style={{ padding: '14px', textAlign: 'center', color: '#888', fontSize: '0.85rem' }}>
                   Загрузка данных...
                 </div>
               ) : filteredCatalog.length > 0 ? (
@@ -514,7 +457,7 @@ const ScheduleWidget = () => {
                   </div>
                 ))
               ) : (
-                <div style={{ padding: '14px', textCenter: 'center', color: '#888', fontSize: '0.85rem' }}>
+                <div style={{ padding: '14px', textAlign: 'center', color: '#888', fontSize: '0.85rem' }}>
                   Ничего не найдено
                 </div>
               )}
@@ -523,68 +466,37 @@ const ScheduleWidget = () => {
         </div>
 
         {/* Academic Year Select */}
-        <div style={{ position: 'relative', width: '140px' }}>
+        <div className="schedule-year-select-wrap">
           <select 
             value={selectedYear}
             onChange={(e) => setSelectedYear(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '10px 28px 10px 12px',
-              borderRadius: '14px',
-              border: '1px solid #DEE2E6',
-              background: '#F8F9FA',
-              fontSize: '0.88rem',
-              fontWeight: '750',
-              color: 'var(--text)',
-              outline: 'none',
-              cursor: 'pointer',
-              appearance: 'none',
-              WebkitAppearance: 'none'
-            }}
+            className="schedule-year-select"
           >
             {availableYears.map(y => (
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
-          <ChevronDown size={16} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#666' }} />
+          <ChevronDown size={16} className="schedule-year-chevron" />
         </div>
       </div>
 
       {/* 3. CLEAN TOOLBAR: MODE SWITCHER (ДЕНЬ / НЕДЕЛЯ) & DATE NAVIGATION */}
-      <div style={{ background: '#F8F9FA', padding: '14px 18px', borderRadius: '18px', marginBottom: '20px', border: '1px solid #E9ECEF' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+      <div className="schedule-toolbar-container">
+        <div className="schedule-toolbar-inner">
           
           {/* Mode Switcher */}
-          <div style={{ display: 'flex', background: 'white', padding: '3px', borderRadius: '12px', border: '1px solid #DEE2E6' }}>
+          <div className="schedule-mode-switcher">
             <button 
+              type="button"
               onClick={() => setViewMode('day')}
-              style={{
-                padding: '7px 16px',
-                borderRadius: '9px',
-                border: 'none',
-                background: viewMode === 'day' ? 'var(--primary)' : 'transparent',
-                color: viewMode === 'day' ? 'white' : '#555',
-                fontWeight: viewMode === 'day' ? '800' : '600',
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                transition: 'all 0.12s'
-              }}
+              className={`schedule-mode-btn ${viewMode === 'day' ? 'active' : ''}`}
             >
               📅 1 день
             </button>
             <button 
+              type="button"
               onClick={() => setViewMode('week')}
-              style={{
-                padding: '7px 16px',
-                borderRadius: '9px',
-                border: 'none',
-                background: viewMode === 'week' ? 'var(--primary)' : 'transparent',
-                color: viewMode === 'week' ? 'white' : '#555',
-                fontWeight: viewMode === 'week' ? '800' : '600',
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                transition: 'all 0.12s'
-              }}
+              className={`schedule-mode-btn ${viewMode === 'week' ? 'active' : ''}`}
             >
               🗓️ За неделю
             </button>
@@ -592,49 +504,53 @@ const ScheduleWidget = () => {
 
           {/* Controls for Day Mode */}
           {viewMode === 'day' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="schedule-date-controls">
               <button 
+                type="button"
                 onClick={() => changeDateByDays(-1)}
-                style={{ padding: '6px 12px', borderRadius: '10px', border: '1px solid #DEE2E6', background: 'white', fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                className="schedule-date-btn"
               >
-                <ChevronLeft size={16} /> Вчера
+                <ChevronLeft size={16} /> <span>Вчера</span>
               </button>
 
               <input 
                 type="date"
                 value={selectedDate}
                 onChange={(e) => handleDateChange(e.target.value)}
-                style={{ padding: '6px 12px', borderRadius: '10px', border: '1px solid #DEE2E6', background: 'white', fontSize: '0.86rem', fontWeight: '800', outline: 'none' }}
+                className="schedule-date-input"
               />
 
               <button 
+                type="button"
                 onClick={() => changeDateByDays(1)}
-                style={{ padding: '6px 12px', borderRadius: '10px', border: '1px solid #DEE2E6', background: 'white', fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                className="schedule-date-btn"
               >
-                Завтра <ChevronRight size={16} />
+                <span>Завтра</span> <ChevronRight size={16} />
               </button>
             </div>
           )}
 
           {/* Controls for Week Mode */}
           {viewMode === 'week' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="schedule-date-controls">
               <button 
+                type="button"
                 onClick={() => changeDateByWeeks(-1)}
-                style={{ padding: '6px 12px', borderRadius: '10px', border: '1px solid #DEE2E6', background: 'white', fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                className="schedule-date-btn"
               >
-                <ChevronLeft size={16} /> Пред. неделя
+                <ChevronLeft size={16} /> <span>Пред. неделя</span>
               </button>
 
-              <span style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--primary)' }}>
+              <span className="schedule-week-range">
                 {new Date(weekStartEndDates.monIso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} — {new Date(weekStartEndDates.satIso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
               </span>
 
               <button 
+                type="button"
                 onClick={() => changeDateByWeeks(1)}
-                style={{ padding: '6px 12px', borderRadius: '10px', border: '1px solid #DEE2E6', background: 'white', fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                className="schedule-date-btn"
               >
-                След. неделя <ChevronRight size={16} />
+                <span>След. неделя</span> <ChevronRight size={16} />
               </button>
             </div>
           )}
@@ -736,10 +652,10 @@ const ScheduleWidget = () => {
           ))}
         </div>
       ) : (
-        <div style={{ textAlign: 'center', padding: '36px 0', color: '#888' }}>
-          <BookOpen size={38} strokeWidth={1.5} style={{ color: '#ccc', marginBottom: '8px' }} />
-          <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', fontWeight: '800' }}>Занятий нет</h4>
-          <p style={{ margin: 0, fontSize: '0.85rem' }}>На выбранный день или неделю пары не запланированы</p>
+        <div className="schedule-empty-card">
+          <BookOpen size={38} strokeWidth={1.5} className="schedule-empty-icon" />
+          <h4>Занятий нет</h4>
+          <p>На выбранный день или неделю пары не запланированы</p>
         </div>
       )}
     </div>

@@ -539,12 +539,12 @@ const AdminPanel = () => {
             <div className="admin-section-card">
               <h3>{editingSubjectId ? 'Редактировать дисциплину' : 'Добавить новую дисциплину'}</h3>
               <form onSubmit={handleAddSubject} className="admin-form">
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '10px' }}>
+                <div className="admin-form-grid-3">
                   <input type="text" placeholder="Код (напр. s1-algo) *" value={subjectForm.subject_code} onChange={e => setSubjectForm({ ...subjectForm, subject_code: e.target.value })} required />
                   <input type="text" placeholder="Полное название *" value={subjectForm.name} onChange={e => setSubjectForm({ ...subjectForm, name: e.target.value })} required />
                   <input type="text" placeholder="Сокращение *" value={subjectForm.short_name} onChange={e => setSubjectForm({ ...subjectForm, short_name: e.target.value })} required />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                <div className="admin-form-grid-5">
                   <input type="number" placeholder="Семестр *" min={1} max={12} value={subjectForm.semester} onChange={e => setSubjectForm({ ...subjectForm, semester: Number(e.target.value) })} required />
                   <input type="number" placeholder="Часы *" value={subjectForm.hours} onChange={e => setSubjectForm({ ...subjectForm, hours: Number(e.target.value) })} required />
                   <input type="number" placeholder="Зач. ед. *" value={subjectForm.credits} onChange={e => setSubjectForm({ ...subjectForm, credits: Number(e.target.value) })} required />

@@ -175,10 +175,17 @@ const FreshmanGuide = () => {
   const [activeStepModal, setActiveStepModal] = useState(null); // stepId 0..8 or null
   const [isRewardsOpen, setIsRewardsOpen] = useState(false);
 
-  const activeStep = Math.min(8, completedSteps.length);
+  // Find the first uncompleted step (0-8); if all done, stay at 8
+  const activeStep = (() => {
+    for (let i = 0; i <= 8; i++) {
+      if (!completedSteps.includes(i)) return i;
+    }
+    return 8;
+  })();
 
   const handleStepClick = (stepId) => {
     if (stepId === 8) {
+      completeStep(8);
       setIsRewardsOpen(true);
     } else {
       setActiveStepModal(stepId);
@@ -198,14 +205,22 @@ const FreshmanGuide = () => {
   }, []);
 
   const completeStep = (stepId) => {
-    if (!completedSteps.includes(stepId)) {
-      const next = [...completedSteps, stepId];
-      setCompletedSteps(next);
+    setCompletedSteps(prev => {
+      if (prev.includes(stepId)) return prev;
+      const next = [...prev, stepId];
       try {
         localStorage.setItem('freshman_roadmap_completed', JSON.stringify(next));
       } catch (e) {}
-      adaptationApi.saveProgress(next).catch(e => console.warn('Failed to sync adaptation to DB:', e));
-    }
+      // Debounce API save so rapid calls (e.g. completeStep(7); completeStep(8)) batch together
+      clearTimeout(window._adaptationSaveTimer);
+      window._adaptationSaveTimer = setTimeout(() => {
+        try {
+          const latest = JSON.parse(localStorage.getItem('freshman_roadmap_completed') || '[]');
+          adaptationApi.saveProgress(latest).catch(e => console.warn('Failed to sync adaptation to DB:', e));
+        } catch {}
+      }, 300);
+      return next;
+    });
   };
 
   const closeStepModal = () => {
@@ -473,7 +488,7 @@ const FreshmanGuide = () => {
               )}
               
               {/* Step 8: Student Life */}
-              {activeStepModal === 7 && <FunLayerModal onComplete={() => { completeStep(7); completeStep(8); setIsRewardsOpen(true); closeStepModal(); }} />}
+              {activeStepModal === 7 && <FunLayerModal onComplete={() => { completeStep(7); closeStepModal(); }} />}
             </motion.div>
           </div>
         )}

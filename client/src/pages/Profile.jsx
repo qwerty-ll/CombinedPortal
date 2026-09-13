@@ -19,9 +19,9 @@ const Profile = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 
-  // Load stats from localStorage
-  const [onboardingCompleted, setOnboardingCompleted] = useState(0);
-  const [checklistCompleted, setChecklistCompleted] = useState(0);
+  // Load stats from localStorage and API
+  const [roadmapCompleted, setRoadmapCompleted] = useState(0);
+  const [totalRoadmapSteps] = useState(9);
   const [forumQuestionsCount, setForumQuestionsCount] = useState(0);
 
   // Curator Feedback states
@@ -30,18 +30,31 @@ const Profile = () => {
   const [feedbackText, setFeedbackText] = useState('');
 
   useEffect(() => {
+    // Load roadmap progress from localStorage first
     try {
-      const savedTasks = localStorage.getItem('onboarding_completed_tasks');
-      if (savedTasks) setOnboardingCompleted(JSON.parse(savedTasks).length);
-    } catch (e) { console.error(e); }
-
-    try {
-      const checklist = localStorage.getItem('freshman_checklist');
-      if (checklist) {
-        const parsed = JSON.parse(checklist);
-        setChecklistCompleted(parsed.filter(item => item.checked).length);
+      const saved = localStorage.getItem('freshman_roadmap_completed');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setRoadmapCompleted(parsed.length);
       }
     } catch (e) { console.error(e); }
+
+    // Then try to get from API (authoritative source)
+    import('../services/api').then(({ adaptationApi }) => {
+      adaptationApi.getMyProgress().then(res => {
+        if (res && Array.isArray(res.completed_steps)) {
+          // Merge with localStorage for the most complete picture
+          try {
+            const localSaved = localStorage.getItem('freshman_roadmap_completed');
+            const localSteps = localSaved ? JSON.parse(localSaved) : [];
+            const merged = Array.from(new Set([...localSteps, ...res.completed_steps]));
+            setRoadmapCompleted(merged.length);
+          } catch {
+            setRoadmapCompleted(res.completed_steps.length);
+          }
+        }
+      }).catch(() => {});
+    }).catch(() => {});
 
     try {
       const questions = localStorage.getItem('forum_questions');
@@ -58,7 +71,7 @@ const Profile = () => {
     setIsLoggingIn(true);
     
     if (!loginForm.username.trim()) {
-      setLoginError(loginMode === 'sdo' ? 'Введите логин СДО КГУ' : 'Введите логин администратора');
+      setLoginError(loginMode === 'sdo' ? 'Введите логин ЭИОС КГУ' : 'Введите логин администратора');
       setIsLoggingIn(false);
       return;
     }
@@ -166,7 +179,7 @@ const Profile = () => {
                 transition: 'all 0.2s'
               }}
             >
-              🎓 Студент СДО КГУ
+              🎓 Студент ЭИОС КГУ
             </button>
             <button
               type="button"
@@ -193,16 +206,16 @@ const Profile = () => {
             <div className="login-icon-box" style={{ background: loginMode === 'staff' ? 'rgba(5,150,105,0.1)' : 'rgba(0,127,255,0.1)', color: loginMode === 'staff' ? '#059669' : 'var(--primary)' }}>
               {loginMode === 'staff' ? <UserCheck size={32} /> : <GraduationCap size={32} />}
             </div>
-            <h2>{loginMode === 'staff' ? 'Вход для Администрации ИВИТШ' : 'Вход через СДО КГУ'}</h2>
-            <p>{loginMode === 'staff' ? 'Служебная авторизация администраторов и деканата' : 'Единая авторизация студентов сдо.kosgos.ru / eios.kosgos.ru'}</p>
+            <h2>{loginMode === 'staff' ? 'Вход для Администрации ИВИТШ' : 'Вход через ЭИОС КГУ'}</h2>
+            <p>{loginMode === 'staff' ? 'Служебная авторизация администраторов и деканата' : 'Единая авторизация студентов eios.kosgos.ru'}</p>
           </div>
 
           <form onSubmit={handleLogin} className="login-form">
             <div className="login-field">
-              <label>{loginMode === 'staff' ? 'Логин администратора' : 'Логин СДО КГУ'}</label>
+              <label>{loginMode === 'staff' ? 'Логин администратора' : 'Логин ЭИОС КГУ'}</label>
               <input 
                 type="text"
-                placeholder={loginMode === 'staff' ? 'Учетная запись деканата' : 'Логин учетной записи СДО КГУ (напр. 22-isbo-035)'}
+                placeholder={loginMode === 'staff' ? 'Учетная запись деканата' : 'Логин учетной записи ЭИОС КГУ (напр. 22-isbo-035)'}
                 value={loginForm.username}
                 onChange={e => setLoginForm({ ...loginForm, username: e.target.value })}
                 required
@@ -221,7 +234,7 @@ const Profile = () => {
               />
               {loginMode !== 'staff' && (
                 <span style={{ fontSize: '0.78rem', color: '#666', marginTop: '6px', display: 'block', lineHeight: '1.3' }}>
-                  💡 <strong>Подсказка:</strong> Используется единый логин и пароль от аккаунта СДО / ЭИОС КГУ.
+                  💡 <strong>Подсказка:</strong> Используется единый логин и пароль от аккаунта ЭИОС КГУ (eios.kosgos.ru).
                 </span>
               )}
             </div>
@@ -233,7 +246,7 @@ const Profile = () => {
                 <>Проверка авторизации...</>
               ) : (
                 <>
-                  <Lock size={16} /> {loginMode === 'staff' ? 'Войти в админку' : 'Войти через СДО'}
+                  <Lock size={16} /> {loginMode === 'staff' ? 'Войти в админку' : 'Войти через ЭИОС'}
                 </>
               )}
             </button>
@@ -337,9 +350,14 @@ const Profile = () => {
           transition={{ delay: 0.1 }}
         >
           <div className="stat-box-profile">
-            <span><Compass size={18} style={{ verticalAlign: 'text-bottom', marginRight: '5px', color: 'var(--primary)' }} /> Чек-лист гида</span>
-            <h2>{checklistCompleted} / 7</h2>
-            <p style={{ fontSize: '0.8rem', color: '#888', margin: 0 }}>задач отмечено в Гиде</p>
+            <span><Compass size={18} style={{ verticalAlign: 'text-bottom', marginRight: '5px', color: 'var(--primary)' }} /> Путь адаптации</span>
+            <h2>{roadmapCompleted} / {totalRoadmapSteps}</h2>
+            <p style={{ fontSize: '0.8rem', color: '#888', margin: 0 }}>
+              {roadmapCompleted >= totalRoadmapSteps ? '✅ Все этапы пройдены!' : 'этапов пройдено'}
+            </p>
+            <div style={{ marginTop: '8px', height: '4px', background: '#E8F4FF', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', background: 'var(--primary)', borderRadius: '2px', width: `${Math.round((roadmapCompleted / totalRoadmapSteps) * 100)}%`, transition: 'width 0.5s ease' }} />
+            </div>
           </div>
 
           <div className="stat-box-profile">

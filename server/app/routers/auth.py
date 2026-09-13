@@ -103,10 +103,8 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
     if not username or not password:
         raise HTTPException(status_code=400, detail="Логин и пароль обязательны для входа через ЭИОС КГУ")
 
-    # EIOS REST API Endpoint & SDO Fallback Endpoints
+    # EIOS REST API Endpoint (primary and only authentication path)
     eios_api_token_url = "https://eios.kosgos.ru/api/tokenauth"
-    sdo_token_url = "https://sdo.kosgos.ru/login/token.php"
-    sdo_rest_url = "https://sdo.kosgos.ru/webservice/rest/server.php"
 
     fullname = username
     userpictureurl = ""
@@ -115,7 +113,7 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
     detected_group = sdo_req.group_number.strip() if sdo_req.group_number else ""
 
     async with httpx.AsyncClient(verify=security.VERIFY_SSL, timeout=12.0) as client:
-        # 1. Primary Authentication Path: EIOS REST API (https://eios.kosgos.ru/api/tokenauth)
+        # Authentication via EIOS REST API (https://eios.kosgos.ru/api/tokenauth)
         eios_payload = {
             "userName": username,
             "password": password
@@ -124,21 +122,60 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
 
         try:
             eios_resp = await client.post(eios_api_token_url, json=eios_payload)
+
+            if eios_resp.status_code == 451 or "отключите vpn" in eios_resp.text.lower():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Сервер ЭИОС КГУ заблокировал подключение из-за включённого VPN. Пожалуйста, отключите VPN и повторите попытку."
+                )
+
             if eios_resp.status_code == 200:
                 eios_data = eios_resp.json()
                 if isinstance(eios_data, dict):
-                    user_info = (eios_data.get("data") or {}).get("user") or {}
-                    has_token = bool(eios_data.get("accessToken") or eios_data.get("token") or (eios_data.get("data") or {}).get("token"))
-                    has_valid_user = bool(user_info.get("id") or user_info.get("username") or user_info.get("lastName") or user_info.get("fullName"))
-                    
-                    if (eios_data.get("state") == 1 and (has_token or has_valid_user)) or (has_token and has_valid_user):
+                    inner_data = eios_data.get("data") if isinstance(eios_data.get("data"), dict) else {}
+                    user_info = (
+                        inner_data.get("data")
+                        if isinstance(inner_data.get("data"), dict)
+                        else (inner_data.get("user") or eios_data.get("user") or inner_data)
+                    )
+                    if not isinstance(user_info, dict):
+                        user_info = {}
+
+                    token_val = (
+                        eios_data.get("accessToken")
+                        or eios_data.get("token")
+                        or inner_data.get("accessToken")
+                        or inner_data.get("token")
+                        or user_info.get("accessToken")
+                        or user_info.get("token")
+                    )
+                    has_token = bool(token_val)
+
+                    user_id = user_info.get("id") or inner_data.get("id") or eios_data.get("id")
+                    user_name_val = (
+                        user_info.get("userName")
+                        or user_info.get("username")
+                        or user_info.get("fullName")
+                        or user_info.get("full_name")
+                        or user_info.get("lastName")
+                        or user_info.get("shortFIO")
+                    )
+                    has_valid_user = bool(user_id or user_name_val)
+
+                    state_val = eios_data.get("state")
+                    if state_val is None and "state" in inner_data:
+                        state_val = inner_data.get("state")
+
+                    if (state_val == 1 and (has_token or has_valid_user)) or (has_token and has_valid_user):
                         eios_auth_success = True
                         last_name = user_info.get("lastName") or user_info.get("lastname") or ""
                         first_name = user_info.get("firstName") or user_info.get("firstname") or ""
-                        combined_fio = f"{last_name} {first_name}".strip()
+                        middle_name = user_info.get("middleName") or user_info.get("patronymic") or ""
+                        combined_fio = f"{last_name} {first_name} {middle_name}".strip()
 
                         fullname = (
-                            user_info.get("shortFIO")
+                            user_info.get("userName")
+                            or user_info.get("shortFIO")
                             or user_info.get("fullName")
                             or user_info.get("full_name")
                             or user_info.get("fio")
@@ -146,104 +183,48 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
                             or combined_fio
                             or username
                         )
-                        logger.info(f"[EIOS REST AUTH SUCCESS] Authenticated user {username} ({fullname}) via eios.kosgos.ru/api/tokenauth")
+
+                        # Extract avatar URL from EIOS response if available
+                        userpictureurl = (
+                            user_info.get("avatar")
+                            or user_info.get("photo")
+                            or user_info.get("userpictureurl")
+                            or user_info.get("profileimageurl")
+                            or ""
+                        )
+
+                        # Extract department/group info from EIOS if available
+                        if not detected_group:
+                            detected_group = (
+                                user_info.get("groupName")
+                                or user_info.get("group")
+                                or user_info.get("departmentName")
+                                or user_info.get("department")
+                                or ""
+                            )
+
+                        logger.info(f"[EIOS AUTH SUCCESS] Authenticated user {username} ({fullname}) via eios.kosgos.ru/api/tokenauth")
                     else:
-                        logger.warning(f"[EIOS REST AUTH REJECTED] EIOS response lacked token or valid user: {eios_data}")
+                        logger.warning(f"[EIOS AUTH REJECTED] EIOS response lacked token or valid user info: state={eios_data.get('state')}, has_token={has_token}, has_valid_user={has_valid_user}")
+            else:
+                logger.warning(f"[EIOS AUTH FAILED] EIOS returned status {eios_resp.status_code} for user {username}")
+
+        except HTTPException:
+            raise
         except Exception as eios_err:
-            logger.warning(f"[EIOS REST AUTH NOTICE] eios.kosgos.ru/api/tokenauth unavailable: {eios_err}")
+            logger.error(f"[EIOS AUTH ERROR] eios.kosgos.ru/api/tokenauth unavailable: {eios_err}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Сервер ЭИОС КГУ недоступен. Попробуйте позже или обратитесь к администратору."
+            )
 
-        # If EIOS REST auth succeeded but name is still equal to username, enrich name from SDO webservice
-        if eios_auth_success and (not fullname or fullname.lower() == username.lower()):
-            try:
-                sdo_resp = await client.post(sdo_token_url, data={
-                    "username": username,
-                    "password": password,
-                    "service": "moodle_mobile_app"
-                })
-                if sdo_resp.status_code == 200:
-                    t_data = sdo_resp.json()
-                    if t_data and "token" in t_data:
-                        ws_tok = t_data["token"]
-                        info_r = await client.post(sdo_rest_url, data={
-                            "wstoken": ws_tok,
-                            "moodlewsrestformat": "json",
-                            "wsfunction": "core_webservice_get_site_info"
-                        })
-                        info_d = info_r.json()
-                        sdo_fn = info_d.get("fullname", "").strip()
-                        if sdo_fn and sdo_fn.lower() != username.lower():
-                            fullname = sdo_fn
-                        if info_d.get("userpictureurl"):
-                            userpictureurl = info_d.get("userpictureurl")
-            except Exception as name_enrich_err:
-                logger.warning(f"[SDO NAME ENRICH WARN] Could not fetch full name from SDO: {name_enrich_err}")
-
-        # 2. Fallback Authentication Path: SDO KOSGOS Moodle Mobile Service
+        # If EIOS authentication failed — return error immediately (no SDO fallback)
         if not eios_auth_success:
-            sdo_payload = {
-                "username": username,
-                "password": password,
-                "service": "moodle_mobile_app"
-            }
-            try:
-                resp = await client.post(sdo_token_url, data=sdo_payload)
-                if resp.status_code == 451 or "отключите vpn" in resp.text.lower():
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Сервер ЭИОС КГУ заблокировал подключение из-за включённого VPN. Пожалуйста, отключите VPN и повторите попытку."
-                    )
-                token_data = resp.json()
-                if not token_data or "error" in token_data or "token" not in token_data:
-                    err_msg = token_data.get("error", "Неверный логин или пароль ЭИОС / СДО КГУ") if token_data else "Неверный логин или пароль"
-                    raise HTTPException(status_code=400, detail=err_msg)
-
-                wstoken = token_data["token"]
-                logger.info(f"[SDO MOODLE AUTH SUCCESS] Token obtained for {username}")
-
-                # Step 2b: Fetch profile info from SDO
-                userid = None
-                try:
-                    info_resp = await client.post(sdo_rest_url, data={
-                        "wstoken": wstoken,
-                        "moodlewsrestformat": "json",
-                        "wsfunction": "core_webservice_get_site_info"
-                    })
-                    info_data = info_resp.json()
-                    fullname = info_data.get("fullname", "").strip() or info_data.get("username", "").strip() or username
-                    userid = info_data.get("userid")
-                    userpictureurl = info_data.get("userpictureurl", "")
-                except Exception as info_err:
-                    logger.warning(f"[SDO SITE INFO WARN] Could not fetch site info: {info_err}")
-
-                # Step 2c: Query detailed user fields by userid to get real ФИО (e.g. Смирнов Макар Андреевич)
-                if userid:
-                    try:
-                        u_resp = await client.post(sdo_rest_url, data={
-                            "wstoken": wstoken,
-                            "moodlewsrestformat": "json",
-                            "wsfunction": "core_user_get_users_by_field",
-                            "field": "id",
-                            "values[0]": userid
-                        })
-                        u_json = u_resp.json()
-                        if isinstance(u_json, list) and len(u_json) > 0:
-                            u_item = u_json[0]
-                            u_fn = u_item.get("fullname") or f"{u_item.get('lastname', '')} {u_item.get('firstname', '')}".strip()
-                            if u_fn and u_fn.lower() != username.lower():
-                                fullname = u_fn
-                                logger.info(f"[SDO FULL NAME EXTRACT] Found full name for {username}: {fullname}")
-                            if u_item.get("profileimageurl"):
-                                userpictureurl = u_item.get("profileimageurl")
-                    except Exception as u_err:
-                        logger.warning(f"[SDO USER DETAILS WARN] Could not fetch user details: {u_err}")
-            except HTTPException:
-                raise
-            except Exception as conn_err:
-                logger.error(f"[EIOS/SDO CONN FAILED] Async connection error: {conn_err}")
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Сервер ЭИОС КГУ недоступен из сети. Проверьте логин и подключение."
-                )
+            logger.warning(f"[EIOS AUTH DENIED] Authentication failed for user: {username}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Неверный логин или пароль ЭИОС КГУ. Проверьте данные и попробуйте снова."
+            )
 
     if not detected_group:
         detected_group = department_name or "КГУ ИВИТШ"
@@ -277,7 +258,7 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
             if not db_user:
                 raise HTTPException(status_code=500, detail="Ошибка создания пользователя. Попробуйте ещё раз.")
     else:
-        # Always update db_user.full_name with the real full name from SDO/EIOS!
+        # Always update db_user.full_name with the real full name from EIOS
         if fullname and fullname.lower() != username.lower():
             db_user.full_name = fullname
         elif not db_user.full_name or db_user.full_name.lower() == username.lower():
@@ -301,7 +282,7 @@ async def eios_login(sdo_req: schemas.EiosLoginRequest, response: Response, db: 
         created_at=db_user.created_at
     )
 
-    logger.info(f"[SDO LOGIN COMPLETE] User {username} ({db_user.full_name}) successfully logged in")
+    logger.info(f"[EIOS LOGIN COMPLETE] User {username} ({db_user.full_name}) successfully logged in")
     return schemas.TokenResponse(access_token=jwt_token, user=user_resp)
 
 

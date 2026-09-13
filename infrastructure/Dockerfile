@@ -32,4 +32,4 @@ EXPOSE 8000
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app/server
 
-CMD ["python3", "-m", "uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python3", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
