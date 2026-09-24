@@ -165,6 +165,7 @@ const Dashboard = () => {
 
   // --- Today's lessons, reported by the schedule widget ---
   const [groupLessons, setGroupLessons] = useState(null);
+  const ownGroup = user?.group ? { id: user.groupId || null, name: user.group } : null;
   // Re-render every 30 s so "сейчас идёт / следующая" follows the clock
   const [, setClockTick] = useState(0);
   useEffect(() => {
@@ -318,7 +319,7 @@ const Dashboard = () => {
           onClickCapture={() => markTaskDone('schedule')}
           onChangeCapture={() => markTaskDone('schedule')}
         >
-          <ScheduleWidget onGroupLessons={setGroupLessons} />
+          <ScheduleWidget onGroupLessons={setGroupLessons} ownGroup={ownGroup} />
         </section>
 
         <div className="dash-aside">

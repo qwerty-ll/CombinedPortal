@@ -23,6 +23,7 @@ class UserResponse(BaseModel):
     full_name: str
     role: str
     group_number: Optional[str] = None
+    eios_group_id: Optional[int] = None
     email: Optional[str] = None
     userpictureurl: Optional[str] = None
     auth_source: str = "eios"

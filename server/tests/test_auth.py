@@ -1,3 +1,8 @@
+import asyncio
+import base64
+import json
+
+import httpx
 from fastapi.testclient import TestClient
 
 import app.models as models
@@ -101,6 +106,18 @@ def test_cookie_writes_require_csrf_header(app, fake_eios):
     assert c.post("/api/v1/forum/questions", json=body, headers=CSRF).status_code == 200
 
 
+def test_eios_group_and_its_timetable_id_are_saved(app, fake_eios, db):
+    c = login_student(app, fake_eios, group="24-ИСбо-1", group_id=4242)
+    me = c.get("/api/v1/auth/me").json()
+    assert me["group_number"] == "24-ИСбо-1" and me["eios_group_id"] == 4242
+    # A group typed by hand has no EIOS id, so the old one must not stick to it
+    r = c.patch("/api/v1/auth/me", json={"group_number": "25-ИВТбо-1"}, headers=CSRF)
+    assert r.json()["group_number"] == "25-ИВТбо-1" and r.json()["eios_group_id"] is None
+    # The next login brings the EIOS group back
+    c = login_student(app, fake_eios, group="24-ИСбо-1", group_id=4242)
+    assert c.get("/api/v1/auth/me").json()["eios_group_id"] == 4242
+
+
 def test_full_name_is_not_user_editable(app, fake_eios):
     c = login_student(app, fake_eios)
     r = c.patch("/api/v1/auth/me", json={"full_name": "Администратор ИВИТШ", "group_number": "25-ИВТбо-1"}, headers=CSRF)
@@ -125,3 +142,83 @@ def test_parse_auth_response():
     assert eios.parse_auth_response({"data": {"user": {"userID": 7}}}) is None
     assert eios.parse_auth_response({"state": 1}) is None
     assert eios.parse_auth_response("error") is None
+
+
+def _jwt(claims):
+    body = base64.urlsafe_b64encode(json.dumps(claims).encode()).decode().rstrip("=")
+    return f"eyJhbGciOiJIUzI1NiJ9.{body}.signature"
+
+
+_CLAIMS = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/"
+TOKEN = _jwt({_CLAIMS + "name": "student@example.com", _CLAIMS + "surname": "Иванов И. И.", _CLAIMS + "sid": "-12345"})
+TOKENAUTH_OK = {"state": 1, "msg": "", "data": {"data": {
+    "userName": "student@example.com", "accessToken": TOKEN, "refreshToken": "r", "id": -12345, "expiresIn": 10980,
+}}}
+_RealAsyncClient = httpx.AsyncClient
+STUDENT_OK = {"state": 1, "msg": "", "data": {
+    "studentID": 12345, "fullName": "Иванов Иван Иванович", "surname": "Иванов", "name": "Иван", "middleName": "Иванович",
+    "group": {"item1": "24-ИСбо-1", "item2": 4242, "formID": 1}, "course": 2, "photoLink": "https://example.com/p.jpg",
+}}
+
+
+def _run_login(monkeypatch, student_reply):
+    """eios.authenticate against a fake EIOS; student_reply(request) answers UserInfo/Student."""
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        if request.url.path.endswith("/tokenauth"):
+            return httpx.Response(200, json=TOKENAUTH_OK)
+        return student_reply(request)
+
+    monkeypatch.setattr(eios.httpx, "AsyncClient", lambda **kw: _RealAsyncClient(transport=httpx.MockTransport(handler), **kw))
+    return asyncio.run(eios.authenticate("student@example.com", "pw")), seen
+
+
+def test_authenticate_takes_name_and_group_from_the_student_card(monkeypatch):
+    identity, seen = _run_login(monkeypatch, lambda request: httpx.Response(200, json=STUDENT_OK))
+    assert identity.full_name == "Иванов Иван Иванович"
+    assert identity.group == "24-ИСбо-1" and identity.group_id == 4242
+    assert identity.eios_id == "-12345"  # unchanged: existing accounts stay bound to it
+    card = seen[1]
+    assert card.url.path.endswith("/UserInfo/Student") and card.url.params["studentID"] == "-12345"
+    assert card.headers["Authorization"] == f"Bearer {TOKEN}"
+
+
+def test_authenticate_retries_the_card_with_a_bare_token(monkeypatch):
+    def reply(request):
+        if request.headers["Authorization"].startswith("Bearer "):
+            return httpx.Response(401)
+        return httpx.Response(200, json=STUDENT_OK)
+
+    identity, _ = _run_login(monkeypatch, reply)
+    assert identity.full_name == "Иванов Иван Иванович" and identity.group_id == 4242
+
+
+def test_authenticate_falls_back_to_the_token_name(monkeypatch):
+    # EIOS answers 200 with state -1 for errors
+    identity, _ = _run_login(monkeypatch, lambda request: httpx.Response(200, json={"state": -1, "msg": "Не найдено", "data": None}))
+    assert identity.full_name == "Иванов И. И." and identity.group is None and identity.group_id is None
+
+    def down(request):
+        raise httpx.ConnectError("unreachable")
+
+    identity, _ = _run_login(monkeypatch, down)
+    assert identity is not None and identity.full_name == "Иванов И. И."
+
+
+def test_parse_student_profile():
+    assert eios.parse_student_profile(STUDENT_OK) == eios.StudentProfile("Иванов Иван Иванович", "24-ИСбо-1", 4242)
+    parts = {"state": 1, "data": {"surname": "Петров", "name": "Пётр", "middleName": None, "group": {"item1": " 25-ИВТбо-2 ", "item2": "77"}}}
+    assert eios.parse_student_profile(parts) == eios.StudentProfile("Петров Пётр", "25-ИВТбо-2", 77)
+    odd_id = {"state": 1, "data": {"fullName": "Петров Пётр", "group": {"item1": "25-ИВТбо-2", "item2": True}}}
+    assert eios.parse_student_profile(odd_id).group_id is None
+    assert eios.parse_student_profile({"state": -1, "data": STUDENT_OK["data"]}) is None
+    assert eios.parse_student_profile({"state": 1, "data": {}}) is None
+    assert eios.parse_student_profile([]) is None
+
+
+def test_jwt_claims_tolerate_garbage():
+    assert eios.jwt_claims(TOKEN)[_CLAIMS + "sid"] == "-12345"
+    for bad in (None, "", "no-dots", "a.!!!.c", "a.bm90IGpzb24.c"):
+        assert eios.jwt_claims(bad) == {}

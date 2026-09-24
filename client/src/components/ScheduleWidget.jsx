@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Search, MapPin, User, AlertCircle, ChevronDown, GraduationCap, Check,
-  ChevronLeft, ChevronRight, CalendarX2, CloudOff, RotateCw
+  ChevronLeft, ChevronRight, CalendarX2, CloudOff, RotateCw, Undo2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { scheduleApi } from '../services/api';
@@ -66,19 +66,39 @@ const TARGET_TYPES = [
   { id: 'aud', label: 'Аудитории', field: 'Аудитория', placeholder: 'Найти аудиторию, например Б-304' },
 ];
 
+// Shown to guests until they pick a group
+const GUEST_GROUP_NAME = '24-ИСбо-1';
+const GROUP_KEY = 'portal_sched_group';
+
+const sameName = (a, b) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+const findGroupByName = (items, name) => (name ? items.find(g => sameName(g.name, name)) : null);
+
+// Only a group chosen in the list is remembered ({ picked: true }); an automatic choice is not,
+// so a student's own group takes over from it.
+const readSavedGroup = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(GROUP_KEY));
+    return saved && saved.name ? saved : null;
+  } catch { return null; }
+};
+const readPickedGroup = () => {
+  const saved = readSavedGroup();
+  return saved?.picked ? saved : null;
+};
+
 // onGroupLessons({ group, lessons }) receives the loaded lessons whenever a group's schedule is shown,
 // so the dashboard can summarise today without fetching the schedule twice.
-const ScheduleWidget = ({ onGroupLessons }) => {
+// ownGroup ({ id, name }) is the signed-in student's group from EIOS; id may be missing for a group typed by hand.
+const ScheduleWidget = ({ onGroupLessons, ownGroup = null }) => {
   const [targetType, setTargetType] = useState('group'); // 'group' | 'teacher' | 'aud'
   const availableYears = ['2025-2026', '2024-2025', '2023-2024', '2026-2027'];
 
   // Separate target selection states per category
-  const [selectedGroup, setSelectedGroup] = useState(() => {
-    try {
-      const saved = localStorage.getItem('portal_sched_group');
-      return saved ? JSON.parse(saved) : { id: 8540, name: '24-ИСбо-1' };
-    } catch { return { id: 8540, name: '24-ИСбо-1' }; }
-  });
+  const [selectedGroup, setSelectedGroup] = useState(() => (
+    readPickedGroup() || (ownGroup?.name ? { id: ownGroup.id || null, name: ownGroup.name } : readSavedGroup())
+  ));
+  const ownGroupRef = useRef(ownGroup);
+  ownGroupRef.current = ownGroup;
 
   const [selectedTeacher, setSelectedTeacher] = useState(() => {
     try {
@@ -196,10 +216,16 @@ const ScheduleWidget = ({ onGroupLessons }) => {
             const activeId = currentTarget?.id;
             const exists = activeId ? items.find(i => Number(i.id) === Number(activeId)) : null;
             if (!exists) {
+              const own = ownGroupRef.current;
               const defaultItem = targetType === 'group'
-                ? (items.find(g => g.name && g.name.includes('24-ИСбо-1')) || items.find(g => g.facul === 'ИВИТШ') || items[0])
+                // Group ids change every academic year, names do not: keep the same group, else the student's own
+                ? (findGroupByName(items, currentTarget?.name)
+                  || (own?.id && items.find(g => Number(g.id) === Number(own.id)))
+                  || findGroupByName(items, own?.name)
+                  || findGroupByName(items, GUEST_GROUP_NAME)
+                  || items.find(g => g.facul === 'ИВИТШ') || items[0])
                 : (items.find(a => a.name && (a.name.includes('Б-') || a.name.includes('Б2'))) || items[0]);
-              if (defaultItem) handleSelectItem(defaultItem);
+              if (defaultItem) handleSelectItem(defaultItem, { auto: true });
             }
           }
         }
@@ -217,13 +243,20 @@ const ScheduleWidget = ({ onGroupLessons }) => {
   }, [targetType, selectedYear]);
 
   // Handle selecting an item from search dropdown
-  const handleSelectItem = (item) => {
+  const handleSelectItem = (item, { auto = false } = {}) => {
     const itemId = item.id || item.idName;
     const targetObj = { id: itemId, name: item.name };
 
     if (targetType === 'group') {
       setSelectedGroup(targetObj);
-      localStorage.setItem('portal_sched_group', JSON.stringify(targetObj));
+      if (!auto) {
+        // Choosing one's own group again means "follow my group", not a fixed pick
+        const picked = !sameName(item.name, ownGroupRef.current?.name);
+        try {
+          if (picked) localStorage.setItem(GROUP_KEY, JSON.stringify({ ...targetObj, picked }));
+          else localStorage.removeItem(GROUP_KEY);
+        } catch { /* storage unavailable */ }
+      }
     } else if (targetType === 'teacher') {
       setSelectedTeacher(targetObj);
       localStorage.setItem('portal_sched_teacher', JSON.stringify(targetObj));
@@ -235,6 +268,33 @@ const ScheduleWidget = ({ onGroupLessons }) => {
     setIsDropdownOpen(false);
     setSearchQuery('');
   };
+
+  // The student's group with an id for the selected year, or null when it has no timetable
+  // (a group typed by hand, or "Деканат" for staff)
+  const ownGroupTarget = () => {
+    if (!ownGroup?.name) return null;
+    if (targetType === 'group' && catalogItems.length) {
+      const listed = findGroupByName(catalogItems, ownGroup.name);
+      return listed ? { id: listed.id, name: listed.name } : null;
+    }
+    return ownGroup.id ? { id: ownGroup.id, name: ownGroup.name } : null;
+  };
+
+  // Signing in (or the profile arriving later) switches to the student's group unless one was picked
+  useEffect(() => {
+    if (!ownGroup?.name || readPickedGroup()) return;
+    const target = ownGroupTarget();
+    if (target) setSelectedGroup(prev => (prev?.id && sameName(prev.name, target.name) ? prev : target));
+  }, [ownGroup?.id, ownGroup?.name]);
+
+  const showOwnGroup = () => {
+    const target = ownGroupTarget();
+    if (!target) return;
+    try { localStorage.removeItem(GROUP_KEY); } catch { /* storage unavailable */ }
+    setSelectedGroup(target);
+  };
+  const canReturnToOwnGroup = targetType === 'group' && !!selectedGroup?.name && !!ownGroup?.name
+    && !sameName(selectedGroup.name, ownGroup.name) && !!ownGroupTarget();
 
   // Filter catalog items by search query
   const filteredCatalog = useMemo(() => {
@@ -522,7 +582,15 @@ const ScheduleWidget = ({ onGroupLessons }) => {
       {/* 2. SEARCH COMBOBOX & ACADEMIC YEAR SELECT */}
       <div className="sched-filters">
         <div className="field sched-combo" ref={dropdownRef}>
-          <label className="field-label" htmlFor="schedule-target-input">{targetMeta.field}</label>
+          <div className="sched-field-head">
+            <label className="field-label" htmlFor="schedule-target-input">{targetMeta.field}</label>
+            {canReturnToOwnGroup && (
+              <button type="button" className="sched-own-group" onClick={showOwnGroup} aria-label={`Моя группа, ${ownGroup.name}`}>
+                <Undo2 size={14} {...ICON} />
+                Моя группа
+              </button>
+            )}
+          </div>
           <div className="sched-combo-control">
             <Search size={16} className="sched-combo-icon" {...ICON} />
             <input

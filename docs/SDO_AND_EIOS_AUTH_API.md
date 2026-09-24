@@ -139,23 +139,56 @@ POST https://sdo.kosgos.ru/webservice/rest/server.php?wstoken=ВАШ_ТОКЕН&
 ```
 
 #### Ответ при успехе:
+Успех определяется по `state == 1`, а не по HTTP-коду: ошибки тоже приходят с `200 OK` и `state: -1`.
 ```json
 {
   "state": 1,
-  "msg": "Успешно",
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6...",
+  "msg": "",
   "data": {
-    "user": {
-      "userID": 12345,
-      "shortFIO": "Иванов И. И.",
-      "login": "student_login"
+    "data": {
+      "userName": "student@example.com",
+      "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6...",
+      "refreshToken": "...",
+      "id": -12345,
+      "expiresIn": 10980
     }
   }
 }
 ```
 
+`id` — это **userID** пользователя ЭИОС (отрицательное число). ФИО и группы в этом ответе нет.
+Токен живёт около трёх часов. В его payload есть краткое ФИО (claim `.../claims/surname`, например «Иванов И. И.»)
+и тот же userID (claim `.../claims/sid`).
+
 Для последующих запросов к `eios.kosgos.ru/api/` заголовок авторизации:
-`Authorization: Bearer {accessToken}` или передача через cookie `authToken`.
+`Authorization: Bearer {accessToken}`.
+
+### Карточка студента: ФИО и группа
+* **URL:** `GET https://eios.kosgos.ru/api/UserInfo/Student?studentID={userID}` (userID со знаком минус, как в `id` выше)
+* **Заголовки:** `Authorization: Bearer {accessToken}`
+
+```json
+{
+  "state": 1,
+  "data": {
+    "studentID": 12345,
+    "fullName": "Иванов Иван Иванович",
+    "surname": "Иванов", "name": "Иван", "middleName": "Иванович",
+    "group": { "item1": "24-ИСбо-1", "item2": 4242, "formID": 1 },
+    "course": 2,
+    "faculty": "..."
+  }
+}
+```
+
+`group.item1` — название группы, `group.item2` — её **idGroup**, по которому запрашивается расписание
+(`/api/Rasp?idGroup=…`). idGroup меняется от учебного года к году, название группы — нет.
+
+### Как портал использует вход
+1. `POST /api/tokenauth` проверяет логин и пароль.
+2. Сразу после этого сервер портала один раз запрашивает `UserInfo/Student` и сохраняет ФИО, группу и её idGroup.
+   Если карточка недоступна, ФИО берётся из токена (краткая форма), а вход всё равно проходит.
+3. Токен ЭИОС нигде не сохраняется: после входа портал работает со своей сессией.
 
 ---
 
