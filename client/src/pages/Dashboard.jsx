@@ -256,7 +256,7 @@ const Dashboard = () => {
                   {todaySummary.count === 0
                     ? <>{whose} сегодня пар нет</>
                     : todaySummary.done
-                      ? <>{whose} сегодня было <strong className="tabular">{todaySummary.count} {plural(todaySummary.count, ['пара', 'пары', 'пар'])}</strong> — на&nbsp;сегодня&nbsp;всё</>
+                      ? <>{whose} сегодня было <strong className="tabular">{todaySummary.count} {plural(todaySummary.count, ['пара', 'пары', 'пар'])}</strong>, занятия закончились</>
                       : <>{whose} сегодня <strong className="tabular">{todaySummary.count} {plural(todaySummary.count, ['пара', 'пары', 'пар'])}</strong></>}
                 </p>
                 {todaySummary.current && <HeroLesson lesson={todaySummary.current} kind="now" />}

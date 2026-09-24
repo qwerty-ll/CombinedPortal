@@ -112,7 +112,8 @@ a.dash-hero-room {
   gap: var(--space-3);
   margin-top: var(--space-6);
 }
-.dash-hero .btn-secondary { border-color: var(--warm-border); }
+/* One warm outline value in the hero: the white button shares the chip's #B04E0B (4.6:1 on the panel) */
+.dash-hero .btn-secondary { border-color: var(--warm-strong); }
 .dash-hero-count {
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
