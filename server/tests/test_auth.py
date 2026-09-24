@@ -32,6 +32,21 @@ def test_eios_login_creates_student_bound_to_eios_id(app, fake_eios, db):
     assert user.sdo_id == "555" and user.auth_source == "eios"
 
 
+def test_eios_avatar_is_kept_for_later_page_loads(app, fake_eios):
+    photo = "https://sdo.kosgos.ru/pluginfile.php/5/user/icon/f1"
+    c = login_student(app, fake_eios, "24-isbo-001", avatar_url=photo)
+    # /auth/me runs on every page load; it must still carry the EIOS picture
+    assert c.get("/api/v1/auth/me").json()["userpictureurl"] == photo
+    # A later login without a picture in the EIOS reply keeps the saved one
+    c = login_student(app, fake_eios, "24-isbo-001", avatar_url=None)
+    assert c.get("/api/v1/auth/me").json()["userpictureurl"] == photo
+
+
+def test_eios_avatar_must_be_a_web_link(app, fake_eios):
+    c = login_student(app, fake_eios, "24-isbo-001", avatar_url="javascript:alert(1)")
+    assert c.get("/api/v1/auth/me").json()["userpictureurl"] is None
+
+
 def test_eios_login_is_case_insensitive_for_existing_accounts(app, fake_eios, db):
     login_student(app, fake_eios, "24-isbo-001")
     login_student(app, fake_eios, "24-ISBO-001")

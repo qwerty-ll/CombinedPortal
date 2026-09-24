@@ -24,6 +24,8 @@ class User(Base):
     # "eios" for accounts created by EIOS SSO, "local" for the env-configured administrator.
     auth_source = Column(String, nullable=False, default="eios", server_default="eios")
     is_blocked = Column(Boolean, nullable=False, default=False, server_default=false())
+    # Profile picture URL reported by EIOS, refreshed on every login.
+    avatar_url = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), default=_utcnow)
 
     questions = relationship("ForumQuestion", back_populates="author", cascade="all, delete-orphan")

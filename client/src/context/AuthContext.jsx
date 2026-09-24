@@ -18,30 +18,61 @@ const clearUserStorage = () => {
   clearApiCache();
 };
 
+// A photo the user picks is kept in this browser per account (it is never uploaded), apart from the
+// session cache: a reload, an expired session or signing out does not lose it.
+const avatarKey = (id) => `portal_avatar_${id}`;
+const readAvatar = (id) => {
+  try { return id ? localStorage.getItem(avatarKey(id)) : null; } catch { return null; }
+};
+
 const toClientUser = (apiUser) => ({
   id: apiUser.id,
   username: apiUser.username,
   fullName: apiUser.full_name || apiUser.username,
   group: apiUser.group_number || '',
   role: apiUser.role || 'student',
-  photoUrl: apiUser.userpictureurl || '',
+  serverPhotoUrl: apiUser.userpictureurl || '',
 });
+
+// photoUrl shown in the UI: the chosen photo, else the EIOS picture
+const withPhoto = (u) => {
+  const custom = readAvatar(u.id);
+  return { ...u, photoUrl: custom || u.serverPhotoUrl || '', hasCustomPhoto: !!custom };
+};
+
+// Profiles cached by older versions kept a chosen photo inline; move it to its own key.
+const fromCache = (cached) => {
+  const inline = typeof cached.photoUrl === 'string' && cached.photoUrl.startsWith('data:') ? cached.photoUrl : '';
+  if (inline && !readAvatar(cached.id)) {
+    try {
+      // Free the space first: the photo must not sit in storage twice
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ ...cached, photoUrl: '' }));
+      localStorage.setItem(avatarKey(cached.id), inline);
+    } catch { /* storage full */ }
+  }
+  const serverPhotoUrl = cached.serverPhotoUrl ?? (inline ? '' : cached.photoUrl || '');
+  return withPhoto({ ...cached, serverPhotoUrl });
+};
 
 export const AuthProvider = ({ children }) => {
   // The cached profile only drives the UI until /auth/me confirms it; the server enforces all access.
   const [user, setUser] = useState(() => {
     try {
       const saved = localStorage.getItem(AUTH_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : null;
+      return saved ? fromCache(JSON.parse(saved)) : null;
     } catch {
       return null;
     }
   });
 
   const saveUser = useCallback((nextUser) => {
-    setUser(nextUser);
+    const shown = nextUser ? withPhoto(nextUser) : null;
+    setUser(shown);
     try {
-      if (nextUser) localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextUser));
+      if (shown) {
+        const { photoUrl, hasCustomPhoto, ...cacheable } = shown;
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(cacheable));
+      }
     } catch { /* storage unavailable */ }
   }, []);
 
@@ -77,8 +108,7 @@ export const AuthProvider = ({ children }) => {
         try { cached = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null'); } catch { /* ignore */ }
         // A different account is signed in now: drop the previous person's local data.
         if (cached && cached.id !== res.id) clearUserStorage();
-        // A locally chosen avatar is kept for the same account (it is never uploaded to the server).
-        saveUser(cached?.id === res.id && cached.photoUrl ? { ...fresh, photoUrl: cached.photoUrl } : fresh);
+        saveUser(fresh);
       })
       .catch((err) => {
         // A 401 is handled by the SESSION_EXPIRED_EVENT listener above.
@@ -124,13 +154,20 @@ export const AuthProvider = ({ children }) => {
     clearUserStorage();
   };
 
+  // photoUrl: a data URL to keep as the chosen photo, or null to go back to the EIOS picture.
+  // Returns false when the browser refused to store the photo.
   const updateUserProfile = (data = {}) => {
-    if (!user) return;
-    saveUser({
-      ...user,
-      ...(data.group !== undefined ? { group: data.group } : {}),
-      ...(data.photoUrl !== undefined ? { photoUrl: data.photoUrl } : {}),
-    });
+    if (!user) return false;
+    if (data.photoUrl !== undefined) {
+      try {
+        if (data.photoUrl) localStorage.setItem(avatarKey(user.id), data.photoUrl);
+        else localStorage.removeItem(avatarKey(user.id));
+      } catch {
+        return false;
+      }
+    }
+    saveUser({ ...user, ...(data.group !== undefined ? { group: data.group } : {}) });
+    return true;
   };
 
   const isLoggedIn = !!user;

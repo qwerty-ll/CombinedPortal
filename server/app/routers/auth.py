@@ -28,15 +28,25 @@ def _find_user(db: Session, username: str) -> Optional[models.User]:
     return db.query(models.User).filter(func.lower(models.User.username) == username.lower()).first()
 
 
-def _user_response(user: models.User, avatar_url: Optional[str] = None) -> schemas.UserResponse:
+def _safe_avatar_url(url: Optional[str]) -> Optional[str]:
+    """Keep only plain http(s) links: the value ends up in an <img src> on every page."""
+    if not isinstance(url, str):
+        return None
+    url = url.strip()
+    if len(url) > 1000 or not url.lower().startswith(("https://", "http://")):
+        return None
+    return url
+
+
+def _user_response(user: models.User) -> schemas.UserResponse:
     response = schemas.UserResponse.model_validate(user)
-    response.userpictureurl = avatar_url
+    response.userpictureurl = user.avatar_url
     return response
 
 
-def _login_response(response: Response, user: models.User, avatar_url: Optional[str] = None) -> schemas.LoginResponse:
+def _login_response(response: Response, user: models.User) -> schemas.LoginResponse:
     security.set_auth_cookie(response, security.create_access_token(user.username))
-    return schemas.LoginResponse(user=_user_response(user, avatar_url))
+    return schemas.LoginResponse(user=_user_response(user))
 
 
 @router.post("/admin-login", response_model=schemas.LoginResponse)
@@ -132,6 +142,7 @@ async def eios_login(req: schemas.EiosLoginRequest, request: Request, response: 
     if not full_name or full_name.lower() == username.lower() or _LOGIN_LOOKS_LIKE_RAW_ID.match(full_name):
         full_name = f"Студент {username}"
     group = (identity.group or (req.group_number or "").strip() or None)
+    avatar_url = _safe_avatar_url(identity.avatar_url)
 
     db_user = _find_user(db, username)
     if db_user is None and identity.eios_id:
@@ -149,6 +160,8 @@ async def eios_login(req: schemas.EiosLoginRequest, request: Request, response: 
         db_user.full_name = full_name
         if group:
             db_user.group_number = group
+        if avatar_url:
+            db_user.avatar_url = avatar_url
         db.commit()
     else:
         db_user = models.User(
@@ -160,6 +173,7 @@ async def eios_login(req: schemas.EiosLoginRequest, request: Request, response: 
             role="student",
             auth_source="eios",
             sdo_id=identity.eios_id,
+            avatar_url=avatar_url,
         )
         db.add(db_user)
         try:
@@ -174,12 +188,12 @@ async def eios_login(req: schemas.EiosLoginRequest, request: Request, response: 
 
     rate_limit.login_failures_by_user.reset(user_key)
     logger.info("EIOS login succeeded for %r", db_user.username)
-    return _login_response(response, db_user, identity.avatar_url)
+    return _login_response(response, db_user)
 
 
 @router.get("/me", response_model=schemas.UserResponse)
 def get_me(current_user: models.User = Depends(security.require_current_user)):
-    return current_user
+    return _user_response(current_user)
 
 
 @router.patch("/me", response_model=schemas.UserResponse)
@@ -193,7 +207,7 @@ def update_my_profile(
         current_user.group_number = req.group_number.strip()
     db.commit()
     db.refresh(current_user)
-    return current_user
+    return _user_response(current_user)
 
 
 @router.post("/logout")

@@ -8,7 +8,7 @@ import { useToast } from '../context/ToastContext';
 import { adaptationApi, forumApi } from '../services/api';
 import MiniGamesSection from '../components/MiniGamesSection';
 import SectionIcon from '../components/SectionIcon';
-import { hueFor, initialsOf } from '../utils/avatar';
+import { hueFor, initialsOf, shrinkAvatar } from '../utils/avatar';
 
 const ICON = { strokeWidth: 1.75, 'aria-hidden': true };
 
@@ -128,18 +128,29 @@ const Profile = () => {
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      toast.show('Файл больше 2 МБ. Выберите изображение поменьше', 'warning');
+    if (file.size > 15 * 1024 * 1024) {
+      toast.show('Файл больше 15 МБ. Выберите изображение поменьше', 'warning');
+      e.target.value = '';
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      updateUserProfile({ photoUrl: reader.result });
-      setAvatarLoadError(false);
-      toast.show('Фото профиля обновлено (сохраняется только на этом устройстве)', 'success');
-    };
-    reader.readAsDataURL(file);
+    shrinkAvatar(file)
+      .then((dataUrl) => {
+        if (updateUserProfile({ photoUrl: dataUrl })) {
+          setAvatarLoadError(false);
+          toast.show('Фото профиля обновлено', 'success');
+        } else {
+          toast.show('Браузер не дал сохранить фото. Проверьте, не включён ли приватный режим', 'warning');
+        }
+      })
+      .catch(() => toast.show('Не удалось открыть изображение. Попробуйте другой файл', 'warning'))
+      .finally(() => { e.target.value = ''; });
+  };
+
+  const handleAvatarReset = () => {
+    updateUserProfile({ photoUrl: null });
+    setAvatarLoadError(false);
+    toast.show(user?.serverPhotoUrl ? 'Вернули фото из ЭИОС' : 'Фото убрано', 'success');
   };
 
   const selectLoginMode = (mode) => {
@@ -366,8 +377,13 @@ const Profile = () => {
                   aria-describedby="profile-photo-hint"
                 />
               </label>
+              {user.hasCustomPhoto && (
+                <button type="button" className="btn btn-ghost btn-sm profile-photo-reset" onClick={handleAvatarReset}>
+                  {user.serverPhotoUrl ? 'Вернуть фото из ЭИОС' : 'Убрать фото'}
+                </button>
+              )}
               <p id="profile-photo-hint" className="profile-photo-hint">
-                PNG, JPEG или WebP до 2 МБ. Фото хранится только на этом устройстве.
+                PNG, JPEG или WebP. Фото хранится в этом браузере — на другом устройстве выберите его снова.
               </p>
             </div>
 
