@@ -23,11 +23,14 @@
   --accent-soft-hover: #D3E2FF;
   --on-accent: #FFFFFF;
 
-  /* Brand surfaces: navy panels (hero, login) and the mascot's warm orange */
-  --brand: #15326B;
-  --brand-2: #1C4390;
-  --on-brand: #FFFFFF;
-  --on-brand-2: #BFD0F2;             /* secondary text on --brand, 7.9:1 */
+  /* Navigation panel (sidebar, phone header, profile card band): light blue with dark text */
+  --nav-bg: #E4ECF9;
+  --nav-hover: #D6E2F5;
+  --nav-border: #C9D5E8;
+  --nav-text: #172033;               /* 13.7:1 on --nav-bg */
+  --nav-text-2: #3F4B63;             /* 7.4:1 on --nav-bg, 6.7:1 on --nav-hover */
+
+  /* The mascot's warm orange */
   --warm: #F08A3C;                    /* decorative only, never text */
   --warm-strong: #B04E0B;
   --warm-soft: #FFEBDA;
