@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, CircleStop, ExternalLink, Maximize2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { X, Send, CircleStop, ExternalLink, Maximize2, ArrowRight } from 'lucide-react';
 import { chatApi } from '../services/api';
 import { mapImageNameToPath } from '../utils/chatImages';
 import { OPEN_CHAT_EVENT } from '../utils/chat';
@@ -34,6 +35,16 @@ const useIsMobile = () => {
   return isMobile;
 };
 
+// The group a visitor picked in the dashboard schedule: lets ВИТШик answer about pairs before signing in
+const pickedGroupName = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('portal_sched_group'));
+    return saved?.picked && typeof saved.name === 'string' ? saved.name : null;
+  } catch { return null; }
+};
+
+const GREETING = 'Привет! Я ВИТШик. Спроси, где у тебя следующая пара, что завтра, как найти аудиторию или где сейчас преподаватель.';
+
 // Floating mascot button and the chat panel with the ВИТШик assistant.
 const ChatWidget = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -42,7 +53,7 @@ const ChatWidget = () => {
 
   // Chat States
   const [chatMessages, setChatMessages] = useState([
-    { text: 'Привет! Я ВИТШик, твой ассистент по Высшей ИТ-школе КГУ. Задай мне любой вопрос об аудиториях, стипендиях, коворкинге или клубах.', sender: 'bot', isInitial: true }
+    { text: GREETING, sender: 'bot', isInitial: true }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -65,10 +76,10 @@ const ChatWidget = () => {
   const wasOpenRef = useRef(false);
 
   const suggestions = [
-    'Где найти Б-209?',
+    'Где у меня следующая пара?',
+    'Какие пары завтра?',
+    'Как найти Б-407?',
     'Стипендии и ПГАС',
-    'Клубы и объединения ВИТШ',
-    'Где находится коворкинг?',
     'Где поесть рядом?'
   ];
 
@@ -90,8 +101,11 @@ const ChatWidget = () => {
     setIsTyping(true);
 
     try {
-      const data = await chatApi.sendMessage(messageToSend, historyPayload);
-      setChatMessages(prev => [...prev, { text: data?.reply || 'Не удалось получить ответ. Попробуй спросить иначе.', sender: 'bot' }]);
+      const data = await chatApi.sendMessage(messageToSend, historyPayload, pickedGroupName());
+      const actions = Array.isArray(data?.actions)
+        ? data.actions.filter(a => typeof a?.to === 'string' && a.to.startsWith('/') && !a.to.startsWith('//'))
+        : [];
+      setChatMessages(prev => [...prev, { text: data?.reply || 'Не удалось получить ответ. Попробуй спросить иначе.', sender: 'bot', actions }]);
     } catch (e) {
       const text = e.status === 429
         ? e.message
@@ -103,7 +117,7 @@ const ChatWidget = () => {
   };
 
   const startChat = () => {
-    setChatMessages([{ text: 'Привет! Я ВИТШик, твой помощник. Чем могу помочь?', sender: 'bot', isInitial: true }]);
+    setChatMessages([{ text: GREETING, sender: 'bot', isInitial: true }]);
     setIsChatActive(true);
   };
 
@@ -251,6 +265,23 @@ const ChatWidget = () => {
               </span>
             </button>
           )}
+
+          {msg.actions?.length > 0 && (
+            <div className="chat-actions">
+              {msg.actions.map(action => (
+                <Link
+                  key={action.to}
+                  to={action.to}
+                  className="btn btn-secondary btn-sm chat-action"
+                  // The bottom sheet covers the page on phones; the side panel can stay open
+                  onClick={() => { if (isMobile) setIsChatOpen(false); }}
+                >
+                  {action.label}
+                  <ArrowRight size={14} {...ICON} />
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -393,7 +424,7 @@ const ChatWidget = () => {
               ) : (
                 <div className="chat-start">
                   <h3 className="chat-start-title">Готов поболтать?</h3>
-                  <p className="chat-start-text">Начни чат, чтобы задать вопрос ВИТШику про аудитории, стипендии и студенческую жизнь.</p>
+                  <p className="chat-start-text">Начни чат, чтобы спросить ВИТШика про пары, аудитории, преподавателей и студенческую жизнь.</p>
                   <button ref={startRef} type="button" onClick={startChat} className="btn btn-primary btn-block">
                     Начать чат
                   </button>

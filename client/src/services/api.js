@@ -66,7 +66,9 @@ export const apiFetch = async (endpoint, options = {}) => {
     'X-Requested-With': 'XMLHttpRequest',
     ...extraHeaders,
   };
-  const maxRetries = retries !== undefined ? retries : (isGet ? 2 : 0);
+  // Offline there is nothing to wait for: go straight to the saved copy
+  const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  const maxRetries = offline ? 0 : (retries !== undefined ? retries : (isGet ? 2 : 0));
   const timeoutMs = timeout || 12000;
   const enableCache = useCache !== false && isGet && isCacheable(endpoint);
 
@@ -231,8 +233,9 @@ export const contentApi = {
 
 // Chatbot Services
 export const chatApi = {
-  sendMessage: (message, history) =>
-    apiFetch('/api/v1/chat', json('POST', { message, history })),
+  // group: the group picked in the dashboard schedule, for visitors who have not signed in
+  sendMessage: (message, history, group = null) =>
+    apiFetch('/api/v1/chat', json('POST', { message, history, ...(group ? { group } : {}) })),
 };
 
 // Schedule EIOS Services
@@ -252,5 +255,14 @@ export const scheduleApi = {
     if (idAud) query.append('idAud', idAud);
     if (sdate) query.append('sdate', sdate);
     return apiFetch(`/api/v1/schedule/rasp?${query.toString()}`);
-  }
+  },
+  // Today's lessons of the portal's teachers: { date, teachers: { [teacherId]: lessons[] } }
+  getTeachersToday: () =>
+    apiFetch('/api/v1/schedule/teachers/today', { retries: 0, timeout: 20000 }),
+};
+
+// iCalendar feed of a group's timetable, for subscribing in a phone calendar
+export const groupCalendarUrl = (groupName) => {
+  const base = /^https?:\/\//.test(API_BASE_URL) ? API_BASE_URL : `${window.location.origin}${API_BASE_URL}`;
+  return `${base}/api/v1/calendar/group.ics?name=${encodeURIComponent(groupName)}`;
 };

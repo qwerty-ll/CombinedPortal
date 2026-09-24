@@ -333,6 +333,12 @@ a.dash-hero-room {
 }
 
 .sched-combo { position: relative; }
+.sched-footer {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.sched-calendar { color: var(--accent); margin-left: calc(var(--space-3) * -1); }
 .sched-field-head {
   display: flex;
   align-items: baseline;

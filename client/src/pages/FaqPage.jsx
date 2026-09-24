@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronDown, HelpCircle, Search, MessageCircle, MessageSquarePlus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import DOMPurify from 'dompurify';
@@ -46,11 +46,13 @@ const FAQItem = ({ id, question, answer, isOpen, onClick }) => {
 
 const FaqPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [openIndex, setOpenIndex] = useState(null);
 
   const [faqItems, setFaqItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState('');
+  // /faq?q=… (links from the assistant) opens the list already filtered
+  const [query, setQuery] = useState(() => searchParams.get('q') || '');
 
   // Search questions and answer text (answers are HTML, so tags are ignored)
   const visibleItems = useMemo(() => {

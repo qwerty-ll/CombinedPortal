@@ -255,6 +255,23 @@
   font-size: var(--text-sm);
   color: var(--text-2);
 }
+.profile-phone-row {
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+}
+.profile-phone-row .profile-stat-text { flex: 1; gap: var(--space-1); }
+.profile-phone-row .profile-stat-meta { display: inline; }
+.profile-phone-row .profile-stat-meta svg { display: inline; vertical-align: -2px; }
+.profile-phone-action { flex-shrink: 0; }
+.profile-phone-row .tabular { white-space: nowrap; }
+@media (max-width: 480px) {
+  /* The button drops under the text instead of squeezing it */
+  .profile-phone-row { flex-wrap: wrap; align-items: flex-start; }
+  .profile-phone-row .profile-stat-text { flex-basis: calc(100% - 2.5rem - var(--space-4)); }
+  .profile-phone-action { margin-left: calc(2.5rem + var(--space-4)); }
+}
+
 .profile-stat-meta.is-done {
   color: var(--success);
   font-weight: var(--weight-medium);
@@ -652,6 +669,15 @@
   transition: border-color var(--dur-fast) var(--ease);
 }
 .chat-link span { overflow-wrap: anywhere; }
+
+/* Where to go next: links to the map, the schedule, a forum thread */
+.chat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.chat-action { gap: var(--space-1); }
 
 .chat-image {
   position: relative;

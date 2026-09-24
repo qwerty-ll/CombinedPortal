@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Search, Mail, MapPin, Phone, ChevronRight, SearchX, Users as UsersIcon, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { contentApi } from '../services/api';
+import { contentApi, scheduleApi } from '../services/api';
 import SectionIcon from '../components/SectionIcon';
 import { initialsOf } from '../utils/avatar';
+import { mskNow, toMinutes } from '../utils/time';
 
 const ICON = { strokeWidth: 1.75 };
 const EASE = [0.16, 1, 0.3, 1];
@@ -33,12 +35,50 @@ const TeacherPhoto = ({ photo, name, size = 'md' }) => {
   );
 };
 
+const isFemale = (name) => /(вна|чна)$/i.test((name || '').trim().split(/\s+/)[2] || '');
+
+const BUILDING_B_ROOM = /^Б-?\d{3}$/i;
+
+/** Where a teacher is right now, from today's lessons: { tone, text } */
+const teacherStatus = (lessons, name, nowMin) => {
+  if (!lessons) return null;
+  const current = lessons.find(l => toMinutes(l.start) <= nowMin && nowMin < toMinutes(l.end));
+  if (current) return { tone: 'busy', text: `На паре${current.room ? ` в ${current.room}` : ''} до ${current.end}` };
+  const later = lessons.find(l => toMinutes(l.start) > nowMin);
+  const free = isFemale(name) ? 'Свободна' : 'Свободен';
+  if (later) return { tone: 'free', text: `${free} до ${later.start}` };
+  if (lessons.length) return { tone: 'idle', text: 'Пары на сегодня закончились' };
+  return { tone: 'idle', text: 'Сегодня без пар' };
+};
+
+const TeacherStatus = ({ status }) => (status ? (
+  <span className={`teacher-status is-${status.tone}`}>
+    <span className="teacher-status-dot" aria-hidden="true" />
+    {status.text}
+  </span>
+) : null);
+
 const Teachers = () => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchParams] = useSearchParams();
+  // /teachers?q=Киприна opens the directory filtered (links from the assistant)
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [teachersList, setTeachersList] = useState([]);
   const [loading, setLoading] = useState(true);
   const rowTriggerRef = useRef(null);
+
+  // Today's lessons per teacher; statuses are recomputed from the clock every 30 s
+  const [today, setToday] = useState(null);
+  const [clock, setClock] = useState(() => mskNow());
+  useEffect(() => {
+    let active = true;
+    scheduleApi.getTeachersToday()
+      .then(res => { if (active && res?.date === mskNow().date) setToday(res.teachers || {}); })
+      .catch(() => { /* statuses are optional: EIOS may be unreachable */ });
+    const timer = setInterval(() => setClock(mskNow()), 30000);
+    return () => { active = false; clearInterval(timer); };
+  }, []);
+  const statusOf = (teacher) => (today ? teacherStatus(today[teacher.id], teacher.name, clock.minutes) : null);
 
   useEffect(() => {
     contentApi.getTeachers().then(res => {
@@ -190,6 +230,7 @@ const Teachers = () => {
                       <span className="teacher-main">
                         <span className="teacher-name">{highlightText(teacher.name, searchQuery)}</span>
                         <span className="teacher-role">{highlightText(teacher.role, searchQuery)}</span>
+                        <TeacherStatus status={statusOf(teacher)} />
                       </span>
                       <span className="teacher-details">
                         {teacher.office && (
@@ -251,8 +292,37 @@ const Teachers = () => {
                 <div>
                   <h2 id="teacher-dialog-name">{selectedTeacher.name}</h2>
                   <p className="teacher-modal-role">{selectedTeacher.role}</p>
+                  <TeacherStatus status={statusOf(selectedTeacher)} />
                 </div>
               </div>
+
+              {today?.[selectedTeacher.id]?.length > 0 && (
+                <section className="teacher-today" aria-labelledby="teacher-today-title">
+                  <h3 id="teacher-today-title" className="teacher-today-title">Пары сегодня</h3>
+                  <ul className="teacher-day">
+                    {today[selectedTeacher.id].map(l => {
+                      const isNow = toMinutes(l.start) <= clock.minutes && clock.minutes < toMinutes(l.end);
+                      const isPast = toMinutes(l.end) <= clock.minutes;
+                      return (
+                        <li key={`${l.start}-${l.discipline}-${l.subgroup}`} className={`teacher-day-item${isNow ? ' is-now' : ''}${isPast ? ' is-past' : ''}`}>
+                          <span className="teacher-day-time tabular">{l.start}–{l.end}</span>
+                          <span className="teacher-day-body">
+                            <span className="teacher-day-title">{l.discipline}</span>
+                            <span className="teacher-day-meta">
+                              {isNow && <><strong>Сейчас</strong> · </>}
+                              {l.kind}
+                              {l.room && <> · {BUILDING_B_ROOM.test(l.room)
+                                ? <Link to={`/map?room=${encodeURIComponent(l.room)}`}>{l.room}</Link>
+                                : l.room}</>}
+                              {l.groups?.map(g => <React.Fragment key={g}> · <span className="teacher-day-group">{g}</span></React.Fragment>)}
+                            </span>
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              )}
 
               <dl className="teacher-facts">
                 <div className="teacher-fact">

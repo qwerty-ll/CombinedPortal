@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Search, MapPin, User, AlertCircle, ChevronDown, GraduationCap, Check,
-  ChevronLeft, ChevronRight, CalendarX2, CloudOff, RotateCw, Undo2
+  ChevronLeft, ChevronRight, CalendarX2, CloudOff, RotateCw, Undo2, CalendarPlus
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { scheduleApi } from '../services/api';
+import CalendarDialog from './CalendarDialog';
 
 const EIOS_DIRECT_URL = 'https://eios.kosgos.ru/api';
 
@@ -129,6 +130,8 @@ const ScheduleWidget = ({ onGroupLessons, ownGroup = null }) => {
   const [activeIndex, setActiveIndex] = useState(-1);
   const inputRef = useRef(null);
   const listRef = useRef(null);
+
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   // View Mode: 'day' (1 день) | 'week' (1 неделя)
   const [viewMode, setViewMode] = useState('day');
@@ -860,6 +863,16 @@ const ScheduleWidget = ({ onGroupLessons, ownGroup = null }) => {
           )}
         </div>
       )}
+
+      {targetType === 'group' && selectedGroup?.name && (
+        <div className="sched-footer">
+          <button type="button" className="btn btn-ghost sched-calendar" onClick={() => setCalendarOpen(true)} aria-haspopup="dialog">
+            <CalendarPlus size={16} {...ICON} />
+            Добавить пары в календарь телефона
+          </button>
+        </div>
+      )}
+      <CalendarDialog groupName={selectedGroup?.name} open={calendarOpen} onClose={() => setCalendarOpen(false)} />
     </div>
   );
 };

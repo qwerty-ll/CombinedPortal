@@ -61,7 +61,7 @@ def test_next_pair_is_computed_from_the_timetable(student):
         "Сейчас идёт Программирование на Python (практика) в Б-214, до 11:40. "
         "Следующая пара — завтра в 13:40: Базы данных (лабораторная), Б-407."
     )
-    assert ("Б-214 на карте", "/map?room=Б-214") in actions and ("Расписание на главной", "/") in actions
+    assert ("Б-214 на карте", "/map?room=Б-214") in actions and ("Расписание на главной", "/#schedule-section") in actions
 
 
 def test_pairs_on_a_day_and_follow_up(student):
@@ -105,10 +105,10 @@ def test_rooms(client, fake_timetable):
 
 def test_where_is_a_teacher_now(client, fake_timetable):
     reply, actions = ask(client, "Где сейчас Киприна?")
-    assert reply.startswith("Киприна Людмила Юрьевна — заведующая кафедрой")
+    assert reply.startswith("**Киприна Людмила Юрьевна** — заведующая кафедрой")
     assert "Сейчас ведёт пару «Информатика» в Б-305, до 11:40." in reply
     assert ("Карточка преподавателя", "/teachers?q=Киприна") in actions
-    assert ask(client, "как найти Киприной кабинет")[0].startswith("Киприна Людмила Юрьевна")
+    assert ask(client, "как найти Киприной кабинет")[0].startswith("**Киприна Людмила Юрьевна**")
     # "логином" must not be taken for Логинова
     assert "Логинова" not in ask(client, "как войти с логином?")[0]
 

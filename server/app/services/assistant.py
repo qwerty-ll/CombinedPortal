@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from typing import List, Optional, Tuple
 from urllib.parse import quote
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 import app.models as models
 from app.services import rag_service, timetable
@@ -21,6 +21,8 @@ logger = logging.getLogger("ivitsh_portal.assistant")
 
 LOOKAHEAD_DAYS = 14
 MAX_ACTIONS = 3
+# The newest threads are searched; older ones are still on the forum itself
+FORUM_SEARCH_LIMIT = 300
 WEEKDAY_AT = ["в понедельник", "во вторник", "в среду", "в четверг", "в пятницу", "в субботу", "в воскресенье"]
 # Rooms that have their own highlighted floor plan in /public
 ROOM_IMAGES = {
@@ -191,7 +193,7 @@ def _schedule_answer(q: str, lessons: List[timetable.Lesson], group: str, now: d
     soon = timetable.upcoming(lessons, now, LOOKAHEAD_DAYS)
     when = parse_when(q, today)
     disciplines = _matching_disciplines(q, soon)
-    actions = [Action("Расписание на главной", "/")]
+    actions = [Action("Расписание на главной", "/#schedule-section")]
 
     def finish(text: str, focus: Optional[timetable.Lesson]) -> Finding:
         room = _map_action(focus.room) if focus else None
@@ -255,7 +257,7 @@ async def _schedule_finding(q, previous_q, user, hint, now) -> Optional[Finding]
     except timetable.TimetableUnavailable:
         if not asked:
             return None
-        return Finding("ЭИОС сейчас не отвечает, и расписание я не вижу. Попробуй чуть позже.", [Action("Расписание на главной", "/")], exact=True, weight=100)
+        return Finding("ЭИОС сейчас не отвечает, и расписание я не вижу. Попробуй чуть позже.", [Action("Расписание на главной", "/#schedule-section")], exact=True, weight=100)
 
     # A discipline named without any "пара"/"когда" word still counts: «философия на этой неделе?»
     if not asked and not (group and _matching_disciplines(q, timetable.upcoming(lessons, now, LOOKAHEAD_DAYS))):
@@ -263,9 +265,9 @@ async def _schedule_finding(q, previous_q, user, hint, now) -> Optional[Finding]
     if not group:
         if missing:
             text = f"Не нашёл группу «{missing}» в расписании ЭИОС на этот учебный год. Выбери группу в расписании на главной."
-            return Finding(text, [Action("Расписание на главной", "/")], exact=True, weight=100)
+            return Finding(text, [Action("Расписание на главной", "/#schedule-section")], exact=True, weight=100)
         text = "Я пока не знаю твою группу. Войди через ЭИОС в «Личном кабинете» или выбери группу в расписании на главной, и я подскажу пары."
-        return Finding(text, [Action("Войти через ЭИОС", "/profile"), Action("Расписание на главной", "/")], exact=True, weight=100)
+        return Finding(text, [Action("Войти через ЭИОС", "/profile"), Action("Расписание на главной", "/#schedule-section")], exact=True, weight=100)
 
     finding = _schedule_answer(q, lessons, group["name"], now)
     if stale:
@@ -346,11 +348,12 @@ async def _teacher_finding(q: str, db: Session, now: datetime) -> Optional[Findi
 
     blocks, actions = [], []
     for teacher in matched:
-        facts = [f"{teacher.name} — {teacher.role[:1].lower() + teacher.role[1:]}." if teacher.role else f"{teacher.name}."]
+        role = f" — {teacher.role[:1].lower() + teacher.role[1:]}" if teacher.role else ""
+        facts = [f"**{teacher.name}**{role}."]
         if teacher.office:
             facts.append(f"Кабинет: {teacher.office}.")
         if teacher.email:
-            facts.append(f"E-mail: {teacher.email}.")
+            facts.append(f"E-mail: {teacher.email}")
         eios_ids = ids.get(timetable.normalize_name(teacher.name))
         if eios_ids:
             try:
@@ -361,7 +364,7 @@ async def _teacher_finding(q: str, db: Session, now: datetime) -> Optional[Findi
                     actions.append(room)
             except timetable.TimetableUnavailable:
                 pass
-        blocks.append(" ".join(facts))
+        blocks.append("\n".join(facts))
         actions.append(Action("Карточка преподавателя", _link("/teachers", q=teacher.name.split()[0])))
     return Finding("\n\n".join(blocks), actions, exact=True, weight=80)
 
@@ -391,7 +394,13 @@ def _forum_findings(q: str, db: Session) -> List[Finding]:
     if not asked:
         return []
     findings = []
-    for question in db.query(models.ForumQuestion).all():
+    recent = (
+        db.query(models.ForumQuestion)
+        .options(selectinload(models.ForumQuestion.answers))
+        .order_by(models.ForumQuestion.created_at.desc())
+        .limit(FORUM_SEARCH_LIMIT)
+    )
+    for question in recent:
         answers = sorted(question.answers, key=lambda a: (not a.is_solution, a.created_at))
         if not answers:
             continue

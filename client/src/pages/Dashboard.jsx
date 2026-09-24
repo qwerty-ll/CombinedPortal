@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   ChevronRight, ChevronDown, Circle, CheckCircle2, BellRing, ArrowRight, MessageCircle, LogIn, MapPin
 } from 'lucide-react';
@@ -196,6 +196,15 @@ const Dashboard = () => {
   }, [user?.id]);
 
   const markTaskDone = (taskId) => markStep(user?.id, taskId);
+
+  // "/#schedule-section" (the app shortcut, ВИТШик's "Расписание" button) opens the page at the schedule;
+  // after the frame, so the scroll-to-top on navigation does not undo it
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash !== '#schedule-section') return undefined;
+    const frame = requestAnimationFrame(() => document.getElementById('schedule-section')?.scrollIntoView());
+    return () => cancelAnimationFrame(frame);
+  }, [hash]);
 
   const handleTaskClick = (task) => {
     markTaskDone(task.id);
