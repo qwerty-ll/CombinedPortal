@@ -65,7 +65,7 @@ const summariseToday = (info) => {
 /** The lesson in progress (or the next one) as its own white card, so it never blends into the hero. */
 const HeroLesson = ({ lesson, now }) => (
   <div className={`dash-hero-lesson ${now ? 'is-now' : ''}`}>
-    <span className={`badge ${now ? 'dash-hero-badge-now' : 'badge-accent'}`}>{now ? 'Идёт сейчас' : 'Следующая'}</span>
+    <span className={`badge ${now ? 'dash-hero-badge-now' : 'badge-warm'}`}>{now ? 'Идёт сейчас' : 'Следующая'}</span>
     <span className="dash-hero-lesson-title">{lesson.title}</span>
     <span className="dash-hero-lesson-meta tabular">
       {lesson.room && (/^Б-?\d{3}/i.test(lesson.room) ? (

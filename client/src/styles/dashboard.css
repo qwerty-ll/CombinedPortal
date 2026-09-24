@@ -53,7 +53,8 @@
 }
 .dash-hero-lead strong { font-weight: var(--weight-semibold); }
 
-/* The current / next lesson sits on its own white card instead of blending into the warm panel */
+/* The current / next lesson sits on its own white card instead of blending into the warm panel.
+   Everything inside stays in the panel's warm family; the only blue in the hero is the main button. */
 .dash-hero-lesson {
   display: flex;
   flex-wrap: wrap;
@@ -63,9 +64,9 @@
   padding: var(--space-3) var(--space-4);
   background: var(--surface);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-card);
+  box-shadow: 0 1px 2px rgba(176, 78, 11, 0.08), 0 2px 8px -4px rgba(176, 78, 11, 0.14);
 }
-.dash-hero-badge-now { background: var(--accent); color: var(--on-accent); }
+.dash-hero-badge-now { background: var(--warm-strong); color: var(--on-accent); }
 .dash-hero-lesson-title {
   font-weight: var(--weight-semibold);
   color: var(--text);
@@ -96,7 +97,7 @@ a.dash-hero-room {
 @media (hover: hover) {
   a.dash-hero-room:hover { color: var(--accent); text-decoration-color: currentColor; }
 }
-.dash-hero-lesson-when { font-weight: var(--weight-medium); color: var(--accent-hover); }
+.dash-hero-lesson-when { font-weight: var(--weight-medium); color: var(--warm-strong); }
 .dash-hero-actions {
   display: flex;
   flex-wrap: wrap;
