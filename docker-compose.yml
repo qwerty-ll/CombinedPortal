@@ -1,0 +1,31 @@
+# The whole portal in one container — the quickest way to try it:
+#   docker compose up --build        then open http://localhost:8080
+#
+# DEMO=1 adds a fake EIOS and demo content (announcements, FAQ, forum):
+#   student  — "Студент ЭИОС КГУ":  25-isbo-011 / demo  (any login with the password "demo" works)
+#   admin    — "Сотрудник ИВИТШ":   portal_admin / demo-admin
+# Set DEMO to "0" to sign in through the real EIOS instead (then pick your own admin password).
+# Data lives in the "portal_data" volume; `docker compose down -v` starts from scratch.
+#
+# Production (PostgreSQL, HTTPS, separate services) is infrastructure/docker-compose.yml.
+services:
+  portal:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.standalone
+    image: ivitsh-portal:standalone
+    init: true
+    ports:
+      # Only reachable from this computer. Change the host port with PORT=8081 docker compose up.
+      - "127.0.0.1:${PORT:-8080}:8080"
+    environment:
+      DEMO: "1"
+      PORT: ${PORT:-8080}
+      ADMIN_USERNAME: portal_admin
+      ADMIN_PASSWORD: demo-admin
+      # GIGACHAT_AUTH_KEY: ""   # optional: enables the AI chat
+    volumes:
+      - portal_data:/app/data
+
+volumes:
+  portal_data:

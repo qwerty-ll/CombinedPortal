@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -59,3 +60,18 @@ jobs:
             -v "$PWD/infrastructure/nginx/snippets:/etc/nginx/snippets:ro" \
             -v /tmp/certs:/etc/nginx/certs:ro \
             nginx:1.27-alpine nginx -t
+
+  standalone:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start the all-in-one container
+        run: docker compose up -d --build --wait --wait-timeout 180
+      - name: Smoke test
+        run: |
+          curl -fsS http://127.0.0.1:8080/api/v1/health
+          curl -fsS http://127.0.0.1:8080/forum | grep -q '<div id="root">'
+          curl -fsS http://127.0.0.1:8080/api/v1/announcements | grep -q 'Посвящение в студенты'
+      - name: Container log
+        if: always()
+        run: docker compose logs

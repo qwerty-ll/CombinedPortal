@@ -26,12 +26,15 @@ CombinedPortal/
 │   ├── migrations/             # миграции Alembic
 │   └── tests/                  # pytest
 ├── infrastructure/
-│   ├── docker/                 # Dockerfile.client (Node build + Nginx), Dockerfile.server
+│   ├── docker/                 # Dockerfile.client (Node build + Nginx), Dockerfile.server,
+│   │                           # Dockerfile.standalone (всё в одном контейнере) + standalone/
 │   ├── nginx/                  # конфигурация Nginx (HTTPS, CSP, rate limiting)
 │   ├── certs/                  # TLS-сертификат (не коммитится)
 │   ├── docker-compose.yml
 │   └── DEPLOYMENT_GUIDE.md
 ├── docs/                       # описание API ЭИОС и СДО КГУ
+├── scripts/demo/               # поддельный ЭИОС и демо-данные для локального просмотра
+├── docker-compose.yml          # всё в одном контейнере для быстрого запуска (не для продакшена)
 ├── .env.example                # все переменные окружения (без секретов)
 └── package.json                # корневые команды
 ```
@@ -48,6 +51,26 @@ Nginx сконфигурирован на обработку домена `ivits
 ---
 
 ## 🚀 Быстрый запуск
+
+### Всё в одном контейнере (посмотреть портал за одну команду)
+
+Нужен только Docker (Docker Desktop на Windows/macOS). Ничего настраивать не надо: `.env` не нужен.
+
+```bash
+docker compose up --build        # первый запуск собирает образ ~2–3 минуты
+```
+
+Откройте **http://localhost:8080**. В контейнере сайт (Nginx), backend (SQLite), поддельный ЭИОС
+и демо-данные: объявления, FAQ, вопросы на форуме.
+
+- Студент: «Личный кабинет» → «Студент ЭИОС КГУ», логин `25-isbo-011`, пароль `demo`
+  (подойдёт любой логин с паролем `demo`).
+- Администратор: «Сотрудник ИВИТШ», `portal_admin` / `demo-admin`.
+
+Остановить — `Ctrl+C` или `docker compose down`; начать с чистой базы — `docker compose down -v`.
+Порт занят — `PORT=8081 docker compose up`. Вход через настоящий ЭИОС — `DEMO: "0"` в
+`docker-compose.yml` (и свой пароль администратора). Портал слушает только `127.0.0.1` и работает
+по HTTP, поэтому для продакшена используйте вариант ниже.
 
 ### Продакшен (Docker)
 
