@@ -6,6 +6,7 @@ import {
 import { Link } from 'react-router-dom';
 import { scheduleApi } from '../services/api';
 import CalendarDialog from './CalendarDialog';
+import { subgroupOf, cleanLessonTitle } from '../utils/lessons';
 
 const EIOS_DIRECT_URL = 'https://eios.kosgos.ru/api';
 
@@ -25,13 +26,8 @@ const calculateAcademicYear = (dateStr) => {
   }
 };
 
-// Clean discipline titles (remove leading 'лек ', 'лаб ', 'пр ')
-const cleanDisciplineTitle = (rawTitle) => {
-  if (!rawTitle) return '';
-  let clean = rawTitle.replace(/^(лек|лаб|пр)\s+/i, '').trim();
-  clean = clean.replace(/,\s*п\/г\s*\d+$/i, '').trim();
-  return clean;
-};
+// Clean discipline titles (remove leading 'лек ', 'лаб ', 'пр ' and the subgroup, shown on its own)
+const cleanDisciplineTitle = (rawTitle) => cleanLessonTitle(rawTitle || '');
 
 // Helper for lesson type badge (label + badge tone)
 const getLessonTypeBadge = (disciplineName) => {
@@ -370,6 +366,14 @@ const ScheduleWidget = ({ onGroupLessons, ownGroup = null }) => {
     return result;
   }, [rawLessons]);
 
+  // Subgroups the group has anywhere in its timetable: a slot where only one of them has a pair
+  // tells the others they are free
+  const knownSubgroups = useMemo(() => {
+    if (lessonsOwner?.type !== 'group') return [];
+    const found = new Set(deduplicatedLessons.map(subgroupOf).filter(Boolean));
+    return found.size <= 4 ? [...found].sort((a, b) => a - b) : [];
+  }, [deduplicatedLessons, lessonsOwner]);
+
   useEffect(() => {
     if (onGroupLessons && lessonsOwner?.type === 'group') {
       onGroupLessons({ group: lessonsOwner.name, lessons: deduplicatedLessons });
@@ -509,26 +513,68 @@ const ScheduleWidget = ({ onGroupLessons, ownGroup = null }) => {
     }
   };
 
-  const renderLesson = (slot, state, isNext) => (item, iIdx) => {
+  // Pair number and the live badges belong to the time slot, not to one lesson
+  const slotBadges = (slot, state, isNext) => (
+    <>
+      {slot.lessonNum ? <span className="sched-lesson-num tabular">{slot.lessonNum} пара</span> : null}
+      {state === 'now' && (
+        <>
+          <span className="badge sched-now-badge">Идёт сейчас</span>
+          <span className="sched-countdown tabular">ещё {formatDuration(toMinutes(slot.timeEnd) - nowMin)}</span>
+        </>
+      )}
+      {isNext && (
+        <span className="badge badge-accent tabular">Следующая · через {formatDuration(toMinutes(slot.timeStart) - nowMin)}</span>
+      )}
+    </>
+  );
+
+  // inSplit: the lesson sits in a subgroup column, which already names the subgroup and the slot badges are above
+  /**
+   * A slot where subgroups have different pairs shows them side by side, one column per subgroup
+   * (stacked on narrow screens). A subgroup without a pair gets an empty column, so its students see
+   * at a glance that they are free.
+   */
+  const renderSlotBody = (slot, state, isNext) => {
+    if (!slot.items.some(item => subgroupOf(item) > 0)) return slot.items.map(renderLesson(slot, state, isNext));
+    const numbers = [...new Set([
+      ...slot.items.map(subgroupOf).filter(Boolean),
+      ...(targetType === 'group' ? knownSubgroups : []),
+    ])].sort((a, b) => a - b);
+    const wholeGroup = slot.items.filter(item => subgroupOf(item) === 0);
+    const hasBadges = slot.lessonNum || state === 'now' || isNext;
+    return (
+      <>
+        {hasBadges && <p className="sched-lesson-tags">{slotBadges(slot, state, isNext)}</p>}
+        {wholeGroup.map(renderLesson(slot, state, isNext, true))}
+        <div className="sched-split">
+          {numbers.map(n => {
+            const items = slot.items.filter(item => subgroupOf(item) === n);
+            return (
+              <div key={n} className={`sched-split-col${items.length ? '' : ' is-free'}`}>
+                <p className="sched-sub-label tabular">{n} подгруппа</p>
+                {items.length
+                  ? items.map(renderLesson(slot, state, isNext, true))
+                  : <p className="sched-sub-free">Нет пары</p>}
+              </div>
+            );
+          })}
+        </div>
+      </>
+    );
+  };
+
+  const renderLesson = (slot, state, isNext, inSplit = false) => (item, iIdx) => {
     const typeBadge = getLessonTypeBadge(item.дисциплина);
     const cleanedTitle = cleanDisciplineTitle(item.дисциплина);
+    const subgroup = subgroupOf(item);
     return (
       <div key={item.код || iIdx} className="sched-lesson">
         <p className="sched-lesson-tags">
           <span className={`badge ${typeBadge.tone}`}>{typeBadge.label}</span>
-          {item.номерПодгруппы > 0 && (
-            <span className="badge">Подгруппа {item.номерПодгруппы}</span>
-          )}
-          {iIdx === 0 && slot.lessonNum ? <span className="sched-lesson-num tabular">{slot.lessonNum} пара</span> : null}
-          {iIdx === 0 && state === 'now' && (
-            <>
-              <span className="badge sched-now-badge">Идёт сейчас</span>
-              <span className="sched-countdown tabular">ещё {formatDuration(toMinutes(slot.timeEnd) - nowMin)}</span>
-            </>
-          )}
-          {iIdx === 0 && isNext && (
-            <span className="badge badge-accent tabular">Следующая · через {formatDuration(toMinutes(slot.timeStart) - nowMin)}</span>
-          )}
+          {!inSplit && subgroup > 0 && <span className="badge">Подгруппа {subgroup}</span>}
+          {item.замена && <span className="badge badge-warning">Замена</span>}
+          {!inSplit && iIdx === 0 && slotBadges(slot, state, isNext)}
         </p>
         <h4 className="sched-lesson-title">{cleanedTitle}</h4>
         <p className="sched-lesson-meta">
@@ -837,7 +883,7 @@ const ScheduleWidget = ({ onGroupLessons, ownGroup = null }) => {
                         </span>
                       </p>
                       <div className="sched-slot-body">
-                        {slot.items.map(renderLesson(slot, state, isNext))}
+                        {renderSlotBody(slot, state, isNext)}
                       </div>
                       {state === 'now' && (
                         <span className="sched-now-progress" aria-hidden="true">

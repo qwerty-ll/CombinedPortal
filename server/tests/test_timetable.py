@@ -125,3 +125,17 @@ def test_teachers_today(client, monkeypatch, db):
 def test_teachers_today_without_eios(client, monkeypatch):
     fake_eios(monkeypatch, {})
     assert client.get("/api/v1/schedule/teachers/today").status_code == 503
+
+
+def test_subgroup_comes_from_the_name_when_the_field_is_empty():
+    rows = [
+        lesson("2026-09-24", "10:10", "11:40", "пр Python для ИИ (ТЭК, АПК), п/г 1"),
+        lesson("2026-09-24", "10:10", "11:40", "лаб Базы данных (п/г 2)", room="Б-407"),
+        lesson("2026-09-24", "11:50", "13:20", "лаб ОС, подгруппа 2"),
+        lesson("2026-09-24", "13:40", "15:10", "лек Философия", номерПодгруппы=0),
+        lesson("2026-09-24", "15:20", "16:50", "пр Физика", номерПодгруппы=1),
+    ]
+    parsed = [(l.discipline, l.subgroup) for l in timetable.parse_lessons(ok({"rasp": rows}))]
+    assert parsed == [
+        ("Python для ИИ (ТЭК, АПК)", 1), ("Базы данных", 2), ("ОС", 2), ("Философия", 0), ("Физика", 1),
+    ]

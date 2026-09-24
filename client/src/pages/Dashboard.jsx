@@ -10,6 +10,7 @@ import { SECTIONS } from '../data/sections';
 import { contentApi, adaptationApi } from '../services/api';
 import { openChat } from '../utils/chat';
 import { markStep, readSteps, ONBOARDING_EVENT } from '../utils/onboarding';
+import { subgroupOf, cleanLessonTitle } from '../utils/lessons';
 
 const ICON = { strokeWidth: 1.75, 'aria-hidden': true };
 
@@ -25,7 +26,6 @@ const plural = (n, [one, few, many]) => {
   if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
   return many;
 };
-const cleanTitle = (raw = '') => raw.replace(/^(лек|лаб|пр)\s+/i, '').replace(/,\s*п\/г\s*\d+$/i, '').trim();
 
 const toMinutes = (hm = '') => {
   const [h, m] = hm.split(':').map(Number);
@@ -38,52 +38,71 @@ const formatDuration = (mins) => (mins < 60
 /**
  * Today's lessons for the hero: how many, the one in progress or the next one, and — once today
  * is over or free — the first lesson of the next study day. Null while the schedule is unknown.
+ * Each of those is a time slot: { start, end, parts }, where parts are the lessons at that time
+ * (one per subgroup when subgroups have different pairs).
  */
 const summariseToday = (info) => {
   if (!info) return null;
   const now = new Date();
   const today = localIso(now);
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  const lesson = (l) => ({ title: cleanTitle(l.дисциплина), room: l.аудитория || '', start: l.начало, end: l.конец });
 
-  const slots = new Map();
-  info.lessons
-    .filter(l => l.дата && l.дата.startsWith(today))
-    .forEach(l => { if (!slots.has(l.начало)) slots.set(l.начало, l); });
-  const lessons = [...slots.values()].sort((a, b) => toMinutes(a.начало) - toMinutes(b.начало));
+  // Lessons of one day grouped by start time, sorted
+  const slotsOf = (day) => {
+    const slots = new Map();
+    info.lessons.filter(l => l.дата && l.дата.startsWith(day)).forEach(l => {
+      const slot = slots.get(l.начало) || { start: l.начало, end: l.конец, parts: [] };
+      const part = { title: cleanLessonTitle(l.дисциплина), room: l.аудитория || '', sub: subgroupOf(l) };
+      if (!slot.parts.some(p => p.title === part.title && p.room === part.room && p.sub === part.sub)) slot.parts.push(part);
+      slots.set(l.начало, slot);
+    });
+    return [...slots.values()]
+      .map(slot => ({ ...slot, parts: slot.parts.sort((a, b) => a.sub - b.sub) }))
+      .sort((a, b) => toMinutes(a.start) - toMinutes(b.start));
+  };
 
-  const current = lessons.find(l => toMinutes(l.начало) <= nowMin && nowMin < toMinutes(l.конец));
-  const next = lessons.find(l => toMinutes(l.начало) > nowMin);
+  const lessons = slotsOf(today);
+  const current = lessons.find(l => toMinutes(l.start) <= nowMin && nowMin < toMinutes(l.end));
+  const next = lessons.find(l => toMinutes(l.start) > nowMin);
 
   let later = null;
   if (!current && !next) {
-    const upcoming = info.lessons
-      .filter(l => l.дата && l.дата.slice(0, 10) > today)
-      .sort((a, b) => a.дата.localeCompare(b.дата) || toMinutes(a.начало) - toMinutes(b.начало))[0];
-    if (upcoming) {
-      const day = upcoming.дата.slice(0, 10);
+    const day = info.lessons.map(l => (l.дата || '').slice(0, 10)).filter(d => d > today).sort()[0];
+    if (day) {
       const tomorrow = new Date(now);
       tomorrow.setDate(now.getDate() + 1);
       const dayLabel = day === localIso(tomorrow)
         ? 'Завтра'
         : new Date(`${day}T00:00:00`).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' });
-      later = { ...lesson(upcoming), dayLabel: dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1) };
+      later = { ...slotsOf(day)[0], dayLabel: dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1) };
     }
   }
 
   return {
     group: info.group || '',
     count: lessons.length,
-    current: current ? { ...lesson(current), left: toMinutes(current.конец) - nowMin } : null,
-    next: !current && next ? { ...lesson(next), in: toMinutes(next.начало) - nowMin } : null,
+    current: current ? { ...current, left: toMinutes(current.end) - nowMin } : null,
+    next: !current && next ? { ...next, in: toMinutes(next.start) - nowMin } : null,
     later,
     done: lessons.length > 0 && !current && !next,
   };
 };
 
+const RoomLink = ({ room }) => (/^Б-?\d{3}/i.test(room) ? (
+  <Link to={`/map?room=${encodeURIComponent(room)}`} className="dash-hero-room">
+    <MapPin size={15} {...ICON} />
+    <span className="visually-hidden">Аудитория </span>{room}
+  </Link>
+) : (
+  <span className="dash-hero-room"><MapPin size={15} {...ICON} />{room}</span>
+));
+
+const subLabel = (sub) => (sub ? `${sub} подгруппа` : 'Вся группа');
+
 /**
  * The lesson in progress, the next one, or the first one of the next study day, as a white slip.
  * One warm chip carries the status and the time left: filled while the lesson is on, outlined before it.
+ * When subgroups have different pairs at that time, each gets its own line with its room.
  */
 const HeroLesson = ({ lesson, kind }) => {
   const chip = kind === 'now'
@@ -91,31 +110,46 @@ const HeroLesson = ({ lesson, kind }) => {
     : kind === 'next'
       ? `Следующая · через ${formatDuration(lesson.in)}`
       : lesson.dayLabel;
+  const [only] = lesson.parts;
+  const split = lesson.parts.length > 1;
   return (
     <div className="dash-hero-lesson">
-      <span className="dash-hero-lesson-title">{lesson.title}</span>
+      {split ? (
+        <ul className="dash-hero-parts">
+          {lesson.parts.map(part => (
+            <li key={`${part.sub}-${part.title}-${part.room}`} className="dash-hero-part">
+              <span className="dash-hero-sub tabular">{subLabel(part.sub)}</span>
+              <span className="dash-hero-part-title">{part.title}</span>
+              {part.room && <RoomLink room={part.room} />}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <span className="dash-hero-lesson-title">
+          {only.sub > 0 && <span className="dash-hero-sub tabular">{subLabel(only.sub)}</span>}
+          {only.title}
+        </span>
+      )}
       <span className="dash-hero-lesson-meta tabular">
         <span className={`dash-hero-chip ${kind === 'now' ? 'is-now' : ''}`}>{chip}</span>
         <span className="dash-hero-clock">{kind === 'now' ? `до ${lesson.end}` : `в ${lesson.start}`}</span>
-        {lesson.room && (/^Б-?\d{3}/i.test(lesson.room) ? (
-          <Link to={`/map?room=${encodeURIComponent(lesson.room)}`} className="dash-hero-room">
-            <MapPin size={15} {...ICON} />
-            <span className="visually-hidden">Аудитория </span>{lesson.room}
-          </Link>
-        ) : (
-          <span className="dash-hero-room"><MapPin size={15} {...ICON} />{lesson.room}</span>
-        ))}
+        {!split && only.room && <RoomLink room={only.room} />}
       </span>
     </div>
   );
 };
 
+// "Философия" or "у 1 подгруппы — Python, у 2 подгруппы — Базы данных"
+const partsText = (parts) => (parts.length > 1
+  ? parts.map(p => `${p.sub ? `у ${p.sub} подгруппы` : 'у всей группы'} — ${p.title}`).join(', ')
+  : parts[0].title);
+
 // What a screen reader hears: only when the status changes, not on every minute of the countdown
 const heroStatus = (t) => {
   if (!t) return '';
-  if (t.current) return `Сейчас идёт ${t.current.title}, до ${t.current.end}`;
-  if (t.next) return `Следующая пара — ${t.next.title} в ${t.next.start}`;
-  if (t.later) return `Следующая пара — ${t.later.dayLabel.toLowerCase()}, ${t.later.title} в ${t.later.start}`;
+  if (t.current) return `Сейчас идёт ${partsText(t.current.parts)}, до ${t.current.end}`;
+  if (t.next) return `Следующая пара — ${partsText(t.next.parts)} в ${t.next.start}`;
+  if (t.later) return `Следующая пара — ${t.later.dayLabel.toLowerCase()}, ${partsText(t.later.parts)} в ${t.later.start}`;
   return t.done ? 'На сегодня пары закончились' : '';
 };
 

@@ -176,3 +176,21 @@ def test_llm_failure_falls_back_to_the_found_text(student, monkeypatch):
 ])
 def test_parse_when(question, expected):
     assert assistant.parse_when(question, date(2026, 9, 24)) == expected
+
+
+def test_parallel_subgroup_pairs_are_both_named(student, monkeypatch):
+    key = ("Rasp", frozenset({"year": "2026-2027", "idGroup": 4242}.items()))
+    monkeypatch.setitem(ANSWERS, key, ok({"rasp": [
+        lesson("2026-09-24", "10:10", "11:40", "пр Программирование на Python, п/г 1", room="Б-214"),
+        lesson("2026-09-24", "10:10", "11:40", "лаб Базы данных, п/г 2", room="Б-407"),
+        lesson("2026-09-24", "11:50", "13:20", "лек Философия, п/г 2"),
+    ]}))
+    timetable.clear_cache()
+    reply, _ = ask(student, "Где у меня следующая пара?")
+    assert reply == (
+        "Сейчас идут пары по подгруппам, до 11:40: 1 подгруппа — Программирование на Python (практика), Б-214; "
+        "2 подгруппа — Базы данных (лабораторная), Б-407. "
+        "Следующая пара — сегодня в 11:50: Философия (лекция) у 2 подгруппы, Б-305."
+    )
+    reply, _ = ask(student, "Что сегодня?")
+    assert "• 10:10–11:40 · Базы данных (лабораторная) · Б-407 · 2 подгруппа · сейчас" in reply

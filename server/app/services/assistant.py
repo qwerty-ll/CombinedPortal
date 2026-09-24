@@ -139,12 +139,24 @@ def _day_label(day: date, today: date) -> str:
     return f"{WEEKDAY_AT[day.weekday()]}, {day:%d.%m}"
 
 
+def _whose(lesson: timetable.Lesson) -> str:
+    return f" у {lesson.subgroup} подгруппы" if lesson.subgroup else ""
+
+
+def _by_subgroup(lessons: List[timetable.Lesson]) -> str:
+    """"1 подгруппа — Python (практика), Б-214; 2 подгруппа — Базы данных (лабораторная), Б-407"."""
+    return "; ".join(
+        f"{f'{l.subgroup} подгруппа' if l.subgroup else 'вся группа'} — {l.discipline} ({l.kind})" + (f", {l.room}" if l.room else "")
+        for l in sorted(lessons, key=lambda l: l.subgroup)
+    )
+
+
 def _lesson_line(lesson: timetable.Lesson) -> str:
     parts = [f"{lesson.start}–{lesson.end}", f"{lesson.discipline} ({lesson.kind})"]
     if lesson.room:
         parts.append(lesson.room)
     if lesson.subgroup:
-        parts.append(f"п/г {lesson.subgroup}")
+        parts.append(f"{lesson.subgroup} подгруппа")
     if lesson.replaced:
         parts.append("замена")
     return " · ".join(parts)
@@ -229,15 +241,25 @@ def _schedule_answer(q: str, lessons: List[timetable.Lesson], group: str, now: d
 
     current = [l for l in soon if l.starts_at <= now < l.ends_at]
     upcoming = [l for l in soon if l.starts_at > now]
+    # Subgroups can have different pairs at the same time: name them all
+    current = [l for l in current if l.starts_at == current[0].starts_at] if current else []
+    upcoming = [l for l in upcoming if l.starts_at == upcoming[0].starts_at] if upcoming else []
     parts = []
     if current:
         c = current[0]
-        parts.append(f"Сейчас идёт {c.discipline} ({c.kind})" + (f" в {c.room}" if c.room else "") + f", до {c.end}.")
+        if len(current) > 1:
+            parts.append(f"Сейчас идут пары по подгруппам, до {c.end}: {_by_subgroup(current)}.")
+        else:
+            parts.append(f"Сейчас идёт {c.discipline} ({c.kind}){_whose(c)}" + (f" в {c.room}" if c.room else "") + f", до {c.end}.")
     if upcoming:
         n = upcoming[0]
         if not current and n.day != today and any(l.day == today for l in lessons):
             parts.append("На сегодня пары закончились.")
-        parts.append(f"Следующая пара — {_day_label(n.day, today)} в {n.start}: {n.discipline} ({n.kind})" + (f", {n.room}" if n.room else "") + ".")
+        when = f"{_day_label(n.day, today)} в {n.start}"
+        if len(upcoming) > 1:
+            parts.append(f"Следующая пара — {when}, по подгруппам: {_by_subgroup(upcoming)}.")
+        else:
+            parts.append(f"Следующая пара — {when}: {n.discipline} ({n.kind}){_whose(n)}" + (f", {n.room}" if n.room else "") + ".")
     if not parts:
         return finish(f"В ближайшие две недели у группы {group} пар в расписании нет.", None)
     return finish(" ".join(parts), current[0] if current else upcoming[0])

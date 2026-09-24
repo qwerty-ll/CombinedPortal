@@ -68,6 +68,42 @@
   color: var(--text);
   line-height: 1.35;
 }
+/* Subgroup of the lesson; with different pairs per subgroup each gets its own line */
+.dash-hero-sub {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.dash-hero-lesson-title .dash-hero-sub { display: block; margin-bottom: var(--space-half); }
+.dash-hero-parts {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+.dash-hero-part {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+}
+.dash-hero-part-title {
+  flex: 1 1 auto;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+  line-height: 1.35;
+}
+.dash-hero-part .dash-hero-room { font-size: var(--text-sm); }
+@media (max-width: 640px) {
+  /* Same shape for every subgroup on a phone: its label, then the pair and the room */
+  .dash-hero-parts { gap: var(--space-3); }
+  .dash-hero-part .dash-hero-sub { flex-basis: 100%; margin-bottom: calc(-1 * var(--space-1)); }
+  .dash-hero-part + .dash-hero-part { padding-top: var(--space-3); border-top: 1px solid var(--border); }
+}
+
 .dash-hero-lesson-meta {
   display: flex;
   flex-wrap: wrap;
@@ -613,6 +649,7 @@ a.dash-hero-room {
   flex-direction: column;
   gap: var(--space-4);
   min-width: 0;
+  container-type: inline-size;
 }
 .sched-lesson {
   display: flex;
@@ -652,6 +689,45 @@ a.dash-hero-room {
   font-weight: var(--weight-medium);
   color: var(--text);
 }
+/* Subgroups with different pairs at the same time: side by side, stacked when the card is narrow */
+.sched-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-3);
+}
+.sched-split-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.sched-split-col.is-free {
+  border-style: dashed;
+  background: transparent;
+}
+.sched-sub-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-2);
+}
+.sched-sub-free { font-size: var(--text-sm); color: var(--text-3); }
+/* Stacked columns (too narrow for two side by side): a free subgroup is one quiet line */
+@container (max-width: 22.7rem) {
+  .sched-split-col.is-free {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--space-2);
+    padding-block: var(--space-2);
+  }
+  .sched-split-col.is-free .sched-sub-free::before { content: '— '; }
+}
+.sched-slot.is-now .sched-split-col.is-free { border-color: var(--hue-blue-edge); }
+.sched-slot.is-past .sched-sub-label { color: var(--text-3); font-weight: var(--weight-medium); }
+
 /* Room in building Б: opens the floor plan */
 .sched-room-link {
   text-decoration: underline;

@@ -64,7 +64,10 @@ async def cached(endpoint: str, params: dict, ttl: int) -> dict:
 # --- Lessons -----------------------------------------------------------------------------------
 
 _KIND_PREFIX = re.compile(r"^(лек|лаб|пр)\.?\s+", re.IGNORECASE)
-_SUBGROUP_SUFFIX = re.compile(r",\s*п/г\s*\d+$", re.IGNORECASE)
+# EIOS writes the subgroup into the name ("пр Python, п/г 1", "(п/г 2)", "подгруппа 1") and only
+# sometimes into номерПодгруппы
+_SUBGROUP_IN_TITLE = re.compile(r"(?:п/г|подгр[а-яё]*)\.?\s*(\d)|(\d)\s*п/г", re.IGNORECASE)
+_SUBGROUP_SUFFIX = re.compile(r"[\s,(]*(?:(?:п/г|подгр[а-яё]*)\.?\s*\d|\d\s*п/г)\s*\)?\s*$", re.IGNORECASE)
 _TIME_RE = re.compile(r"^(\d{1,2}):(\d{2})")
 
 
@@ -72,6 +75,14 @@ def clean_discipline(raw: str) -> str:
     """"лек Философия, п/г 1" → "Философия"."""
     text = _KIND_PREFIX.sub("", (raw or "").strip())
     return _SUBGROUP_SUFFIX.sub("", text).strip()
+
+
+def subgroup_of(raw: str, field: Any) -> int:
+    """0 for the whole group, else the subgroup number."""
+    if isinstance(field, int) and not isinstance(field, bool) and field > 0:
+        return field
+    m = _SUBGROUP_IN_TITLE.search(raw or "")
+    return int(m.group(1) or m.group(2)) if m else 0
 
 
 def lesson_kind(raw: str) -> str:
@@ -155,7 +166,7 @@ def parse_lessons(payload: Any) -> List[Lesson]:
         raw = str(row.get("дисциплина") or "")
         room = str(row.get("аудитория") or "").strip()
         teacher = str(row.get("преподаватель") or "").strip()
-        subgroup = row.get("номерПодгруппы") if isinstance(row.get("номерПодгруппы"), int) else 0
+        subgroup = subgroup_of(raw, row.get("номерПодгруппы"))
         key = (day, start, end, raw, room, teacher, subgroup)
         group = str(row.get("группа") or "").strip()
         if key in merged:

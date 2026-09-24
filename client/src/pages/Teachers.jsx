@@ -311,6 +311,7 @@ const Teachers = () => {
                             <span className="teacher-day-meta">
                               {isNow && <><strong>Сейчас</strong> · </>}
                               {l.kind}
+                              {l.subgroup > 0 && <> · {l.subgroup} подгруппа</>}
                               {l.room && <> · {BUILDING_B_ROOM.test(l.room)
                                 ? <Link to={`/map?room=${encodeURIComponent(l.room)}`}>{l.room}</Link>
                                 : l.room}</>}
