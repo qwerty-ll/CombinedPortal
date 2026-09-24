@@ -141,7 +141,9 @@ async def eios_login(req: schemas.EiosLoginRequest, request: Request, response: 
     full_name = identity.full_name
     if not full_name or full_name.lower() == username.lower() or _LOGIN_LOOKS_LIKE_RAW_ID.match(full_name):
         full_name = f"Студент {username}"
-    group = (identity.group or (req.group_number or "").strip() or None)
+    # The group EIOS reports wins over one typed at login; only the former comes with its timetable id.
+    group = identity.group or (req.group_number or "").strip() or None
+    group_id = identity.group_id if identity.group else None
     avatar_url = _safe_avatar_url(identity.avatar_url)
 
     db_user = _find_user(db, username)
@@ -160,6 +162,7 @@ async def eios_login(req: schemas.EiosLoginRequest, request: Request, response: 
         db_user.full_name = full_name
         if group:
             db_user.group_number = group
+            db_user.eios_group_id = group_id
         if avatar_url:
             db_user.avatar_url = avatar_url
         db.commit()
@@ -168,6 +171,7 @@ async def eios_login(req: schemas.EiosLoginRequest, request: Request, response: 
             username=username.lower(),
             full_name=full_name,
             group_number=group,
+            eios_group_id=group_id,
             # EIOS users never log in with a local password; store an unusable random one.
             hashed_password=security.get_password_hash(secrets.token_urlsafe(32)),
             role="student",
@@ -204,7 +208,11 @@ def update_my_profile(
 ):
     # Full name comes from EIOS and is not user-editable, so nobody can post as "Администратор" or a teacher.
     if req.group_number is not None and req.group_number.strip():
-        current_user.group_number = req.group_number.strip()
+        group = req.group_number.strip()
+        if group != current_user.group_number:
+            # The EIOS id belonged to the old group
+            current_user.group_number = group
+            current_user.eios_group_id = None
     db.commit()
     db.refresh(current_user)
     return _user_response(current_user)

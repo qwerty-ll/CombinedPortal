@@ -19,6 +19,8 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, default="student")  # "student" | "curator" | "moderator" | "admin"
     group_number = Column(String, nullable=True)
+    # EIOS idGroup of group_number, set only when EIOS itself reported the group; used for the timetable.
+    eios_group_id = Column(Integer, nullable=True)
     # Stable user ID returned by EIOS; binds the local account to one EIOS identity.
     sdo_id = Column(String, nullable=True)
     # "eios" for accounts created by EIOS SSO, "local" for the env-configured administrator.

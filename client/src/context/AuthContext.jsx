@@ -5,7 +5,7 @@ const AuthContext = createContext(null);
 const AUTH_STORAGE_KEY = 'portal_auth_user';
 
 // Per-user data kept in the browser; removed on logout so the next person on a shared computer starts clean.
-const USER_SCOPED_KEYS = [AUTH_STORAGE_KEY, 'freshman_roadmap_completed', 'onboarding_completed_tasks', 'portal_group_number'];
+const USER_SCOPED_KEYS = [AUTH_STORAGE_KEY, 'freshman_roadmap_completed', 'onboarding_completed_tasks', 'portal_group_number', 'portal_sched_group'];
 // Left behind by older versions of the portal (JWT in localStorage, cached personal/admin responses).
 const LEGACY_KEYS = ['portal_jwt_token', 'portal_faq', 'portal_announcements', 'forum_questions'];
 
@@ -30,6 +30,8 @@ const toClientUser = (apiUser) => ({
   username: apiUser.username,
   fullName: apiUser.full_name || apiUser.username,
   group: apiUser.group_number || '',
+  // EIOS timetable id of that group; missing for a group typed by hand
+  groupId: apiUser.eios_group_id || null,
   role: apiUser.role || 'student',
   serverPhotoUrl: apiUser.userpictureurl || '',
 });

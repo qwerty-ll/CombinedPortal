@@ -333,6 +333,33 @@ a.dash-hero-room {
 }
 
 .sched-combo { position: relative; }
+.sched-field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+/* Quiet way back to the student's own group once another one is shown */
+.sched-own-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-block: calc(var(--space-1) * -1);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease);
+}
+@media (hover: hover) {
+  .sched-own-group:hover { background: var(--accent-soft); }
+}
 .sched-combo-control,
 .sched-select-wrap { position: relative; }
 
@@ -736,6 +763,8 @@ a.dash-hero-room {
   .sched-filters { grid-template-columns: minmax(0, 1fr) 8.5rem; position: relative; }
   .sched-combo { position: static; }
   .sched-option { min-height: var(--touch-target); }
+  /* Full-size tap area without pushing the field down */
+  .sched-own-group { min-height: var(--touch-target); margin-block: calc((var(--touch-target) - 1.5rem) / -2); }
 
   /* Phone: "Сегодня" sits next to День/Неделя, the date stepper takes its own full row */
   .sched-nav-end { display: contents; }

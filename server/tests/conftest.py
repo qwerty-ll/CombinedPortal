@@ -76,9 +76,9 @@ def fake_eios(monkeypatch):
     return accounts, calls
 
 
-def add_eios_account(fake_eios, username, password="pw", eios_id="100", full_name="Иванов Иван Иванович", group="24-ИСбо-1", avatar_url=None):
+def add_eios_account(fake_eios, username, password="pw", eios_id="100", full_name="Иванов Иван Иванович", group="24-ИСбо-1", avatar_url=None, group_id=None):
     accounts, _ = fake_eios
-    accounts[username.lower()] = (password, eios.EiosIdentity(eios_id=eios_id, full_name=full_name, group=group, avatar_url=avatar_url))
+    accounts[username.lower()] = (password, eios.EiosIdentity(eios_id=eios_id, full_name=full_name, group=group, avatar_url=avatar_url, group_id=group_id))
 
 
 def login_student(app, fake_eios, username="24-isbo-001", **kwargs):
