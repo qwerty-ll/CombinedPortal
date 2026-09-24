@@ -38,12 +38,65 @@
   font-size: var(--text-2xl);
   letter-spacing: -0.02em;
 }
-.dash-hero-lead {
+.dash-hero-today {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
   margin-top: var(--space-3);
+  max-width: 40rem;
+}
+.dash-hero-lead {
   font-size: var(--text-md);
-  color: var(--text-2);
+  color: var(--text);
   max-width: 60ch;
 }
+.dash-hero-lead strong { font-weight: var(--weight-semibold); }
+
+/* The current / next lesson sits on its own white card instead of blending into the warm panel */
+.dash-hero-lesson {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  max-width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+.dash-hero-badge-now { background: var(--accent); color: var(--on-accent); }
+.dash-hero-lesson-title {
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+  line-height: 1.35;
+}
+.dash-hero-lesson-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  flex-basis: 100%;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.dash-hero-room {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+.dash-hero-room svg { color: var(--text-3); }
+a.dash-hero-room {
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 0.2em;
+}
+@media (hover: hover) {
+  a.dash-hero-room:hover { color: var(--accent); text-decoration-color: currentColor; }
+}
+.dash-hero-lesson-when { font-weight: var(--weight-medium); color: var(--accent-hover); }
 .dash-hero-actions {
   display: flex;
   flex-wrap: wrap;

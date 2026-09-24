@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  ChevronRight, ChevronDown, Circle, CheckCircle2, BellRing, ArrowRight, MessageCircle, LogIn
+  ChevronRight, ChevronDown, Circle, CheckCircle2, BellRing, ArrowRight, MessageCircle, LogIn, MapPin
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ScheduleWidget from '../components/ScheduleWidget';
@@ -27,28 +27,60 @@ const plural = (n, [one, few, many]) => {
 };
 const cleanTitle = (raw = '') => raw.replace(/^(лек|лаб|пр)\s+/i, '').replace(/,\s*п\/г\s*\d+$/i, '').trim();
 
-/** One line about today's lessons for the hero, or null while the schedule is unknown. */
+const toMinutes = (hm = '') => {
+  const [h, m] = hm.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+const formatDuration = (mins) => (mins < 60
+  ? `${mins} мин`
+  : `${Math.floor(mins / 60)} ч${mins % 60 ? ` ${mins % 60} мин` : ''}`);
+
+/**
+ * Today's lessons for the hero: how many, and the one in progress or the next one.
+ * Null while the schedule is unknown.
+ */
 const summariseToday = (info) => {
   if (!info) return null;
   const now = new Date();
   const today = localIso(now);
-  const nowHm = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+  const nowMin = now.getHours() * 60 + now.getMinutes();
   const slots = new Map();
   info.lessons
     .filter(l => l.дата && l.дата.startsWith(today))
     .forEach(l => { if (!slots.has(l.начало)) slots.set(l.начало, l); });
-  const lessons = [...slots.values()].sort((a, b) => a.начало.localeCompare(b.начало));
-  const group = info.group ? ` у группы ${info.group}` : '';
+  const lessons = [...slots.values()].sort((a, b) => toMinutes(a.начало) - toMinutes(b.начало));
+  const lesson = (l) => ({ title: cleanTitle(l.дисциплина), room: l.аудитория || '', start: l.начало, end: l.конец });
 
-  if (lessons.length === 0) return `Сегодня${group} пар нет.`;
-  const count = `Сегодня${group} ${lessons.length} ${plural(lessons.length, ['пара', 'пары', 'пар'])}.`;
-  const where = (l) => (l.аудитория ? `, ${l.аудитория}` : '');
-  const current = lessons.find(l => l.начало <= nowHm && nowHm < l.конец);
-  if (current) return `${count} Сейчас идёт «${cleanTitle(current.дисциплина)}»${where(current)} — до ${current.конец}.`;
-  const next = lessons.find(l => l.начало > nowHm);
-  if (next) return `${count} Следующая — «${cleanTitle(next.дисциплина)}» в ${next.начало}${where(next)}.`;
-  return `${count} На сегодня всё — пары закончились.`;
+  const current = lessons.find(l => toMinutes(l.начало) <= nowMin && nowMin < toMinutes(l.конец));
+  const next = lessons.find(l => toMinutes(l.начало) > nowMin);
+  return {
+    group: info.group || '',
+    count: lessons.length,
+    current: current ? { ...lesson(current), left: toMinutes(current.конец) - nowMin } : null,
+    next: !current && next ? { ...lesson(next), in: toMinutes(next.начало) - nowMin } : null,
+    done: lessons.length > 0 && !current && !next,
+  };
 };
+
+/** The lesson in progress (or the next one) as its own white card, so it never blends into the hero. */
+const HeroLesson = ({ lesson, now }) => (
+  <div className={`dash-hero-lesson ${now ? 'is-now' : ''}`}>
+    <span className={`badge ${now ? 'dash-hero-badge-now' : 'badge-accent'}`}>{now ? 'Идёт сейчас' : 'Следующая'}</span>
+    <span className="dash-hero-lesson-title">{lesson.title}</span>
+    <span className="dash-hero-lesson-meta tabular">
+      {lesson.room && (/^Б-?\d{3}/i.test(lesson.room) ? (
+        <Link to={`/map?room=${encodeURIComponent(lesson.room)}`} className="dash-hero-room">
+          <MapPin size={15} {...ICON} />
+          <span className="visually-hidden">Аудитория </span>{lesson.room}
+        </Link>
+      ) : (
+        <span className="dash-hero-room"><MapPin size={15} {...ICON} />{lesson.room}</span>
+      ))}
+      <span>{now ? `до ${lesson.end}` : `в ${lesson.start}`}</span>
+      <span className="dash-hero-lesson-when">{now ? `ещё ${formatDuration(lesson.left)}` : `через ${formatDuration(lesson.in)}`}</span>
+    </span>
+  </div>
+);
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -172,11 +204,24 @@ const Dashboard = () => {
           <h1 id="dash-hello">
             {firstName ? `Привет, ${firstName}!` : isLoggedIn ? 'Добро пожаловать!' : 'Добро пожаловать на портал ИВИТШ'}
           </h1>
-          <p className="dash-hero-lead" aria-live="polite">
-            {isLoggedIn
-              ? (todaySummary || 'Здесь расписание, объявления и путь первокурсника — всё в одном месте.')
-              : 'Войдите через ЭИОС: портал запомнит ваш путь адаптации, вопросы на форуме и прогресс.'}
-          </p>
+          <div className="dash-hero-today" aria-live="polite">
+            {!isLoggedIn ? (
+              <p className="dash-hero-lead">Войдите через ЭИОС: портал запомнит ваш путь адаптации, вопросы на форуме и прогресс.</p>
+            ) : !todaySummary ? (
+              <p className="dash-hero-lead">Здесь расписание, объявления и путь первокурсника — всё в одном месте.</p>
+            ) : (
+              <>
+                <p className="dash-hero-lead">
+                  {todaySummary.count === 0
+                    ? `Сегодня${todaySummary.group ? ` у группы ${todaySummary.group}` : ''} пар нет`
+                    : <>Сегодня{todaySummary.group ? ` у группы ${todaySummary.group}` : ''} — <strong className="tabular">{todaySummary.count} {plural(todaySummary.count, ['пара', 'пары', 'пар'])}</strong></>}
+                  {todaySummary.done && '. На сегодня всё — пары закончились'}
+                </p>
+                {todaySummary.current && <HeroLesson lesson={todaySummary.current} now />}
+                {todaySummary.next && <HeroLesson lesson={todaySummary.next} />}
+              </>
+            )}
+          </div>
           <div className="dash-hero-actions">
             {isLoggedIn ? (
               <Link to="/guide" className="btn btn-primary">
