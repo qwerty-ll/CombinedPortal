@@ -6,6 +6,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { adaptationApi, forumApi } from '../services/api';
 import MiniGamesSection from '../components/MiniGamesSection';
 
 const Profile = () => {
@@ -24,11 +25,6 @@ const Profile = () => {
   const [totalRoadmapSteps] = useState(9);
   const [forumQuestionsCount, setForumQuestionsCount] = useState(0);
 
-  // Curator Feedback states
-  const [rating, setRating] = useState(0);
-  const [hoverRating, setHoverRating] = useState(0);
-  const [feedbackText, setFeedbackText] = useState('');
-
   useEffect(() => {
     // Load roadmap progress from localStorage first
     try {
@@ -39,31 +35,24 @@ const Profile = () => {
       }
     } catch (e) { console.error(e); }
 
-    // Then try to get from API (authoritative source)
-    import('../services/api').then(({ adaptationApi }) => {
-      adaptationApi.getMyProgress().then(res => {
-        if (res && Array.isArray(res.completed_steps)) {
-          // Merge with localStorage for the most complete picture
-          try {
-            const localSaved = localStorage.getItem('freshman_roadmap_completed');
-            const localSteps = localSaved ? JSON.parse(localSaved) : [];
-            const merged = Array.from(new Set([...localSteps, ...res.completed_steps]));
-            setRoadmapCompleted(merged.length);
-          } catch {
-            setRoadmapCompleted(res.completed_steps.length);
-          }
+    if (!user) return;
+
+    // Server progress is authoritative; merge with steps done offline on this device.
+    adaptationApi.getMyProgress().then(res => {
+      if (res && Array.isArray(res.completed_steps)) {
+        try {
+          const localSteps = JSON.parse(localStorage.getItem('freshman_roadmap_completed') || '[]');
+          setRoadmapCompleted(new Set([...localSteps, ...res.completed_steps]).size);
+        } catch {
+          setRoadmapCompleted(res.completed_steps.length);
         }
-      }).catch(() => {});
+      }
     }).catch(() => {});
 
-    try {
-      const questions = localStorage.getItem('forum_questions');
-      if (questions && user) {
-        const parsed = JSON.parse(questions);
-        setForumQuestionsCount(parsed.filter(q => q.author && (q.author.userId === user.id || q.author.name === user.fullName)).length);
-      }
-    } catch (e) { console.error(e); }
-  }, [user]);
+    forumApi.getQuestions('', '', 200, 0, user.id)
+      .then(res => setForumQuestionsCount(Array.isArray(res) ? res.length : 0))
+      .catch(() => {});
+  }, [user?.id]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -99,8 +88,8 @@ const Profile = () => {
     }
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     toast.show('Вы вышли из аккаунта', 'info');
   };
 
@@ -124,27 +113,9 @@ const Profile = () => {
     reader.onloadend = () => {
       updateUserProfile({ photoUrl: reader.result });
       setAvatarLoadError(false);
-      toast.show('Фотография профиля успешно обновлена!', 'success');
+      toast.show('Фото профиля обновлено (сохраняется только на этом устройстве)', 'success');
     };
     reader.readAsDataURL(file);
-  };
-
-  const handleSendFeedback = (e) => {
-    e.preventDefault();
-    if (rating === 0) {
-      toast.show('Выберите оценку звёздами!', 'warning');
-      return;
-    }
-    toast.show('Спасибо! Ваш отзыв отправлен.', 'success');
-    setRating(0);
-    setFeedbackText('');
-  };
-
-  const handleResetApp = () => {
-    if (window.confirm('Вы действительно хотите сбросить весь прогресс?')) {
-      localStorage.clear();
-      window.location.reload();
-    }
   };
 
   // --- NOT LOGGED IN: SHOW LOGIN FORM WITH MODE SWITCHER ---
@@ -321,14 +292,14 @@ const Profile = () => {
           <div className="student-info-meta">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <h2>{user.fullName}</h2>
-              {user.isSdoAuth && (
+              {user.role !== 'admin' && (
                 <span style={{ background: '#E6F4EA', color: '#137333', fontSize: '0.75rem', padding: '3px 8px', borderRadius: '8px', fontWeight: '800' }}>
                   ✓ ЭИОС KOSGOS
                 </span>
               )}
             </div>
             
-            <span className="student-group-tag">{user.group}</span>
+            {user.group && <span className="student-group-tag">{user.group}</span>}
 
             <p>
               {user.role === 'admin' ? 'Администратор' : user.role === 'moderator' ? 'Модератор' : 'Студент ИВИТШ'}

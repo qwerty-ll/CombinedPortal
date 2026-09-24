@@ -110,6 +110,8 @@ const ScheduleWidget = () => {
   const [rawLessons, setRawLessons] = useState([]);
   const [lessonsLoading, setLessonsLoading] = useState(false);
   const [error, setError] = useState(null);
+  // Set when the backend served the last saved copy because EIOS is unreachable.
+  const [staleSince, setStaleSince] = useState(null);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -163,7 +165,10 @@ const ScheduleWidget = () => {
         }
       } catch (err) {
         console.warn('[ScheduleWidget] Catalog load error:', err);
-        if (isMounted) setCatalogLoading(false);
+        if (isMounted) {
+          setCatalogLoading(false);
+          setError(err.message || 'Не удалось загрузить список из ЭИОС.');
+        }
       }
     };
 
@@ -207,6 +212,7 @@ const ScheduleWidget = () => {
     if (!id) return;
     setLessonsLoading(true);
     setError(null);
+    setStaleSince(null);
     try {
       const res = await scheduleApi.getSchedule(
         targetType === 'group' ? id : null,
@@ -218,9 +224,10 @@ const ScheduleWidget = () => {
       
       const raspData = res?.data?.rasp || (Array.isArray(res?.data) ? res.data : []);
       setRawLessons(raspData);
+      setStaleSince(res?.stale && res.cached_at ? new Date(res.cached_at * 1000) : null);
     } catch (err) {
       console.error('[ScheduleWidget] Fetch schedule error:', err);
-      setError('Не удалось загрузить расписание.');
+      setError(err.message || 'Не удалось загрузить расписание.');
       setRawLessons([]);
     } finally {
       setLessonsLoading(false);
@@ -556,6 +563,12 @@ const ScheduleWidget = () => {
           )}
         </div>
       </div>
+
+      {staleSince && !lessonsLoading && !error && (
+        <div style={{ padding: '10px 14px', marginBottom: '12px', background: '#FFFBEB', borderRadius: '12px', color: '#92400E', border: '1px solid #FDE68A', fontSize: '0.85rem', fontWeight: '600' }}>
+          ЭИОС сейчас недоступна — показана сохранённая копия от {staleSince.toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}.
+        </div>
+      )}
 
       {/* 4. COMPACT TIME-SLOT CARDS DISPLAY */}
       {lessonsLoading ? (

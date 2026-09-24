@@ -7,10 +7,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { adminApi, subjectsApi, teachersApi } from '../services/api';
+import { adminApi } from '../services/api';
 
 const AdminPanel = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('announcements');
@@ -44,8 +44,20 @@ const AdminPanel = () => {
     }
   };
 
+  const handleToggleBlock = async (userId, username, blocked) => {
+    const action = blocked ? 'заблокировать' : 'разблокировать';
+    if (!window.confirm(`${blocked ? 'Заблокировать' : 'Разблокировать'} пользователя "${username}"?`)) return;
+    try {
+      const updated = await adminApi.setUserBlocked(userId, blocked);
+      setUsersList(prev => prev.map(u => u.id === userId ? { ...u, is_blocked: updated.is_blocked } : u));
+      toast.show(`Пользователь "${username}" ${blocked ? 'заблокирован' : 'разблокирован'}`, 'success');
+    } catch (err) {
+      toast.show(err.message || `Не удалось ${action} пользователя`, 'warning');
+    }
+  };
+
   const handleDeleteUser = async (userId, username) => {
-    if (!window.confirm(`Вы уверены, что хотите удалить пользователя "${username}"?`)) return;
+    if (!window.confirm(`Удалить пользователя "${username}" вместе с его вопросами и ответами? При следующем входе через ЭИОС аккаунт создастся заново — чтобы закрыть доступ, используйте блокировку.`)) return;
     try {
       await adminApi.deleteUser(userId);
       setUsersList(prev => prev.filter(u => u.id !== userId));
@@ -133,7 +145,7 @@ const AdminPanel = () => {
 
   useEffect(() => {
     if (!isAdmin) return;
-    teachersApi.getTeachers()
+    adminApi.getTeachers()
       .then(res => { if (Array.isArray(res)) setTeachers(res); })
       .catch(e => console.warn('Failed to load teachers:', e));
   }, [isAdmin]);
@@ -171,7 +183,7 @@ const AdminPanel = () => {
       photo_url: teacherForm.photo || 'https://kosgos.ru/images/INSTITUTS/nophoto.jpg'
     };
     try {
-      const created = await teachersApi.createTeacher(teacherData);
+      const created = await adminApi.createTeacher(teacherData);
       setTeachers(prev => [created, ...prev.filter(t => t.id !== created.id)]);
       toast.show('Преподаватель сохранён', 'success');
       setTeacherForm({ name: '', department: '', role: '', email: '', office: '', hours: '', courses: '', photo: '' });
@@ -194,7 +206,7 @@ const AdminPanel = () => {
   const handleDeleteTeacher = async (id) => {
     if (!window.confirm('Удалить преподавателя?')) return;
     try {
-      await teachersApi.deleteTeacher(id);
+      await adminApi.deleteTeacher(id);
       setTeachers(prev => prev.filter(t => t.id !== id));
       toast.show('Преподаватель удалён', 'info');
     } catch (err) {
@@ -215,7 +227,7 @@ const AdminPanel = () => {
 
   useEffect(() => {
     if (!isAdmin) return;
-    subjectsApi.getSubjects()
+    adminApi.getSubjects()
       .then(res => { if (Array.isArray(res)) setSubjects(res); })
       .catch(e => console.warn('Failed to load subjects:', e));
   }, [isAdmin]);
@@ -225,12 +237,12 @@ const AdminPanel = () => {
     if (!subjectForm.name.trim() || !subjectForm.subject_code.trim()) return;
     try {
       if (editingSubjectId) {
-        const updated = await subjectsApi.updateSubject(editingSubjectId, subjectForm);
+        const updated = await adminApi.updateSubject(editingSubjectId, subjectForm);
         setSubjects(prev => prev.map(s => s.id === editingSubjectId ? updated : s));
         toast.show('Предмет обновлён', 'success');
         setEditingSubjectId(null);
       } else {
-        const created = await subjectsApi.createSubject(subjectForm);
+        const created = await adminApi.createSubject(subjectForm);
         setSubjects(prev => [...prev, created]);
         toast.show('Предмет создан', 'success');
       }
@@ -260,7 +272,7 @@ const AdminPanel = () => {
   const handleDeleteSubject = async (id) => {
     if (!window.confirm('Удалить дисциплину из каталога?')) return;
     try {
-      await subjectsApi.deleteSubject(id);
+      await adminApi.deleteSubject(id);
       setSubjects(prev => prev.filter(s => s.id !== id));
       toast.show('Предмет удалён', 'info');
     } catch (err) {
@@ -684,7 +696,8 @@ const AdminPanel = () => {
               {usersList.length === 0 ? (
                 <div className="admin-empty">Нет зарегистрированных пользователей.</div>
               ) : usersList.map(u => {
-                const isSuperAdmin = ['ivitsh_admin', 'admin'].includes(u.username.toLowerCase());
+                const isSuperAdmin = u.auth_source === 'local';
+                const isSelf = user && u.id === user.id;
                 return (
                   <div key={u.id} className="admin-item-row" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
                     <div className="admin-item-info">
@@ -695,15 +708,20 @@ const AdminPanel = () => {
                             Главный Админ
                           </span>
                         )}
+                        {u.is_blocked && (
+                          <span style={{ fontSize: '0.7rem', background: '#EF4444', color: 'white', padding: '2px 6px', borderRadius: '6px', fontWeight: '800' }}>
+                            Заблокирован
+                          </span>
+                        )}
                       </h4>
                       <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#777' }}>
                         Логин: <strong>{u.username}</strong> • Группа: {u.group_number || 'Не указана'}
                       </p>
                     </div>
                     <div className="admin-item-actions" style={{ alignItems: 'center', gap: '8px' }}>
-                      {isSuperAdmin ? (
+                      {isSuperAdmin || isSelf ? (
                         <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#059669', padding: '6px 12px', background: '#ECFDF5', borderRadius: '8px' }}>
-                          Администратор ИВИТШ
+                          {isSelf ? 'Это вы' : 'Администратор ИВИТШ'}
                         </span>
                       ) : (
                         <>
@@ -720,6 +738,22 @@ const AdminPanel = () => {
                             <option value="moderator">Модератор</option>
                             <option value="admin">Администратор</option>
                           </select>
+                          <button
+                            onClick={() => handleToggleBlock(u.id, u.username, !u.is_blocked)}
+                            title={u.is_blocked ? 'Разблокировать пользователя' : 'Заблокировать пользователя'}
+                            style={{
+                              background: u.is_blocked ? 'rgba(5, 150, 105, 0.1)' : 'rgba(245, 158, 11, 0.12)',
+                              color: u.is_blocked ? '#059669' : '#B45309',
+                              border: 'none',
+                              borderRadius: '8px',
+                              padding: '7px 10px',
+                              cursor: 'pointer',
+                              fontSize: '0.8rem',
+                              fontWeight: '700'
+                            }}
+                          >
+                            {u.is_blocked ? 'Разблокировать' : 'Заблокировать'}
+                          </button>
                           <button
                             onClick={() => handleDeleteUser(u.id, u.username)}
                             title="Удалить пользователя"

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Mail, Users as UsersIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { teachersApi } from '../services/api';
+import { contentApi } from '../services/api';
 
 const Teachers = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -9,7 +9,7 @@ const Teachers = () => {
   const [teachersList, setTeachersList] = useState([]);
 
   useEffect(() => {
-    teachersApi.getTeachers().then(res => {
+    contentApi.getTeachers().then(res => {
       if (Array.isArray(res) && res.length > 0) {
         setTeachersList(res.map(t => ({
           id: t.id,

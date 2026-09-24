@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search, Plus, MessageSquare, ThumbsUp, ThumbsDown, X, User, Trash2, LogIn, RefreshCw
+  Search, Plus, MessageSquare, ThumbsUp, ThumbsDown, X, User, Trash2, LogIn, RefreshCw, Pin
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -140,6 +140,17 @@ const Forum = () => {
     }
   };
 
+  const handleTogglePin = async (id, e) => {
+    e.stopPropagation();
+    try {
+      const res = await forumApi.togglePin(id);
+      setQuestions(prev => prev.map(q => (q.id === id ? { ...q, is_pinned: res.is_pinned } : q)));
+      toast.show(res.is_pinned ? 'Вопрос закреплён' : 'Вопрос откреплён', 'info');
+    } catch (err) {
+      toast.show(err.message || 'Не удалось закрепить вопрос', 'warning');
+    }
+  };
+
   // ── Helpers ──────────────────────────────────────────────────────────────
   /** Normalise API ForumQuestionResponse to a UI-friendly shape */
   const normaliseQuestion = (q) => ({
@@ -207,12 +218,12 @@ const Forum = () => {
           <div className="auth-gate-content">
             <LogIn size={20} />
             <div>
-              <strong>Для участия в форуме необходимо войти через СДО КГУ</strong>
+              <strong>Для участия в форуме необходимо войти через ЭИОС КГУ</strong>
               <p>Вы можете просматривать темы, но для создания вопросов и ответов нужна авторизация</p>
             </div>
           </div>
           <button className="btn-auth-gate" onClick={() => navigate('/profile')}>
-            Войти через СДО
+            Войти через ЭИОС
           </button>
         </div>
       )}
@@ -285,6 +296,16 @@ const Forum = () => {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span className="post-time-ago">{formatDate(q.created_at)}</span>
+                    {canModerate && (
+                      <button
+                        className={`vote-action-btn like ${q.is_pinned ? 'active' : ''}`}
+                        style={{ padding: '4px', height: 'auto', width: 'auto', borderRadius: '4px' }}
+                        onClick={(e) => handleTogglePin(q.id, e)}
+                        title={q.is_pinned ? 'Открепить вопрос' : 'Закрепить вопрос'}
+                      >
+                        <Pin size={16} />
+                      </button>
+                    )}
                     {canDelete && (
                       <button
                         className="vote-action-btn dislike"
@@ -333,7 +354,7 @@ const Forum = () => {
           <div className="empty-state-card">
             <MessageSquare size={48} strokeWidth={1.5} />
             <h4>На форуме пока нет вопросов</h4>
-            <p>{isLoggedIn ? 'Станьте первым, кто задаст вопрос!' : 'Войдите через СДО, чтобы задать вопрос'}</p>
+            <p>{isLoggedIn ? 'Станьте первым, кто задаст вопрос!' : 'Войдите через ЭИОС, чтобы задать вопрос'}</p>
           </div>
         )}
       </div>

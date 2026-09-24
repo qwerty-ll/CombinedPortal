@@ -1,9 +1,34 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { authApi, clearApiCache } from '../services/api';
 
 const AuthContext = createContext(null);
 const AUTH_STORAGE_KEY = 'portal_auth_user';
 
+// Per-user data kept in the browser; removed on logout so the next person on a shared computer starts clean.
+const USER_SCOPED_KEYS = [AUTH_STORAGE_KEY, 'freshman_roadmap_completed', 'onboarding_completed_tasks', 'portal_group_number'];
+// Left behind by older versions of the portal (JWT in localStorage, cached personal/admin responses).
+const LEGACY_KEYS = ['portal_jwt_token', 'portal_faq', 'portal_announcements', 'forum_questions'];
+
+const safeRemove = (key) => {
+  try { localStorage.removeItem(key); } catch { /* storage unavailable */ }
+};
+
+const clearUserStorage = () => {
+  USER_SCOPED_KEYS.forEach(safeRemove);
+  clearApiCache();
+};
+
+const toClientUser = (apiUser) => ({
+  id: apiUser.id,
+  username: apiUser.username,
+  fullName: apiUser.full_name || apiUser.username,
+  group: apiUser.group_number || '',
+  role: apiUser.role || 'student',
+  photoUrl: apiUser.userpictureurl || '',
+});
+
 export const AuthProvider = ({ children }) => {
+  // The cached profile only drives the UI until /auth/me confirms it; the server enforces all access.
   const [user, setUser] = useState(() => {
     try {
       const saved = localStorage.getItem(AUTH_STORAGE_KEY);
@@ -13,128 +38,82 @@ export const AuthProvider = ({ children }) => {
     }
   });
 
-  useEffect(() => {
-    if (user) {
-      try {
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-      } catch (e) {}
-    }
-  }, [user]);
-
-  // Restore & verify session on app load
-  useEffect(() => {
-    import('../services/api').then(({ authApi }) => {
-      authApi.getMe().then(res => {
-        if (res && res.id) {
-          const updatedUser = {
-            id: res.id,
-            username: res.username,
-            fullName: res.full_name || res.username,
-            group: res.group_number || '24-ИСбо-1',
-            role: res.role || 'student',
-            photoUrl: res.userpictureurl || '',
-            isEiosAuth: true,
-            courses: res.courses || []
-          };
-          setUser(updatedUser);
-          try {
-            localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedUser));
-          } catch (e) {}
-        }
-      }).catch(err => {
-        // Only clear session if backend explicitly rejects authentication (401 Unauthorized)
-        if (err.message && (err.message.includes('401') | err.message.includes('авторизация'))) {
-          console.info('[AuthContext] Session expired or invalid, clearing local state');
-          setUser(null);
-          localStorage.removeItem(AUTH_STORAGE_KEY);
-          localStorage.removeItem('portal_jwt_token');
-        } else {
-          console.warn('[AuthContext] Network warning on getMe, retaining cached user profile');
-        }
-      });
-    }).catch(() => {});
+  const saveUser = useCallback((nextUser) => {
+    setUser(nextUser);
+    try {
+      if (nextUser) localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextUser));
+    } catch { /* storage unavailable */ }
   }, []);
 
-  // Secure Authentication via EIOS KGU Backend API
+  const resetSession = useCallback(() => {
+    setUser(null);
+    clearUserStorage();
+  }, []);
+
+  // Restore & verify the session on app load
+  useEffect(() => {
+    LEGACY_KEYS.forEach(safeRemove);
+    authApi.getMe()
+      .then((res) => {
+        if (!res || !res.id) return;
+        const fresh = toClientUser(res);
+        let cached = null;
+        try { cached = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null'); } catch { /* ignore */ }
+        // A different account is signed in now: drop the previous person's local data.
+        if (cached && cached.id !== res.id) clearUserStorage();
+        // A locally chosen avatar is kept for the same account (it is never uploaded to the server).
+        saveUser(cached?.id === res.id && cached.photoUrl ? { ...fresh, photoUrl: cached.photoUrl } : fresh);
+      })
+      .catch((err) => {
+        if (err.status === 401) {
+          resetSession();
+        } else {
+          console.warn('[AuthContext] Could not verify session, keeping cached profile:', err.message);
+        }
+      });
+  }, [resetSession, saveUser]);
+
+  const completeLogin = (res) => {
+    if (!res || !res.user) return { error: 'Не удалось авторизоваться' };
+    if (user && user.id !== res.user.id) clearUserStorage();
+    const nextUser = toClientUser(res.user);
+    saveUser(nextUser);
+    return nextUser;
+  };
+
+  // Student login through EIOS KSU (credentials are checked by the backend)
   const login = async (loginInput, groupInput = '', passwordInput = '') => {
     try {
-      const { authApi } = await import('../services/api');
-      const res = await authApi.eiosLogin(loginInput.trim(), passwordInput, groupInput.trim());
-      if (res && res.user) {
-        if (res.access_token) {
-          localStorage.setItem('portal_jwt_token', res.access_token);
-        }
-        const eiosUser = {
-          id: res.user.id,
-          username: res.user.username,
-          fullName: res.user.full_name,
-          group: res.user.group_number || groupInput.trim() || '24-ИСбо-1',
-          role: res.user.role || 'student',
-          photoUrl: res.user.userpictureurl || '',
-          isEiosAuth: true,
-          isSdoAuth: true,
-          courses: res.user.courses || [],
-          createdAt: new Date().toISOString()
-        };
-        setUser(eiosUser);
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(eiosUser));
-        return eiosUser;
-      }
+      return completeLogin(await authApi.eiosLogin(loginInput.trim(), passwordInput, groupInput.trim()));
     } catch (err) {
-      console.warn('[EIOS Auth] Login error:', err.message);
       return { error: err.message || 'Ошибка входа через ЭИОС КГУ. Проверьте логин и пароль' };
     }
-
-    return { error: 'Не удалось авторизоваться через ЭИОС КГУ' };
   };
 
-  // Secure Admin Authentication via Backend API Only
   const adminLogin = async (username, password) => {
     try {
-      const { authApi } = await import('../services/api');
-      const res = await authApi.adminLogin(username.trim(), password);
-      if (res && res.user) {
-        if (res.access_token) {
-          localStorage.setItem('portal_jwt_token', res.access_token);
-        }
-        const adminUser = {
-          id: res.user.id,
-          username: res.user.username,
-          fullName: res.user.full_name,
-          group: res.user.group_number || 'Деканат ИВИТШ',
-          role: res.user.role || 'admin',
-          photoUrl: res.user.userpictureurl || '',
-          createdAt: new Date().toISOString()
-        };
-        setUser(adminUser);
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(adminUser));
-        return adminUser;
-      }
+      return completeLogin(await authApi.adminLogin(username.trim(), password));
     } catch (err) {
-      console.warn('[Admin Auth] Login error:', err.message);
       return { error: err.message || 'Неверный логин или пароль администратора' };
     }
-    return { error: 'Ошибка входа в систему администрации' };
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-    localStorage.removeItem('portal_jwt_token');
-    import('../services/api').then(({ authApi }) => {
-      authApi.logout().catch(() => {});
-    }).catch(() => {});
+  const logout = async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // The cookie expires on its own; local state is cleared regardless.
+    }
+    resetSession();
   };
 
   const updateUserProfile = (data = {}) => {
-    if (user) {
-      setUser({
-        ...user,
-        ...(data.fullName !== undefined ? { fullName: data.fullName } : {}),
-        ...(data.group !== undefined ? { group: data.group } : {}),
-        ...(data.photoUrl !== undefined ? { photoUrl: data.photoUrl } : {})
-      });
-    }
+    if (!user) return;
+    saveUser({
+      ...user,
+      ...(data.group !== undefined ? { group: data.group } : {}),
+      ...(data.photoUrl !== undefined ? { photoUrl: data.photoUrl } : {}),
+    });
   };
 
   const isLoggedIn = !!user;

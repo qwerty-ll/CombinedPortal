@@ -1,153 +1,178 @@
-// Unified API Client for FastAPI backend & Vercel serverless
+// Unified API client for the FastAPI backend.
+// Authentication is an httpOnly cookie set by the backend: page scripts never see the JWT.
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
-// Helper for local SWR cache key generation
-const getCacheKey = (endpoint) => `portal_swr_cache_${endpoint}`;
+const CACHE_PREFIX = 'portal_swr_cache_';
+
+// Only public reference data may be kept in localStorage for offline use.
+// Personal or admin responses must never outlive the session on a shared computer.
+const CACHEABLE_PREFIXES = [
+  '/api/v1/teachers',
+  '/api/v1/subjects',
+  '/api/v1/announcements',
+  '/api/v1/faq',
+  '/api/v1/schedule/',
+];
+
+const isCacheable = (endpoint) => CACHEABLE_PREFIXES.some((prefix) => endpoint.startsWith(prefix));
+
+export class ApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+export const clearApiCache = () => {
+  try {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith(CACHE_PREFIX))
+      .forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // localStorage unavailable (private mode) — nothing cached anyway
+  }
+};
+
+const readCache = (endpoint) => {
+  try {
+    const cached = JSON.parse(localStorage.getItem(CACHE_PREFIX + endpoint) || 'null');
+    return cached && cached.data !== undefined ? cached.data : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const writeCache = (endpoint, data) => {
+  try {
+    localStorage.setItem(CACHE_PREFIX + endpoint, JSON.stringify({ timestamp: Date.now(), data }));
+  } catch {
+    // Ignore quota errors
+  }
+};
 
 export const apiFetch = async (endpoint, options = {}) => {
-  const method = (options.method || 'GET').toUpperCase();
-  const token = localStorage.getItem('portal_jwt_token');
+  const { retries, timeout, useCache, headers: extraHeaders, ...fetchOptions } = options;
+  const method = (fetchOptions.method || 'GET').toUpperCase();
+  const isGet = method === 'GET';
   const headers = {
     'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    ...options.headers,
+    // Required by the backend CSRF check for cookie-authenticated writes.
+    'X-Requested-With': 'XMLHttpRequest',
+    ...extraHeaders,
   };
+  const maxRetries = retries !== undefined ? retries : (isGet ? 2 : 0);
+  const timeoutMs = timeout || 12000;
+  const enableCache = useCache !== false && isGet && isCacheable(endpoint);
 
-  const isGet = method === 'GET';
-  const maxRetries = options.retries !== undefined ? options.retries : (isGet ? 2 : 0);
-  const timeoutMs = options.timeout || 12000;
-  const enableCache = options.useCache !== false && isGet && !endpoint.includes('/admin/users');
-
-  let attempt = 0;
   let lastError = null;
 
-  while (attempt <= maxRetries) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
+    let res;
     try {
-      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+      res = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...fetchOptions,
         credentials: 'include',
-        ...options,
         signal: controller.signal,
         headers,
       });
-
-      clearTimeout(timeoutId);
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Ошибка сервера: ${res.status}`);
-      }
-
-      const data = await res.json();
-
-      // Cache successful GET responses in localStorage for offline / slow network fallback
-      if (enableCache) {
-        try {
-          localStorage.setItem(getCacheKey(endpoint), JSON.stringify({
-            timestamp: Date.now(),
-            data,
-          }));
-        } catch (e) {
-          // Ignore quota errors in localStorage
-        }
-      }
-
-      return data;
     } catch (err) {
       clearTimeout(timeoutId);
-      lastError = err;
-      const isAbort = err.name === 'AbortError';
-      const isNetworkError = isAbort || err.message.includes('Failed to fetch') || err.message.includes('NetworkError');
-
-      // Retry GET requests on network glitches or timeouts
-      if (isGet && attempt < maxRetries && isNetworkError) {
-        attempt++;
-        const backoffMs = attempt * 1000;
-        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      // Network failure or timeout: retry GETs with backoff.
+      lastError = err.name === 'AbortError'
+        ? new ApiError('Превышено время ожидания ответа сервера (слабое соединение). Попробуйте позже.', 0)
+        : new ApiError('Нет соединения с сервером', 0);
+      if (isGet && attempt < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, (attempt + 1) * 1000));
         continue;
       }
       break;
     }
-  }
+    clearTimeout(timeoutId);
 
-  // Fallback to SWR local storage cache for GET requests if network fails completely
-  if (enableCache) {
-    try {
-      const cachedRaw = localStorage.getItem(getCacheKey(endpoint));
-      if (cachedRaw) {
-        const cached = JSON.parse(cachedRaw);
-        if (cached && cached.data) {
-          console.info(`[API SWR Cache Fallback] Served cached data for ${endpoint}`);
-          return cached.data;
-        }
-      }
-    } catch (cacheErr) {
-      // Ignore cache read errors
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      const detail = typeof errorData.detail === 'string' ? errorData.detail : `Ошибка сервера: ${res.status}`;
+      // The server answered: an HTTP error is authoritative and is never masked by cached data.
+      throw new ApiError(detail, res.status);
     }
+
+    const data = await res.json();
+    if (enableCache) writeCache(endpoint, data);
+    return data;
   }
 
-  const errMsg = lastError?.name === 'AbortError' 
-    ? 'Превышено время ожидания ответа сервера (слабое соединение). Попробуйте позже.'
-    : (lastError?.message || 'Ошибка сети');
-  
-  console.warn(`[API Error] ${method} ${endpoint}:`, errMsg);
-  throw new Error(errMsg);
+  // Offline fallback only for public reference data.
+  if (enableCache) {
+    const cached = readCache(endpoint);
+    if (cached !== undefined) return cached;
+  }
+  throw lastError || new ApiError('Ошибка сети', 0);
 };
+
+const json = (method, body) => ({ method, body: JSON.stringify(body) });
 
 // Auth Services
 export const authApi = {
-  // FIX: Removed authApi.login() — endpoint /api/v1/auth/login does not exist.
-  // Use authApi.eiosLogin() for student login or authApi.adminLogin() for admins.
   eiosLogin: (username, password, groupNumber = '') =>
-    apiFetch('/api/v1/auth/eios-login', { method: 'POST', body: JSON.stringify({ username, password, group_number: groupNumber }) }),
-  sdoLogin: (username, password, groupNumber = '') =>
-    apiFetch('/api/v1/auth/eios-login', { method: 'POST', body: JSON.stringify({ username, password, group_number: groupNumber }) }),
+    apiFetch('/api/v1/auth/eios-login', json('POST', { username, password, group_number: groupNumber })),
   adminLogin: (username, password) =>
-    apiFetch('/api/v1/auth/admin-login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+    apiFetch('/api/v1/auth/admin-login', json('POST', { username, password })),
   logout: () =>
     apiFetch('/api/v1/auth/logout', { method: 'POST' }),
   getMe: () =>
     apiFetch('/api/v1/auth/me'),
+  updateProfile: (data) =>
+    apiFetch('/api/v1/auth/me', json('PATCH', data)),
 };
 
 // Forum Services
 export const forumApi = {
-  getQuestions: (category = '', search = '', limit = 50, offset = 0) => {
+  getQuestions: (category = '', search = '', limit = 50, offset = 0, authorId = null) => {
     const query = new URLSearchParams({ limit, offset });
     if (category) query.append('category', category);
     if (search) query.append('search', search);
+    if (authorId !== null) query.append('author_id', authorId);
     return apiFetch(`/api/v1/forum/questions?${query.toString()}`);
   },
   createQuestion: (data) =>
-    apiFetch('/api/v1/forum/questions', { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch('/api/v1/forum/questions', json('POST', data)),
   getQuestionDetail: (id) =>
     apiFetch(`/api/v1/forum/questions/${id}`),
   getAnswers: (id) =>
     apiFetch(`/api/v1/forum/questions/${id}/answers`),
   postAnswer: (id, text) =>
-    apiFetch(`/api/v1/forum/questions/${id}/answers`, { method: 'POST', body: JSON.stringify({ content: text }) }),
+    apiFetch(`/api/v1/forum/questions/${id}/answers`, json('POST', { content: text })),
   vote: (id, voteType) =>
-    apiFetch(`/api/v1/forum/questions/${id}/vote`, { method: 'POST', body: JSON.stringify({ vote_type: voteType }) }),
+    apiFetch(`/api/v1/forum/questions/${id}/vote`, json('POST', { vote_type: voteType })),
   deleteQuestion: (id) =>
     apiFetch(`/api/v1/forum/questions/${id}`, { method: 'DELETE' }),
+  togglePin: (id) =>
+    apiFetch(`/api/v1/forum/questions/${id}/pin`, { method: 'POST' }),
+  deleteAnswer: (answerId) =>
+    apiFetch(`/api/v1/forum/answers/${answerId}`, { method: 'DELETE' }),
+  toggleSolution: (answerId) =>
+    apiFetch(`/api/v1/forum/answers/${answerId}/solution`, { method: 'POST' }),
 };
 
 export const adaptationApi = {
   saveProgress: (completedSteps) =>
-    apiFetch('/api/v1/adaptation', { method: 'POST', body: JSON.stringify({ completed_steps: completedSteps }) }),
+    apiFetch('/api/v1/adaptation', json('POST', { completed_steps: completedSteps })),
   getMyProgress: () =>
     apiFetch('/api/v1/adaptation/me'),
 };
 
-// Admin Services (single consolidated object — no duplicates)
+// Admin Services
 export const adminApi = {
   // Users
   getUsers: (limit = 100, offset = 0) =>
     apiFetch(`/api/v1/admin/users?limit=${limit}&offset=${offset}`),
   updateUserRole: (userId, role) =>
-    apiFetch(`/api/v1/admin/users/${userId}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+    apiFetch(`/api/v1/admin/users/${userId}/role`, json('PATCH', { role })),
+  setUserBlocked: (userId, blocked) =>
+    apiFetch(`/api/v1/admin/users/${userId}/block`, json('PATCH', { blocked })),
   deleteUser: (userId) =>
     apiFetch(`/api/v1/admin/users/${userId}`, { method: 'DELETE' }),
   getAdaptations: () =>
@@ -156,59 +181,50 @@ export const adminApi = {
   // Teachers
   getTeachers: () => apiFetch('/api/v1/teachers'),
   createTeacher: (data) =>
-    apiFetch('/api/v1/admin/teachers', { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch('/api/v1/admin/teachers', json('POST', data)),
   deleteTeacher: (id) =>
     apiFetch(`/api/v1/admin/teachers/${id}`, { method: 'DELETE' }),
 
   // Announcements
   getAnnouncements: () => apiFetch('/api/v1/announcements'),
   createAnnouncement: (data) =>
-    apiFetch('/api/v1/admin/announcements', { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch('/api/v1/admin/announcements', json('POST', data)),
   updateAnnouncement: (id, data) =>
-    apiFetch(`/api/v1/admin/announcements/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    apiFetch(`/api/v1/admin/announcements/${id}`, json('PUT', data)),
   deleteAnnouncement: (id) =>
     apiFetch(`/api/v1/admin/announcements/${id}`, { method: 'DELETE' }),
 
   // FAQ
   getFaq: () => apiFetch('/api/v1/faq'),
   createFaq: (data) =>
-    apiFetch('/api/v1/admin/faq', { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch('/api/v1/admin/faq', json('POST', data)),
   updateFaq: (id, data) =>
-    apiFetch(`/api/v1/admin/faq/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    apiFetch(`/api/v1/admin/faq/${id}`, json('PUT', data)),
   deleteFaq: (id) =>
     apiFetch(`/api/v1/admin/faq/${id}`, { method: 'DELETE' }),
 
   // Subjects
   getSubjects: () => apiFetch('/api/v1/subjects'),
   createSubject: (data) =>
-    apiFetch('/api/v1/admin/subjects', { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch('/api/v1/admin/subjects', json('POST', data)),
   updateSubject: (id, data) =>
-    apiFetch(`/api/v1/admin/subjects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    apiFetch(`/api/v1/admin/subjects/${id}`, json('PUT', data)),
   deleteSubject: (id) =>
     apiFetch(`/api/v1/admin/subjects/${id}`, { method: 'DELETE' }),
 };
 
-// Convenience re-exports for components that import subjectsApi / teachersApi directly
-// They delegate to adminApi to keep a single source of truth.
-export const subjectsApi = {
-  getSubjects: () => adminApi.getSubjects(),
-  createSubject: (data) => adminApi.createSubject(data),
-  updateSubject: (id, data) => adminApi.updateSubject(id, data),
-  deleteSubject: (id) => adminApi.deleteSubject(id),
-};
-
-export const teachersApi = {
+// Public read access to reference data managed in the admin panel
+export const contentApi = {
   getTeachers: () => adminApi.getTeachers(),
-  createTeacher: (data) => adminApi.createTeacher(data),
-  deleteTeacher: (id) => adminApi.deleteTeacher(id),
+  getSubjects: () => adminApi.getSubjects(),
+  getFaq: () => adminApi.getFaq(),
+  getAnnouncements: () => adminApi.getAnnouncements(),
 };
 
 // Chatbot Services
 export const chatApi = {
   sendMessage: (message, history) =>
-    apiFetch('/api/v1/chat', { method: 'POST', body: JSON.stringify({ message, history }) }),
-  getTopQuestions: () =>
-    apiFetch('/api/v1/chat/top-questions'),
+    apiFetch('/api/v1/chat', json('POST', { message, history })),
 };
 
 // Schedule EIOS Services

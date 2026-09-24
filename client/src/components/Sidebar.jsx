@@ -88,7 +88,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen })
           ) : (
             <button className="sidebar-login-btn" onClick={() => handleNavigation('/profile')}>
               <LogIn size={16} />
-              <span>Войти через СДО</span>
+              <span>Войти через ЭИОС</span>
             </button>
           )}
         </div>

@@ -13,7 +13,7 @@ import QuizModal from '../components/QuizModal';
 import ChecklistModal from '../components/ChecklistModal';
 import FunLayerModal from '../components/FunLayerModal';
 import RewardsModal from '../components/RewardsModal';
-import { subjectsApi, adaptationApi } from '../services/api';
+import { contentApi, adaptationApi } from '../services/api';
 
 const DisciplineCard = ({ subject }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -150,7 +150,7 @@ const FreshmanGuide = () => {
   const [subjectsList, setSubjectsList] = useState([]);
 
   useEffect(() => {
-    subjectsApi.getSubjects().then(res => {
+    contentApi.getSubjects().then(res => {
       if (Array.isArray(res) && res.length > 0) {
         setSubjectsList(res.map(s => ({
           id: s.subject_code || `sub-${s.id}`,
@@ -250,7 +250,6 @@ const FreshmanGuide = () => {
         <motion.img 
           src="/img/mascot.png" 
           alt="ВИТШик" 
-          onError={(e) => { e.target.src = "/mascot.png"; }}
           style={{ width: '96px', height: '96px', objectFit: 'contain' }}
           animate={{ y: [0, -8, 0] }}
           transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}

@@ -100,6 +100,28 @@ const QuestionDetail = () => {
     }
   };
 
+  const handleDeleteAnswer = async (answerId) => {
+    if (!window.confirm('Удалить этот ответ?')) return;
+    try {
+      await forumApi.deleteAnswer(answerId);
+      setAnswers(prev => prev.filter(a => a.id !== answerId));
+      setQuestion(prev => prev ? { ...prev, answers_count: Math.max((prev.answers_count || 1) - 1, 0) } : prev);
+      toast.show('Ответ удалён', 'info');
+    } catch (err) {
+      toast.show(err.message || 'Ошибка удаления ответа', 'warning');
+    }
+  };
+
+  const handleToggleSolution = async (answerId) => {
+    try {
+      const res = await forumApi.toggleSolution(answerId);
+      // Only one answer can be the solution: the server unmarks the others.
+      setAnswers(prev => prev.map(a => ({ ...a, is_solution: a.id === answerId ? res.is_solution : (res.is_solution ? false : a.is_solution) })));
+    } catch (err) {
+      toast.show(err.message || 'Не удалось отметить решение', 'warning');
+    }
+  };
+
   // Submit new answer via API
   const handleSendReply = async (e) => {
     e.preventDefault();
@@ -207,6 +229,7 @@ const QuestionDetail = () => {
           answers.map((reply) => {
             const isReplyAuthor = user && reply.author_id === user.id;
             const canDeleteReply = isReplyAuthor || canModerate;
+            const canMarkSolution = isQuestionCreator || canModerate;
             return (
               <motion.div 
                 key={reply.id} 
@@ -237,6 +260,31 @@ const QuestionDetail = () => {
                 </div>
 
                 <p style={{ fontSize: '1rem', color: '#333', lineHeight: '1.5', margin: 0 }}>{reply.content}</p>
+
+                {(canMarkSolution || canDeleteReply) && (
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                    {canMarkSolution && (
+                      <button
+                        className="vote-action-btn like"
+                        style={{ padding: '4px 10px', height: 'auto', width: 'auto', borderRadius: '6px', fontSize: '0.8rem', gap: '4px' }}
+                        onClick={() => handleToggleSolution(reply.id)}
+                        title={reply.is_solution ? 'Снять отметку решения' : 'Отметить как решение'}
+                      >
+                        <CheckCircle2 size={14} /> {reply.is_solution ? 'Снять отметку' : 'Это решение'}
+                      </button>
+                    )}
+                    {canDeleteReply && (
+                      <button
+                        className="vote-action-btn dislike"
+                        style={{ padding: '4px', height: 'auto', width: 'auto', borderRadius: '4px' }}
+                        onClick={() => handleDeleteAnswer(reply.id)}
+                        title="Удалить ответ"
+                      >
+                        <Trash2 size={16} style={{ color: '#E74C3C' }} />
+                      </button>
+                    )}
+                  </div>
+                )}
               </motion.div>
             );
           })
@@ -267,7 +315,7 @@ const QuestionDetail = () => {
           <div className="auth-gate-content">
             <LogIn size={20} />
             <div>
-              <strong>Войдите через СДО, чтобы ответить на вопрос</strong>
+              <strong>Войдите через ЭИОС, чтобы ответить на вопрос</strong>
             </div>
           </div>
           <button className="btn-auth-gate" onClick={() => navigate('/profile')}>

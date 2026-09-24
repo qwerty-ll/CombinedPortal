@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown, Info, MessageCircle, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import DOMPurify from 'dompurify';
+import { contentApi } from '../services/api';
 
 const FAQItem = ({ question, answer, isOpen, onClick }) => (
   <div className={`faq-accordion-item ${isOpen ? 'active' : ''}`}>
@@ -30,13 +31,15 @@ const FaqPage = () => {
   const navigate = useNavigate();
   const [openIndex, setOpenIndex] = useState(null);
 
-  // Read FAQ from localStorage (dynamic data only)
-  const faqItems = (() => {
-    try {
-      const saved = localStorage.getItem('portal_faq');
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  })();
+  const [faqItems, setFaqItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    contentApi.getFaq()
+      .then(res => setFaqItems(Array.isArray(res) ? res : []))
+      .catch(err => console.warn('FAQ load failed:', err.message))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div className="container">
@@ -45,7 +48,11 @@ const FaqPage = () => {
       </div>
 
       {/* ACCORDIONS */}
-      {faqItems.length > 0 ? (
+      {loading ? (
+        <div className="empty-state-card" style={{ background: 'white', borderRadius: '24px', padding: '50px 20px', textAlign: 'center', border: '1px solid #e9ecef', marginBottom: '30px' }}>
+          <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '800' }}>Загрузка вопросов...</h4>
+        </div>
+      ) : faqItems.length > 0 ? (
         <div className="faq-accordions-group">
           {faqItems.map((item, idx) => (
             <FAQItem 

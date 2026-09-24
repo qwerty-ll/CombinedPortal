@@ -7,7 +7,7 @@ import {
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import ScheduleWidget from '../components/ScheduleWidget';
-import { adminApi } from '../services/api';
+import { contentApi } from '../services/api';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -33,18 +33,13 @@ const Dashboard = () => {
     setGroupSaved(false);
   };
 
-  // --- Announcements from backend / localStorage fallback ---
-  const [announcements, setAnnouncements] = useState(() => {
-    try {
-      const saved = localStorage.getItem('portal_announcements');
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  });
+  // --- Announcements from backend (the API client keeps an offline copy) ---
+  const [announcements, setAnnouncements] = useState([]);
   const [expandedAdIds, setExpandedAdIds] = useState([]);
 
   useEffect(() => {
-    adminApi.getAnnouncements().then(res => {
-      if (Array.isArray(res) && res.length > 0) {
+    contentApi.getAnnouncements().then(res => {
+      if (Array.isArray(res)) {
         setAnnouncements(res.map(a => ({
           id: a.id,
           title: a.title,
