@@ -1,11 +1,13 @@
 {
   "name": "combinedportal-root",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
     "dev": "npm --prefix client run dev",
     "build": "npm --prefix client run build",
     "preview": "npm --prefix client run preview",
-    "server": "python3 -m uvicorn server.main:app --reload --port 8000"
+    "server": "cd server && python3 -m uvicorn main:app --reload --port 8000",
+    "migrate": "cd server && python3 -m app.db.migrate",
+    "test": "cd server && python3 -m pytest -q"
   }
 }

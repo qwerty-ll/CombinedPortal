@@ -82,15 +82,14 @@ Thumbs.db
 *.sw?
 
 # ==========================================
-# 7. DEPLOYMENT & VERCEL
+# 7. DEPLOYMENT
 # ==========================================
-.vercel/
 .cache/
 coverage/
-push_and_merge.py
-*/push_and_merge.py
+infrastructure/certs/*
+!infrastructure/certs/README.md
+infrastructure/certbot-www/
+infrastructure/gigachat-ca/
+*.pem
+*.key
 scratch/
-ForSearch/
-audit_scripts/
-RECOMMENDATIONS_M.md
-nextPatch.md
