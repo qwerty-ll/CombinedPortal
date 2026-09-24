@@ -1,24 +1,24 @@
+# Run from the repository root:  docker compose -f infrastructure/docker-compose.yml up -d --build
+# Requires ../.env (see .env.example) and TLS certificates in infrastructure/certs/ (see DEPLOYMENT_GUIDE.md).
 services:
-  # 1. PostgreSQL Database Service
   db:
     image: postgres:16-alpine
     container_name: ivitsh_portal_db
     restart: always
     environment:
-      POSTGRES_DB: portal_db
-      POSTGRES_USER: portal_user
-      POSTGRES_PASSWORD: portal_password
+      POSTGRES_DB: ${POSTGRES_DB:-portal_db}
+      POSTGRES_USER: ${POSTGRES_USER:-portal_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U portal_user -d portal_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
       - portal_network
 
-  # 2. FastAPI Backend Service
   backend:
     build:
       context: ..
@@ -28,17 +28,16 @@ services:
     env_file:
       - ../.env
     environment:
-      - DATABASE_URL=postgresql://portal_user:portal_password@db:5432/portal_db
-      - PYTHONPATH=/app/server
+      DATABASE_URL: postgresql://${POSTGRES_USER:-portal_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-portal_db}
     volumes:
-      - sqlite_data:/app/server_data
+      # Optional Russian Trusted Root CA for GigaChat (set GIGACHAT_CA_BUNDLE=/app/certs/russian_trusted_root_ca.pem).
+      - ./gigachat-ca:/app/certs:ro
     depends_on:
       db:
         condition: service_healthy
     networks:
       - portal_network
 
-  # 3. Nginx Web Server & React Client SPA
   client:
     build:
       context: ..
@@ -48,13 +47,16 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
+      - ./certbot-www:/var/www/certbot:ro
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - portal_network
 
 volumes:
-  sqlite_data:
   postgres_data:
 
 networks:

@@ -1,0 +1,17 @@
+.git
+.env
+.env.*
+!.env.example
+**/node_modules
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/venv
+**/.venv
+**/*.db
+**/*.db-*
+client/dist
+server/tests
+infrastructure/certs
+infrastructure/certbot-www
+infrastructure/gigachat-ca
