@@ -13,7 +13,7 @@ from app.core import security
 from app.db.database import SessionLocal
 from app.db.migrate import run_migrations
 import app.models as models
-from app.routers import auth, forum, chat, schedule, admin, adaptation
+from app.routers import auth, forum, chat, schedule, calendar_feed, admin, adaptation
 
 logging.basicConfig(
     level=logging.INFO,
@@ -105,6 +105,7 @@ app.include_router(auth.router)
 app.include_router(forum.router)
 app.include_router(chat.router)
 app.include_router(schedule.router)
+app.include_router(calendar_feed.router)
 app.include_router(admin.router)
 app.include_router(adaptation.router)
 

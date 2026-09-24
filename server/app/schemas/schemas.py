@@ -154,9 +154,16 @@ class ChatMessageTurn(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=500)
     history: Optional[List[ChatMessageTurn]] = Field(default_factory=list, max_length=20)
+    # Group picked in the dashboard schedule; used when the student's own group is unknown
+    group: Optional[str] = Field(None, max_length=50)
+
+class ChatAction(BaseModel):
+    label: str
+    to: str  # an in-portal path such as "/map?room=Б-407"
 
 class ChatResponse(BaseModel):
     reply: str
+    actions: List[ChatAction] = Field(default_factory=list)
 
 
 ADAPTATION_TOTAL_STEPS = 9

@@ -38,8 +38,8 @@ def test_anonymous_chat_never_calls_gigachat(client, monkeypatch):
         raise AssertionError("GigaChat must not be called for anonymous users")
     monkeypatch.setattr(rag_service, "get_access_token", forbidden)
     monkeypatch.setattr(rag_service.settings, "GIGACHAT_AUTH_KEY", "configured")
-    r = client.post("/api/v1/chat", json={"message": "Где дирекция 209?"})
-    assert r.status_code == 200 and "Аудитория 209" in r.json()["reply"]
+    r = client.post("/api/v1/chat", json={"message": "Какая стипендия за отличную сессию?"})
+    assert r.status_code == 200 and "4500" in r.json()["reply"]
 
 
 def test_chat_is_rate_limited(client):
@@ -91,7 +91,7 @@ async def test_gigachat_refreshes_rejected_token(monkeypatch):
     monkeypatch.setattr(rag_service.httpx, "AsyncClient", _FakeGigaChat)
     monkeypatch.setattr(rag_service.settings, "GIGACHAT_AUTH_KEY", "configured")
     rag_service._token_cache.update(access_token="", expires_at=0.0)
-    reply = await rag_service.generate_chatbot_reply("Где дирекция 209?", [], use_llm=True)
+    reply = await rag_service.ask_gigachat("system", [], "Где дирекция?")
     assert reply == "Дирекция в Б-209"
     assert _FakeGigaChat.chat_tokens == ["token-1", "token-2"]
     rag_service._token_cache.update(access_token="", expires_at=0.0)
@@ -105,10 +105,10 @@ def anyio_backend():
 def test_logged_in_chat_does_not_duplicate_current_message(app, fake_eios, monkeypatch):
     sent = {}
 
-    async def capture(message, history, use_llm):
+    async def capture(message, history, user, db, group_hint=None, use_llm=True):
         sent["history"] = history
-        return "ok"
-    monkeypatch.setattr("app.routers.chat.generate_chatbot_reply", capture)
+        return "ok", []
+    monkeypatch.setattr("app.routers.chat.assistant.answer", capture)
     c = login_student(app, fake_eios)
     c.post("/api/v1/chat", json={"message": "где 209", "history": [{"role": "user", "content": "привет"}]}, headers={"X-Requested-With": "XMLHttpRequest"})
     assert sent["history"] == [{"role": "user", "content": "привет"}]
