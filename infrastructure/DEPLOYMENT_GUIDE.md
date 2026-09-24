@@ -1,99 +1,127 @@
-# 📘 РУКОВОДСТВО ПО ПЕРЕДАЧЕ И РАЗВЕРТЫВАНИЮ (DEPLOYMENT HANDOFF GUIDE)
+# 📘 Руководство по развертыванию
 
-**Проект:** Официальный Портал и Гайд первокурсника Высшей ИТ-Школы КГУ  
-**Архитектура:** React (Vite SPA) + FastAPI (REST API) + Standalone SQLite WAL + Nginx Reverse Proxy  
-**Домен проекта (3-й уровень):** `ivitsh-portal.kosgos.ru` (альтернативно: `portal.kosgos.ru` / `itschool.kosgos.ru`)  
-**Способ развертывания:** Docker Compose (2 отдельных контейнера: `client` и `backend`)
-
----
-
-## 📋 1. Системные требования на сервере (Виртуальной Машине)
-
-На сервере (Linux / Ubuntu / Debian / macOS / Windows Server) должен быть установлен **только Docker**:
-- `docker` (v20.10+)
-- `docker compose` (v2.0+)
-
-Никаких локальных версий Python, Node.js, Nginx или PostgreSQL на сервере устанавливать **НЕ ТРЕБУЕТСЯ**.
+**Проект:** портал и гид первокурсника Высшей ИТ-школы КГУ
+**Архитектура:** React (Vite SPA) + FastAPI + PostgreSQL + Nginx (HTTPS)
+**Домен:** `ivitsh-portal.kosgos.ru`
+**Способ развертывания:** Docker Compose (`db`, `backend`, `client`)
 
 ---
 
-## 🌐 2. Домен и Инфраструктура КГУ (`ivitsh-portal.kosgos.ru`)
+## 0. ⚠️ Перед первым запуском после обновления: смена секретов
 
-Для развертывания проекта в локальной сети / интернете КГУ закреплен официальный домен 3-го уровня:
-👉 **`ivitsh-portal.kosgos.ru`** (альтернативно: `portal.kosgos.ru` / `itschool.kosgos.ru`).
+В истории git этого публичного репозитория остались старые секреты: ключ GigaChat, несколько
+значений `SECRET_KEY`, пароль администратора, пароль PostgreSQL и файл базы `backend/portal.db`
+с хэшами паролей. Считайте их скомпрометированными:
 
-Nginx проксирует трафик следующим образом:
-- **`https://ivitsh-portal.kosgos.ru/`** — Фронтенд (React SPA)
-- **`https://ivitsh-portal.kosgos.ru/api/v1/*`** — FastAPI REST API Бэкенд
-- **`https://ivitsh-portal.kosgos.ru/docs`** — Документация Swagger UI (активна при `DOCS_ENABLED=true`)
+1. Перевыпустите ключ авторизации GigaChat в личном кабинете Сбера (developers.sber.ru) и отзовите старый.
+2. Сгенерируйте новые `SECRET_KEY`, `ADMIN_PASSWORD`, `POSTGRES_PASSWORD` (команды — в `.env.example`).
+   Смена `SECRET_KEY` разлогинит всех пользователей — это ожидаемо.
+3. Сообщите владельцу учётной записи из `backend/portal.db` (коммит `eb5a634`), что пароль ЭИОС нужно сменить.
+4. После смены секретов вычистите историю (`git filter-repo --path backend/portal.db --invert-paths`
+   и замена строк секретов через `--replace-text`), затем force-push всех веток. Это переписывает историю
+   у всех участников — согласуйте заранее. Уже сделанные клоны и форки всё равно сохранят старые данные,
+   поэтому шаги 1–3 обязательны независимо от чистки.
 
 ---
 
-## 🚀 3. Пошаговая инструкция по развертыванию
+## 1. Требования к серверу
 
-### Шаг 1: Клонирование Git-репозитория
+Только Docker: `docker` 20.10+ и `docker compose` v2. Python, Node.js, Nginx и PostgreSQL на хост ставить не нужно.
+
+Nginx отдаёт SPA и проксирует `/api/` на backend. Swagger (`/docs`) доступен только при `DOCS_ENABLED=true`.
+
+---
+
+## 2. Установка
+
+### Шаг 1. Клонирование
 ```bash
 git clone https://github.com/qwerty-ll/CombinedPortal.git
 cd CombinedPortal
 ```
 
-### Шаг 2: Создание файла переменных окружения
-Скопируйте пример файла конфигурации в корень:
+### Шаг 2. Файл окружения
 ```bash
 cp .env.example .env
 ```
-Укажите в `.env` файле учетные данные администратора и настройки:
-```env
-ADMIN_USERNAME=ivitsh_admin
-ADMIN_PASSWORD=Ваш_Сложный_Пароль_2026!
-SECRET_KEY=Ваш_Секретный_JWT_Ключ
-DOCS_ENABLED=true
-```
+Заполните обязательные значения: `SECRET_KEY` (≥ 32 символов), `POSTGRES_PASSWORD`, `ADMIN_USERNAME`,
+`ADMIN_PASSWORD`, `GIGACHAT_AUTH_KEY`. Backend не запустится с пустым или коротким `SECRET_KEY`.
+`ADMIN_USERNAME` не должен совпадать ни с одним логином ЭИОС.
 
-### Шаг 3: Переход в папку `infrastructure` и запуск контейнеров
+### Шаг 3. TLS-сертификат
+Nginx слушает 443 и перенаправляет весь HTTP на HTTPS. Положите сертификат в `infrastructure/certs/`:
+`fullchain.pem` и `privkey.pem`.
+
+**Let's Encrypt (домен должен указывать на сервер, порт 80 свободен):**
 ```bash
-cd infrastructure
-docker compose up -d --build
+sudo certbot certonly --standalone -d ivitsh-portal.kosgos.ru
+sudo cp /etc/letsencrypt/live/ivitsh-portal.kosgos.ru/fullchain.pem infrastructure/certs/
+sudo cp /etc/letsencrypt/live/ivitsh-portal.kosgos.ru/privkey.pem infrastructure/certs/
 ```
-*(Или из корня проекта без перехода: `docker compose -f infrastructure/docker-compose.yml up -d --build`)*
+Продление без остановки портала (nginx отдаёт `/.well-known/acme-challenge/` из `infrastructure/certbot-www`):
+```bash
+sudo certbot renew --webroot -w "$(pwd)/infrastructure/certbot-www" \
+  --deploy-hook "cp /etc/letsencrypt/live/ivitsh-portal.kosgos.ru/*.pem $(pwd)/infrastructure/certs/ && docker exec ivitsh_portal_client nginx -s reload"
+```
+Если университет выдаёт свой сертификат — просто положите его файлы под теми же именами.
+
+**Для локальной проверки** подойдёт самоподписанный:
+```bash
+openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=localhost" \
+  -keyout infrastructure/certs/privkey.pem -out infrastructure/certs/fullchain.pem
+```
+
+### Шаг 4. Сертификат для GigaChat
+Серверы GigaChat подписаны корневым сертификатом Минцифры, которого нет в стандартных хранилищах.
+Проверку TLS мы не отключаем — вместо этого нужно доверить этот сертификат:
+1. Скачайте «Russian Trusted Root CA» с официальной страницы Госуслуг (раздел «Сертификаты Минцифры»)
+   в формате PEM и сохраните как `infrastructure/gigachat-ca/russian_trusted_root_ca.pem`.
+2. В `.env`: `GIGACHAT_CA_BUNDLE=/app/certs/russian_trusted_root_ca.pem`.
+
+Без этого чат-бот продолжит работать, но будет отвечать текстом из базы знаний без перефразирования GigaChat.
+
+### Шаг 5. Запуск
+```bash
+docker compose -f infrastructure/docker-compose.yml up -d --build
+```
+При старте backend сам применяет миграции базы (Alembic) и при первом запуске заполняет
+справочники преподавателей и предметов. Дальше они редактируются только из админ-панели.
 
 ---
 
-## 🛠️ 4. Разделение Образов (Docker Multicontainer Architecture)
+## 3. Образы
 
-В проекте используются **отдельные изолированные Docker-образы**:
-1. **`infrastructure/docker/Dockerfile.client`**:
-   - Мультистейдж сборка React Vite SPA на Node.js 20.
-   - Минималистичный Nginx Alpine для отдачи статики и безопасной фильтрации трафика (CSP, HSTS).
-2. **`infrastructure/docker/Dockerfile.server`**:
-   - Python 3.11-slim с зависимостями FastAPI, Pydantic, SQLAlchemy, `httpx` и `bcrypt==3.2.2`.
+- **`infrastructure/docker/Dockerfile.client`** — сборка SPA на Node 20 и `nginx:1.27-alpine`.
+  Конфигурация: `infrastructure/nginx/default.conf`, заголовки безопасности и CSP — `infrastructure/nginx/snippets/`.
+- **`infrastructure/docker/Dockerfile.server`** — Python 3.11-slim, запуск от непривилегированного пользователя,
+  один процесс uvicorn (ограничения частоты запросов и кэш расписания хранятся в памяти процесса).
 
 ---
 
-## 🔐 5. Учетные данные Администратора
+## 4. Администратор
 
-- **Вкладка авторизации**: **Личный кабинет** -> **Авторизоваться**
-- **Управление доступом**: Все стандартные фолбэки выключены в целях безопасности. Логин и пароль администратора считываются строго из файла `.env` (`ADMIN_USERNAME` и `ADMIN_PASSWORD`).
+Вход: **Личный кабинет → Сотрудник ИВИТШ** с `ADMIN_USERNAME` / `ADMIN_PASSWORD` из `.env`.
+Главного администратора нельзя удалить, заблокировать или понизить из админ-панели.
 
----
-
-## 🗄️ 6. База данных и Резервное копирование
-
-1. База создается при первом старте в изолированном томе `sqlite_data`.
-2. База работает в режиме **SQLite WAL (Write-Ahead Logging)** для высокой производительности.
-3. При старте бэкенд автоматически сидирует список **17 официальных преподавателей ИВИТШ КГУ**.
-4. **Бэкап базы данных**:
-   ```bash
-   docker cp ivitsh_portal_backend:/app/portal.db ./backup_portal_$(date +%Y%m%d).db
-   ```
+Студенты входят через ЭИОС КГУ. Чтобы закрыть студенту доступ, используйте **блокировку**:
+удалённый аккаунт создаётся заново при следующем входе через ЭИОС.
 
 ---
 
-## 🔄 7. Команды обновления и управления
+## 5. База данных
 
-- **Автоматический пуш и мердж**:
+- PostgreSQL 16 в томе `postgres_data`.
+- Миграции: `server/migrations/`. Вручную: `docker exec ivitsh_portal_backend python -m app.db.migrate`.
+  Новая миграция при разработке: `cd server && alembic revision --autogenerate -m "описание"`.
+- Резервная копия:
   ```bash
-  python3 push_and_merge.py
+  docker exec ivitsh_portal_db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > backup_$(date +%Y%m%d).sql
   ```
-- **Просмотреть логи**: `docker compose logs -f`
-- **Остановить сервер**: `docker compose down`
+
+---
+
+## 6. Управление
+
+- Логи: `docker compose -f infrastructure/docker-compose.yml logs -f`
+- Остановка: `docker compose -f infrastructure/docker-compose.yml down`
+- Обновление: `git pull && docker compose -f infrastructure/docker-compose.yml up -d --build`

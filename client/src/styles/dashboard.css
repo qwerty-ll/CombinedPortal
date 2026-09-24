@@ -1,0 +1,642 @@
+/* Dashboard ("/") — Operate mode: what's next, where, what's new.
+   Owned by the dashboard area. Tokens only; shared primitives come from shared.css. */
+
+/* ---------- Hero: the mascot's warm color owns the greeting ---------- */
+.dash-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: var(--space-8);
+  margin-bottom: var(--space-6);
+  background: var(--warm-soft);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  isolation: isolate;
+}
+/* A soft disc behind the mascot */
+.dash-hero::after {
+  content: '';
+  position: absolute;
+  right: -2.5rem;
+  bottom: -6rem;
+  z-index: -1;
+  width: 19rem;
+  height: 19rem;
+  border-radius: 50%;
+  background: var(--warm-soft-2);
+}
+.dash-hero-text { min-width: 0; max-width: 42rem; }
+.dash-hero-date {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--warm-strong);
+}
+.dash-hero h1 {
+  margin-top: var(--space-1);
+  font-size: var(--text-2xl);
+  letter-spacing: -0.02em;
+}
+.dash-hero-lead {
+  margin-top: var(--space-3);
+  font-size: var(--text-md);
+  color: var(--text-2);
+  max-width: 60ch;
+}
+.dash-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+.dash-hero-count {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: rgba(10, 30, 80, 0.3);   /* darkens the button blue: white text stays above 7:1 */
+  font-size: var(--text-xs);
+  line-height: 1.2;
+}
+.dash-hero-mascot {
+  width: 10rem;
+  height: 10rem;
+  flex-shrink: 0;
+  margin: calc(-1 * var(--space-4)) var(--space-4) calc(-1 * var(--space-6)) 0;
+}
+
+/* ---------- Section shortcuts ---------- */
+.dash-shortcuts { margin-bottom: var(--space-6); }
+.dash-shortcuts ul {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: var(--space-3);
+}
+.dash-shortcut {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+}
+.dash-shortcut:active { transform: translateY(1px); }
+@media (hover: hover) {
+  .dash-shortcut:hover { border-color: var(--border-strong); color: var(--text); transform: translateY(-1px); }
+  .dash-shortcut:hover .tile-quiet { background: var(--tile-soft); color: var(--tile); }
+}
+.dash-shortcut-text { display: flex; flex-direction: column; min-width: 0; }
+.dash-shortcut-label { font-size: var(--text-sm); font-weight: var(--weight-semibold); line-height: 1.3; }
+.dash-shortcut-hint { font-size: var(--text-xs); color: var(--text-3); }
+
+@media (min-width: 1280px) {
+  .dash-shortcuts ul { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* ---------- Page layout ---------- */
+.dash-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+.dash-main,
+.dash-aside { min-width: 0; }
+.dash-aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+@media (min-width: 1280px) {
+  .dash-grid { grid-template-columns: minmax(0, 1fr) 24rem; }
+}
+
+#schedule-section,
+#announcements-section { scroll-margin-top: var(--space-6); }
+
+/* ---------- Side cards ---------- */
+.dash-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.dash-card-head h2 { font-size: var(--text-md); }
+.dash-card-meta {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+/* Hairline rows; the whole row is the target, hover fill bleeds slightly past the text edge */
+.dash-rows > li { border-top: 1px solid var(--border); }
+.dash-rows > li:first-child { border-top: none; }
+
+.dash-row-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: calc(100% + 2 * var(--space-2));
+  min-height: var(--touch-target);
+  margin: 0 calc(-1 * var(--space-2));
+  padding: var(--space-3) var(--space-2);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: var(--text-base);
+  text-align: left;
+  text-decoration: none;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+.dash-row-btn:active { background: var(--surface-2); }
+@media (hover: hover) {
+  .dash-row-btn:hover { background: var(--surface-hover); color: var(--text); }
+}
+
+.dash-row-label { flex: 1; min-width: 0; }
+.dash-row-icon { color: var(--text-2); }
+.dash-row-arrow { color: var(--text-3); }
+
+.dash-chevron {
+  color: var(--text-3);
+  transition: transform var(--dur) var(--ease);
+}
+[aria-expanded='true'] > .dash-chevron { transform: rotate(180deg); }
+
+/* ---------- Announcements ---------- */
+.dash-ann-heading {
+  font-size: var(--text-base);
+  letter-spacing: 0;
+}
+.dash-ann-toggle { align-items: flex-start; }
+.dash-ann-toggle .dash-chevron { margin-top: var(--space-1); }
+.dash-ann-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.dash-ann-title {
+  font-weight: var(--weight-medium);
+  line-height: 1.4;
+}
+.dash-ann-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  color: var(--text-3);
+}
+.dash-ann-body {
+  padding: 0 0 var(--space-4);
+  color: var(--text-2);
+  animation: dash-reveal var(--dur) var(--ease);
+}
+.dash-ann-body p { max-width: var(--prose-width); }
+
+.dash-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  color: var(--text-2);
+}
+.dash-empty svg { color: var(--text-3); }
+.dash-empty h3 { font-size: var(--text-base); }
+.dash-empty p { font-size: var(--text-sm); }
+
+/* ---------- Onboarding checklist ---------- */
+.dash-onb-next {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent);
+  text-align: left;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+@media (hover: hover) {
+  .dash-onb-next:hover { background: var(--accent-soft-hover); }
+}
+.dash-onb-next-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dash-onb-next-label { font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--accent-hover); }
+.dash-onb-next-title { font-weight: var(--weight-semibold); color: var(--text); }
+.dash-onb-done {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--success);
+}
+.dash-onb-toggle { margin: var(--space-2) 0 0 calc(-1 * var(--space-3)); }
+
+.dash-onb-list { margin-top: var(--space-1); }
+.dash-onb-status { color: var(--text-3); }
+.dash-onb-row.is-done .dash-onb-status { color: var(--success); }
+.dash-onb-row.is-done .dash-row-label { color: var(--text-2); }
+
+/* ---------- Schedule widget ---------- */
+.sched-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-5);
+}
+.sched-head h2 { font-size: var(--text-lg); }
+
+/* Target search + academic year */
+.sched-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 9.5rem;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.sched-combo { position: relative; }
+.sched-combo-control,
+.sched-select-wrap { position: relative; }
+
+.sched-combo-icon,
+.sched-combo-chevron,
+.sched-select-chevron {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.sched-combo-icon { left: var(--space-3); color: var(--text-3); }
+.sched-combo-chevron,
+.sched-select-chevron {
+  right: var(--space-3);
+  color: var(--text-2);
+  transition: transform var(--dur) var(--ease);
+}
+.sched-combo-input[aria-expanded='true'] ~ .sched-combo-chevron { transform: translateY(-50%) rotate(180deg); }
+
+.sched-combo-input {
+  padding-left: var(--space-10);
+  padding-right: var(--space-10);
+  text-overflow: ellipsis;
+}
+.sched-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: var(--space-10);
+  cursor: pointer;
+}
+
+.sched-popover {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 18rem;
+  overflow-y: auto;
+  padding: var(--space-1);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+  animation: dash-pop var(--dur-fast) var(--ease);
+}
+.sched-options { list-style: none; }
+.sched-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--control-height);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+.sched-option.is-active { background: var(--surface-hover); }
+@media (hover: hover) {
+  .sched-option:hover { background: var(--surface-hover); }
+}
+.sched-option-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  min-width: 0;
+}
+.sched-option-name { font-weight: var(--weight-medium); color: var(--text); }
+.sched-option[aria-selected='true'] .sched-option-name { color: var(--accent); }
+.sched-option-meta { font-size: var(--text-sm); color: var(--text-3); }
+.sched-option-check { color: var(--accent); }
+.sched-popover-empty {
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.sched-popover-loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+/* Day / week + date navigation */
+.sched-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+.sched-nav-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+.sched-dates {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.sched-date-input { width: 10.5rem; }
+.sched-week-range {
+  min-width: 10.5rem;
+  text-align: center;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+/* Status messages */
+.sched-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+.sched-notice svg { margin-top: 1px; }
+
+.sched-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.sched-alert > svg { margin-top: 2px; }
+.sched-alert-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.sched-alert-title {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--danger);
+}
+.sched-alert-retry { margin-top: var(--space-2); }
+
+/* Lessons: day heading, then hairline rows with a tabular time column */
+.sched-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin-top: var(--space-5);
+}
+.sched-day-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-base);
+  letter-spacing: 0;
+}
+.sched-slots { list-style: none; }
+.sched-slot {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  column-gap: var(--space-4);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--border);
+}
+.sched-slot:first-child { border-top: none; }
+
+.sched-time {
+  display: flex;
+  flex-direction: column;
+  line-height: var(--leading-heading);
+}
+.sched-time-start {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+.sched-time-end { font-size: var(--text-sm); color: var(--text-3); }
+.sched-slot.is-now .sched-time-start { color: var(--accent); }
+
+.sched-slot-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.sched-lesson {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.sched-lesson-tags + .sched-lesson-title { margin-top: var(--space-1); }
+.sched-lesson-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
+.sched-lesson-title {
+  font-size: var(--text-base);
+  line-height: 1.4;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+.sched-lesson-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.sched-lesson-meta > span,
+.sched-lesson-meta > a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.sched-lesson-meta svg { color: var(--text-3); }
+.sched-lesson-room {
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+/* Room in building Б: opens the floor plan */
+.sched-room-link {
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 0.2em;
+}
+@media (hover: hover) {
+  .sched-room-link:hover { color: var(--accent); text-decoration-color: currentColor; }
+}
+
+/* Loading skeleton rows */
+.sched-skel-heading { width: 12rem; height: 1.25rem; margin-bottom: var(--space-1); }
+.sched-skel-time { width: 2.75rem; height: 2.5rem; }
+.sched-skel-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.sched-skel-badge { width: 5rem; height: 1.25rem; border-radius: var(--radius-sm); }
+.sched-skel-line { width: 100%; height: 0.875rem; }
+.sched-skel-line--mid { width: 70%; }
+.sched-skel-line--short { width: 45%; }
+
+/* Empty day/week */
+.sched-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-10) var(--space-4) var(--space-6);
+  text-align: center;
+  color: var(--text-2);
+}
+.sched-empty svg { color: var(--text-3); }
+.sched-empty h3 { font-size: var(--text-base); }
+.sched-empty p { font-size: var(--text-sm); max-width: 40ch; }
+.sched-empty .btn { margin-top: var(--space-2); }
+
+/* ---------- Motion (user-triggered only) ---------- */
+@keyframes dash-reveal {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes dash-pop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes dash-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-ann-body,
+  .sched-popover { animation-name: dash-fade; }
+  .dash-chevron,
+  .sched-combo-chevron { transition: none; }
+}
+
+/* ---------- Tablet & phone ---------- */
+@media (max-width: 1024px) {
+  #schedule-section,
+  #announcements-section { scroll-margin-top: calc(3.5rem + var(--space-4)); }
+}
+
+@media (max-width: 768px) {
+  .dash-grid,
+  .dash-aside { gap: var(--space-4); }
+
+  .dash-hero {
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-5);
+    margin-bottom: var(--space-4);
+  }
+  .dash-hero::after { width: 9rem; height: 9rem; right: -2rem; top: -2rem; bottom: auto; }
+  .dash-hero h1 { font-size: var(--text-xl); }
+  .dash-hero-lead { font-size: var(--text-base); }
+  .dash-hero-actions { margin-top: var(--space-4); }
+  .dash-hero-actions .btn { flex: 1 1 100%; }
+  .dash-hero-mascot { order: -1; position: absolute; top: var(--space-3); right: var(--space-3); width: 4.5rem; height: 4.5rem; margin: 0; }
+  .dash-hero-date,
+  .dash-hero h1 { padding-right: 4.5rem; }
+
+  /* Shortcuts scroll sideways instead of stacking five rows */
+  .dash-shortcuts { margin: 0 calc(-1 * var(--space-4)) var(--space-4); }
+  .dash-shortcuts ul {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    padding: 0 var(--space-4) var(--space-1);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding: 0 var(--space-4);
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .dash-shortcuts ul::-webkit-scrollbar { display: none; }
+  .dash-shortcuts li { scroll-snap-align: start; }
+  .dash-shortcut { padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2); }
+  .dash-shortcut .tile { width: 2.25rem; height: 2.25rem; }
+  .dash-shortcut-hint { display: none; }
+  .dash-onb-toggle { min-height: var(--touch-target); }
+
+  .sched-head {
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: var(--space-4);
+  }
+  .sched-types { display: flex; width: 100%; }
+  .sched-types .segmented-item { flex: 1; justify-content: center; }
+  .sched .segmented-item { min-height: var(--touch-target); }
+
+  /* The results list spans the whole filter row so names fit on one line */
+  .sched-filters { grid-template-columns: minmax(0, 1fr) 8.5rem; position: relative; }
+  .sched-combo { position: static; }
+  .sched-option { min-height: var(--touch-target); }
+
+  /* Phone: "Сегодня" sits next to День/Неделя, the date stepper takes its own full row */
+  .sched-nav-end { display: contents; }
+  .sched-today { margin-left: auto; }
+  .sched-dates {
+    order: 3;
+    flex: 1 1 100%;
+  }
+  .sched-dates .btn-icon { width: var(--touch-target); }
+  .sched-date-input { flex: 1; width: auto; min-width: 0; }
+  .sched-week-range { flex: 1; min-width: 0; }
+
+  .sched-slot { grid-template-columns: 3.25rem minmax(0, 1fr); column-gap: var(--space-3); }
+
+}

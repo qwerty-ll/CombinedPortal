@@ -1,0 +1,67 @@
+"""Single source of application configuration, read once from the environment / .env."""
+import os
+from dotenv import find_dotenv, load_dotenv
+
+load_dotenv(find_dotenv(usecwd=True))
+
+_PLACEHOLDER_SECRETS = {
+    "your_super_secret_jwt_key_here",
+    "change_me",
+    "changeme",
+    "secret",
+}
+_ALLOWED_JWT_ALGORITHMS = {"HS256", "HS384", "HS512"}
+
+
+def _bool(name: str, default: bool) -> bool:
+    return os.getenv(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _int(name: str, default: int) -> int:
+    return int(os.getenv(name, str(default)))
+
+
+def _list(name: str) -> list:
+    return [item.strip() for item in os.getenv(name, "").split(",") if item.strip()]
+
+
+class Settings:
+    def __init__(self) -> None:
+        self.SECRET_KEY = os.getenv("SECRET_KEY", "")
+        if not self.SECRET_KEY or self.SECRET_KEY.strip().lower() in _PLACEHOLDER_SECRETS or len(self.SECRET_KEY) < 32:
+            raise RuntimeError(
+                "SECRET_KEY is missing, a placeholder or shorter than 32 characters. "
+                "Generate one with: python3 -c \"import secrets; print(secrets.token_urlsafe(48))\""
+            )
+        self.ALGORITHM = os.getenv("ALGORITHM", "HS256").strip().upper()
+        if self.ALGORITHM not in _ALLOWED_JWT_ALGORITHMS:
+            raise RuntimeError(f"ALGORITHM must be one of {sorted(_ALLOWED_JWT_ALGORITHMS)}")
+        self.ACCESS_TOKEN_EXPIRE_MINUTES = _int("ACCESS_TOKEN_EXPIRE_MINUTES", 1440)
+        # Secure cookies need HTTPS; browsers still accept them on http://localhost for development.
+        self.COOKIE_SECURE = _bool("COOKIE_SECURE", True)
+
+        self.DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./portal.db")
+        self.DB_POOL_SIZE = _int("DB_POOL_SIZE", 10)
+        self.DB_MAX_OVERFLOW = _int("DB_MAX_OVERFLOW", 20)
+
+        self.ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip()
+        self.ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+
+        self.ALLOWED_ORIGINS = _list("ALLOWED_ORIGINS")
+        self.DOCS_ENABLED = _bool("DOCS_ENABLED", False)
+
+        self.EIOS_BASE_URL = os.getenv("EIOS_BASE_URL", "https://eios.kosgos.ru/api").rstrip("/")
+        self.VERIFY_SSL = _bool("VERIFY_SSL", True)
+
+        # GigaChat "Authorization key" (base64 of client_id:client_secret) from the Sber developer console.
+        self.GIGACHAT_AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY") or os.getenv("GIGACHAT_SECRET", "")
+        self.GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
+        # Path to the Russian Trusted Root CA (PEM) that signs the GigaChat endpoints.
+        self.GIGACHAT_CA_BUNDLE = os.getenv("GIGACHAT_CA_BUNDLE", "")
+
+    @property
+    def admin_username_normalized(self) -> str:
+        return self.ADMIN_USERNAME.lower()
+
+
+settings = Settings()

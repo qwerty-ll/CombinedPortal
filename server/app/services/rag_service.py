@@ -1,80 +1,80 @@
-import os
-import re
-import uuid
-import time
 import logging
-import threading
-import requests
-import urllib3
-from datetime import datetime, timezone
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from dotenv import load_dotenv
-
-import app.models as models
-
-load_dotenv()
-
+import re
+import ssl
+import time
+import uuid
 import asyncio
 
+import certifi
+import httpx
+
+from app.core.config import settings
+
 logger = logging.getLogger("ivitsh_portal.rag")
-logger.setLevel(logging.INFO)
-
-VERIFY_SSL = os.getenv("VERIFY_SSL", "true").lower() == "true"
-if not VERIFY_SSL:
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID", "")
-SECRET = os.getenv("GIGACHAT_SECRET", "")
 
 OAUTH_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
 CHAT_URL = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
 
-# M-REL-01 FIX: Use asyncio.Lock instead of threading.Lock to avoid blocking the event loop during await
+
+def _build_ssl_context() -> ssl.SSLContext:
+    """GigaChat certificates are issued by the Russian Trusted Root CA, which is not in certifi.
+
+    Instead of disabling verification, trust certifi plus the CA file from GIGACHAT_CA_BUNDLE.
+    """
+    context = ssl.create_default_context(cafile=certifi.where())
+    if settings.GIGACHAT_CA_BUNDLE:
+        context.load_verify_locations(cafile=settings.GIGACHAT_CA_BUNDLE)
+    return context
+
+
+_ssl_context = _build_ssl_context()
 _token_lock = asyncio.Lock()
 _token_cache = {
     "access_token": "",
-    "expires_at": 0
+    "expires_at": 0.0,
 }
 
 
-import httpx
+def is_llm_configured() -> bool:
+    return bool(settings.GIGACHAT_AUTH_KEY)
+
+
+def _token_is_fresh(now: float) -> bool:
+    return bool(_token_cache["access_token"]) and now < _token_cache["expires_at"] - 60
+
 
 async def get_access_token(force_refresh: bool = False) -> str:
-    now = time.time()
-    secret = os.getenv("GIGACHAT_SECRET", SECRET)
-
-    # Fast-path check without lock (double-checked locking pattern)
-    if not force_refresh and _token_cache["access_token"] and now < _token_cache["expires_at"] - 60:
+    # With force_refresh the current token was rejected by the API and must not be returned again.
+    rejected_token = _token_cache["access_token"] if force_refresh else None
+    if not force_refresh and _token_is_fresh(time.time()):
         return _token_cache["access_token"]
 
     async with _token_lock:
-        now = time.time()
-        if _token_cache["access_token"] and now < _token_cache["expires_at"] - 60:
+        # Another coroutine may have refreshed the token while we waited for the lock.
+        if _token_is_fresh(time.time()) and _token_cache["access_token"] != rejected_token:
             return _token_cache["access_token"]
 
         headers = {
-            "Authorization": f"Basic {secret}",
+            "Authorization": f"Basic {settings.GIGACHAT_AUTH_KEY}",
             "RqUID": str(uuid.uuid4()),
             "Content-Type": "application/x-www-form-urlencoded",
         }
-        payload = {"scope": "GIGACHAT_API_PERS"}
-
         try:
-            async with httpx.AsyncClient(verify=False, timeout=15.0) as client:
-                resp = await client.post(OAUTH_URL, headers=headers, data=payload)
+            async with httpx.AsyncClient(verify=_ssl_context, timeout=15.0) as client:
+                resp = await client.post(OAUTH_URL, headers=headers, data={"scope": settings.GIGACHAT_SCOPE})
                 resp.raise_for_status()
                 data = resp.json()
         except Exception as e:
             _token_cache["access_token"] = ""
-            _token_cache["expires_at"] = 0
-            logger.error(f"[GIGACHAT AUTH FAILED] Could not authenticate with GigaChat: {e}")
-            raise RuntimeError(f"GigaChat Auth Failed: {e}")
+            _token_cache["expires_at"] = 0.0
+            logger.error("GigaChat authentication failed: %s", e)
+            raise RuntimeError("GigaChat auth failed") from e
 
+        now = time.time()
         _token_cache["access_token"] = data["access_token"]
         exp_ms = data.get("expires_at")
         _token_cache["expires_at"] = (exp_ms / 1000) if exp_ms else (now + 1800)
-        logger.info("[GIGACHAT AUTH SUCCESS] Successfully obtained GigaChat OAuth token")
+        logger.info("Obtained GigaChat OAuth token")
         return _token_cache["access_token"]
 
 
@@ -174,53 +174,20 @@ def evaluate_query(query: str):
     return max_score, best_match
 
 
-def track_question_analytics(query_text: str, db: Session):
+OFF_TOPIC_REPLY = "Я — цифровой маскот ВИТШик и отвечаю исключительно на вопросы про Высшую ИТ-Школу КГУ, аудитории, расписание, стипендии, клубы и учебу! 😸 Задай мне вопрос по университету!"
+
+
+async def generate_chatbot_reply(user_message: str, history: list, use_llm: bool = True) -> str:
+    """Answer from the local knowledge base; GigaChat only rephrases the matched chunk.
+
+    Anonymous visitors get the chunk as is, so the paid API cannot be burned without logging in.
     """
-    Thread-safe analytics tracking using database-level upsert pattern.
-    Uses IntegrityError catch on INSERT to handle concurrent first-inserts gracefully.
-    """
-    try:
-        clean_text = query_text.strip()
-        if len(clean_text) < 3 or len(clean_text) > 100:
-            return
-
-        # FIX: Use SQL-level atomic increment to avoid lost-update race condition
-        updated = (
-            db.query(models.AnalyticsQuestion)
-            .filter(models.AnalyticsQuestion.question_text == clean_text)
-            .update(
-                {
-                    models.AnalyticsQuestion.ask_count: models.AnalyticsQuestion.ask_count + 1,
-                    models.AnalyticsQuestion.last_asked: datetime.now(timezone.utc)
-                }
-            )
-        )
-        if updated == 0:
-            # Row didn't exist — insert it. Handle concurrent duplicate inserts gracefully.
-            try:
-                item = models.AnalyticsQuestion(question_text=clean_text, ask_count=1)
-                db.add(item)
-                db.commit()
-            except IntegrityError:
-                # Another concurrent request already inserted it — that's fine, just rollback
-                db.rollback()
-                db.query(models.AnalyticsQuestion).filter(
-                    models.AnalyticsQuestion.question_text == clean_text
-                ).update({models.AnalyticsQuestion.ask_count: models.AnalyticsQuestion.ask_count + 1})
-                db.commit()
-        else:
-            db.commit()
-    except Exception:
-        db.rollback()
-
-
-async def generate_chatbot_reply(user_message: str, history: list, db: Session) -> str:
     score, chunk = evaluate_query(user_message)
 
     if score < 4 or not chunk:
-        return "Я — цифровой маскот ВИТШик и отвечаю исключительно на вопросы про Высшую ИТ-Школу КГУ, аудитории, расписание, стипендии, клубы и учебу! 😸 Задай мне вопрос по университету!"
-
-    track_question_analytics(user_message, db)
+        return OFF_TOPIC_REPLY
+    if not use_llm or not is_llm_configured():
+        return chunk["content"]
 
     system_prompt = (
         "Ты — маскот ВИТШик. Отвечай СТРОГО И ИСКЛЮЧИТЕЛЬНО на основе предоставленного текста ниже.\n\n"
@@ -233,13 +200,13 @@ async def generate_chatbot_reply(user_message: str, history: list, db: Session) 
         f"{chunk['content']}"
     )
 
+    turns = [t for t in (history or []) if t.get("role") in ("user", "assistant")]
+    # Older clients included the current question in history; don't send it twice.
+    if turns and turns[-1].get("role") == "user" and turns[-1].get("content", "").strip() == user_message.strip():
+        turns = turns[:-1]
     messages = [{"role": "system", "content": system_prompt}]
-    # Use only last 4 turns from history (already limited by schema to 20 total)
-    for turn in (history or [])[-4:]:
-        role = turn.get("role")
-        content = turn.get("content", "")
-        if role in ("user", "assistant"):
-            messages.append({"role": role, "content": content})
+    for turn in turns[-4:]:
+        messages.append({"role": turn["role"], "content": turn.get("content", "")})
 
     messages.append({"role": "user", "content": user_message})
 
@@ -256,10 +223,10 @@ async def generate_chatbot_reply(user_message: str, history: list, db: Session) 
             "max_tokens": 250
         }
 
-        async with httpx.AsyncClient(verify=False, timeout=15.0) as client:
+        async with httpx.AsyncClient(verify=_ssl_context, timeout=15.0) as client:
             resp = await client.post(CHAT_URL, headers=headers, json=payload)
 
-            if resp.status_code in (401, 402):
+            if resp.status_code == 401:
                 token = await get_access_token(force_refresh=True)
                 headers["Authorization"] = f"Bearer {token}"
                 resp = await client.post(CHAT_URL, headers=headers, json=payload)
@@ -274,6 +241,5 @@ async def generate_chatbot_reply(user_message: str, history: list, db: Session) 
 
         return reply if reply else chunk["content"]
     except Exception as e:
-        logger.warning(f"[GIGACHAT RAG FALLBACK] GigaChat API Notice (using local RAG fallback): {e}")
+        logger.warning("GigaChat unavailable, answering from the knowledge base: %s", e)
         return chunk["content"]
-

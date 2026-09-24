@@ -1,93 +1,156 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, Info, MessageCircle, HelpCircle } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronDown, HelpCircle, Search, MessageCircle, MessageSquarePlus } from 'lucide-react';
+import { motion } from 'framer-motion';
 import DOMPurify from 'dompurify';
+import { contentApi } from '../services/api';
+import { openChat } from '../utils/chat';
+import SectionIcon from '../components/SectionIcon';
 
-const FAQItem = ({ question, answer, isOpen, onClick }) => (
-  <div className={`faq-accordion-item ${isOpen ? 'active' : ''}`}>
-    <button className="faq-accordion-trigger" onClick={onClick}>
-      <span>{question}</span>
-      <ChevronDown size={18} />
-    </button>
-    <AnimatePresence initial={false}>
-      {isOpen && (
-        <motion.div 
-          className="faq-accordion-content"
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          transition={{ duration: 0.25 }}
+const ICON = { strokeWidth: 1.75 };
+
+const FAQItem = ({ id, question, answer, isOpen, onClick }) => {
+  const buttonId = `faq-q-${id}`;
+  const panelId = `faq-a-${id}`;
+  return (
+    <li className={`faq-item ${isOpen ? 'is-open' : ''}`}>
+      <h2 className="faq-question">
+        <button
+          type="button"
+          id={buttonId}
+          className="faq-trigger"
+          onClick={onClick}
+          aria-expanded={isOpen}
+          aria-controls={panelId}
         >
-          <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(answer || '') }} />
+          <span>{question}</span>
+          <ChevronDown size={20} {...ICON} className="faq-chevron" aria-hidden="true" />
+        </button>
+      </h2>
+      {isOpen && (
+        <motion.div
+          id={panelId}
+          role="region"
+          aria-labelledby={buttonId}
+          className="faq-answer"
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <div className="faq-answer-body" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(answer || '') }} />
         </motion.div>
       )}
-    </AnimatePresence>
-  </div>
-);
+    </li>
+  );
+};
 
 const FaqPage = () => {
   const navigate = useNavigate();
   const [openIndex, setOpenIndex] = useState(null);
 
-  // Read FAQ from localStorage (dynamic data only)
-  const faqItems = (() => {
-    try {
-      const saved = localStorage.getItem('portal_faq');
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  })();
+  const [faqItems, setFaqItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+
+  // Search questions and answer text (answers are HTML, so tags are ignored)
+  const visibleItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const indexed = faqItems.map((item, idx) => ({ item, idx }));
+    if (!q) return indexed;
+    return indexed.filter(({ item }) => {
+      const answerText = (item.answer || '').replace(/<[^>]*>/g, ' ');
+      return `${item.question} ${answerText}`.toLowerCase().includes(q);
+    });
+  }, [faqItems, query]);
+
+  useEffect(() => {
+    contentApi.getFaq()
+      .then(res => setFaqItems(Array.isArray(res) ? res : []))
+      .catch(err => console.warn('FAQ load failed:', err.message))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
-    <div className="container">
-      <div className="page-header">
-        <h1>Частые вопросы (FAQ)</h1>
-      </div>
+    <div className="container cm-page faq-page">
+      <header className="page-header">
+        <div className="page-heading">
+          <SectionIcon section="faq" size="lg" />
+          <div>
+            <h1>Частые вопросы</h1>
+            <p className="page-subtitle">Короткие ответы на то, что первокурсники спрашивают чаще всего.</p>
+          </div>
+        </div>
+      </header>
 
-      {/* ACCORDIONS */}
-      {faqItems.length > 0 ? (
-        <div className="faq-accordions-group">
-          {faqItems.map((item, idx) => (
-            <FAQItem 
-              key={item.id || idx}
-              question={item.question}
-              answer={item.answer}
-              isOpen={openIndex === idx}
-              onClick={() => setOpenIndex(openIndex === idx ? null : idx)}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="empty-state-card" style={{ background: 'white', borderRadius: '24px', padding: '50px 20px', textAlign: 'center', border: '1px solid #e9ecef', marginBottom: '30px' }}>
-          <HelpCircle size={48} strokeWidth={1.5} style={{ color: '#aaa', marginBottom: '12px' }} />
-          <h4 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: '800' }}>Список частых вопросов пуст</h4>
-          <p style={{ margin: 0, fontSize: '0.88rem', color: '#777' }}>Администратор может добавить вопросы через панель управления</p>
-        </div>
-      )}
+      <div className="faq-layout">
+        <div className="faq-main">
+          {faqItems.length > 3 || query ? (
+            <div className="cm-search faq-search">
+              <label htmlFor="faq-search" className="visually-hidden">Поиск по вопросам</label>
+              <Search size={18} {...ICON} className="cm-search-icon" aria-hidden="true" />
+              <input
+                id="faq-search"
+                type="search"
+                className="input"
+                placeholder="Например, стипендия или студенческий"
+                value={query}
+                onChange={(e) => { setQuery(e.target.value); setOpenIndex(null); }}
+              />
+            </div>
+          ) : null}
 
-      {/* FOOTER HELPER */}
-      <div className="faq-help-box">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Info size={24} style={{ color: 'var(--primary)' }} />
-          <h3>Не нашли ответ на свой вопрос?</h3>
+          {loading ? (
+            <ul className="faq-list" aria-busy="true" aria-label="Загрузка вопросов">
+              {[0, 1, 2].map(i => (
+                <li key={i} className="faq-item faq-item-skeleton" aria-hidden="true">
+                  <span className="skeleton faq-skel" />
+                </li>
+              ))}
+            </ul>
+          ) : visibleItems.length > 0 ? (
+            <ul className="faq-list">
+              {visibleItems.map(({ item, idx }) => (
+                <FAQItem
+                  key={item.id || idx}
+                  id={item.id || idx}
+                  question={item.question}
+                  answer={item.answer}
+                  isOpen={openIndex === idx}
+                  onClick={() => setOpenIndex(openIndex === idx ? null : idx)}
+                />
+              ))}
+            </ul>
+          ) : query ? (
+            <div className="empty-state" role="status">
+              <Search size={32} {...ICON} aria-hidden="true" />
+              <h2 className="cm-empty-title">Ничего не нашлось по запросу «{query.trim()}»</h2>
+              <p>Попробуйте другое слово или спросите ВИТШика — он знает больше, чем написано здесь.</p>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <HelpCircle size={32} {...ICON} aria-hidden="true" />
+              <h2 className="cm-empty-title">Список частых вопросов пока пуст</h2>
+              <p>Администратор добавляет вопросы через панель управления. А пока спросите на форуме — там отвечают студенты и кураторы.</p>
+            </div>
+          )}
         </div>
-        <p>
-          Наши студенты и кураторы часто делятся ответами на форуме. Посмотрите обсуждения или задайте свой собственный вопрос!
-        </p>
-        <div className="faq-help-buttons">
-          <button 
-            className="btn-faq-redirect secondary"
-            onClick={() => navigate('/forum')}
-          >
-            Перейти на форум
-          </button>
-          <button 
-            className="btn-faq-redirect primary"
-            onClick={() => navigate('/forum')}
-          >
-            Задать вопрос
-          </button>
-        </div>
+
+        {/* NOT FOUND AN ANSWER */}
+        <aside className="faq-help" aria-labelledby="faq-help-heading">
+          <img src="/img/mascot-160.png" alt="" className="faq-help-mascot" width="72" height="72" />
+          <h2 id="faq-help-heading">Не нашли ответ?</h2>
+          <p>ВИТШик ответит сразу, а на форуме помогут сокурсники и кураторы.</p>
+          <div className="faq-help-actions">
+            <button type="button" className="btn btn-primary" onClick={openChat}>
+              <MessageCircle size={16} {...ICON} aria-hidden="true" />
+              Спросить ВИТШика
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => navigate('/forum')}>
+              <MessageSquarePlus size={16} {...ICON} aria-hidden="true" />
+              Спросить на форуме
+            </button>
+          </div>
+        </aside>
       </div>
     </div>
   );

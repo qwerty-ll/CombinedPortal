@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const EASE = [0.16, 1, 0.3, 1];
+
 const MascotMessage = ({ text, position = "left" }) => {
   const [isMeowing, setIsMeowing] = useState(false);
-  
+
   const handleMascotClick = () => {
     if (isMeowing) return;
     setIsMeowing(true);
@@ -13,34 +15,33 @@ const MascotMessage = ({ text, position = "left" }) => {
   };
 
   return (
-    <motion.div 
-      className={`mascot-level ${position === 'right' ? 'right' : ''}`}
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-    >
-      <motion.div 
-        className="mascot-img-wrapper" 
-        onClick={handleMascotClick} 
-        style={{ cursor: isMeowing ? 'default' : 'pointer' }}
-        animate={isMeowing ? { scale: [1, 1.15, 1], rotate: [0, 5, -5, 0] } : {}}
+    <div className={`mascot-say${position === 'right' ? ' mascot-say-right' : ''}`}>
+      <motion.button
+        type="button"
+        className="mascot-say-button"
+        onClick={handleMascotClick}
+        aria-label="Погладить ВИТШика"
+        animate={isMeowing ? { scale: 1.06 } : { scale: 1 }}
+        transition={{ duration: 0.2, ease: EASE }}
       >
-        <img src="/img/mascot.png" alt="ВИТШик" className="mascot-avatar" />
+        <img src="/img/mascot-160.png" alt="" className="mascot-say-avatar" width="56" height="56" />
         <AnimatePresence>
           {isMeowing && (
-            <motion.div 
-              className="meow-hint active"
-              initial={{ opacity: 0, y: 10, scale: 0.5 }}
-              animate={{ opacity: 1, y: -20, scale: 1.2 }}
-              exit={{ opacity: 0, scale: 0.8 }}
+            <motion.span
+              className="mascot-say-meow"
+              role="status"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: EASE }}
             >
-              Мяу! 🐱
-            </motion.div>
+              Мяу
+            </motion.span>
           )}
         </AnimatePresence>
-      </motion.div>
-      <div className="speech-bubble-level">{text}</div>
-    </motion.div>
+      </motion.button>
+      <div className="message bot">{text}</div>
+    </div>
   );
 };
 

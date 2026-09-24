@@ -1,185 +1,115 @@
-import os
 import json
 import logging
+import os
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
-from dotenv import load_dotenv
+from fastapi.responses import JSONResponse
 
-from app.db.database import engine, Base
-import app.models as models  # Explicit top-level import used in seed_database
-import app.core.security as security
-from app.routers import auth, forum, chat, schedule, admin
+from app.core.config import settings
+from app.core import security
+from app.db.database import SessionLocal
+from app.db.migrate import run_migrations
+import app.models as models
+from app.routers import auth, forum, chat, schedule, admin, adaptation
 
-load_dotenv()
-
-# Configure Application Logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger("ivitsh_portal")
-logger.info("Initializing IVITSH KSU Portal Backend Services...")
 
-# Initialize DB tables automatically on startup
-Base.metadata.create_all(bind=engine)
+SEEDS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app", "db", "seeds")
 
 
-def seed_database():
-    """
-    Seed the database from JSON files on first startup.
-    FIX (A-05): Each row is inserted in its own transaction with IntegrityError handling
-    to be safe against multi-worker race conditions where two workers both see count=0
-    and try to seed simultaneously.
-    """
-    from app.db.database import SessionLocal
-    from sqlalchemy.exc import IntegrityError
+def _seed_table_if_empty(db, model, filename: str) -> None:
+    path = os.path.join(SEEDS_DIR, filename)
+    if db.query(model).first() is not None or not os.path.exists(path):
+        return
+    with open(path, "r", encoding="utf-8") as f:
+        rows = json.load(f)
+    db.add_all(model(**row) for row in rows)
+    db.commit()
+    logger.info("Seeded %d rows into %s from %s", len(rows), model.__tablename__, filename)
+
+
+def seed_database() -> None:
+    """Fill reference tables on first start only; afterwards they are managed from the admin panel."""
     db = SessionLocal()
-    seeds_dir = os.path.join(os.path.dirname(__file__), "app", "db", "seeds")
     try:
-        teachers_file = os.path.join(seeds_dir, "teachers.json")
-        if os.path.exists(teachers_file):
-            with open(teachers_file, "r", encoding="utf-8") as f:
-                teachers_seed = json.load(f)
-            # Always sync teachers from JSON to ensure accurate data
-            db.query(models.Teacher).delete()
-            db.commit()
-            inserted = 0
-            for t in teachers_seed:
-                try:
-                    db.add(models.Teacher(**t))
-                    db.commit()
-                    inserted += 1
-                except IntegrityError:
-                    db.rollback()
-            logger.info(f"[DB SEED] Successfully synced {inserted}/{len(teachers_seed)} teachers from teachers.json")
-
-        subjects_file = os.path.join(seeds_dir, "subjects.json")
-        if db.query(models.Subject).count() == 0 and os.path.exists(subjects_file):
-            with open(subjects_file, "r", encoding="utf-8") as f:
-                subjects_seed = json.load(f)
-            inserted = 0
-            for s in subjects_seed:
-                try:
-                    db.add(models.Subject(**s))
-                    db.commit()
-                    inserted += 1
-                except IntegrityError:
-                    db.rollback()
-            logger.info(f"[DB SEED] Seeded {inserted}/{len(subjects_seed)} subjects from subjects.json")
-    except Exception as e:
+        _seed_table_if_empty(db, models.Teacher, "teachers.json")
+        _seed_table_if_empty(db, models.Subject, "subjects.json")
+    except Exception:
         db.rollback()
-        logger.warning(f"[DB SEED WARN] Could not seed database: {e}")
+        logger.exception("Could not seed the database")
     finally:
         db.close()
 
 
-seed_database()
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    logger.info("Starting IVITSH KSU Portal backend")
+    run_migrations()
+    seed_database()
+    yield
 
-
-DOCS_ENABLED = os.getenv("DOCS_ENABLED", "true").lower() == "true"
 
 app = FastAPI(
     title="Портал ИВИТШ КГУ API",
-    description="Официальный REST API для сайта-портала и гайда адаптации первокурсников Высшей ИТ-Школы КГУ",
-    version="1.0.0",
-    docs_url="/docs" if DOCS_ENABLED else None,
-    redoc_url="/redoc" if DOCS_ENABLED else None,
-    openapi_url="/openapi.json" if DOCS_ENABLED else None,
+    description="REST API портала и гайда адаптации первокурсников Высшей ИТ-Школы КГУ",
+    version="1.1.0",
+    docs_url="/docs" if settings.DOCS_ENABLED else None,
+    redoc_url="/redoc" if settings.DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if settings.DOCS_ENABLED else None,
+    lifespan=lifespan,
 )
 
-# Enable GZip Response Compression for Mobile / Low-Bandwidth Networks (>500 bytes)
+_UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+@app.middleware("http")
+async def csrf_protection(request: Request, call_next):
+    """Cookie-authenticated writes must carry X-Requested-With.
+
+    A foreign site cannot add that header without a CORS preflight, which only ALLOWED_ORIGINS pass.
+    Requests authenticated with an explicit Bearer header are not exposed to CSRF and are let through.
+    """
+    if (
+        request.method in _UNSAFE_METHODS
+        and request.url.path.startswith("/api/")
+        and security.AUTH_COOKIE_NAME in request.cookies
+        and not request.headers.get("authorization")
+        and request.headers.get(security.CSRF_HEADER_NAME) != security.CSRF_HEADER_VALUE
+    ):
+        return JSONResponse(status_code=403, content={"detail": "Запрос отклонён: отсутствует CSRF-заголовок"})
+    return await call_next(request)
+
+
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
-# CORS Configuration (Security Hardening)
-# - Explicitly whitelist allowed origins for dev and prod environments.
-# - Can be overridden dynamically via ALLOWED_ORIGINS environment variable.
-# - Credentials (cookies/headers) allowed only for trusted origins.
-allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
-origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()] if allowed_origins_env else [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:5173",
-    "https://ivitsh-portal.kosgos.ru",
-    "https://portal.kosgos.ru",
-    "https://combined-portal-freshman.vercel.app"
-]
+# The SPA is served from the same origin as the API (nginx / Vite proxy), so CORS is only needed
+# for extra trusted front-ends listed explicitly in ALLOWED_ORIGINS.
+if settings.ALLOWED_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.ALLOWED_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Accept", security.CSRF_HEADER_NAME],
+    )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
-)
-
-# Include Router Modules
 app.include_router(auth.router)
 app.include_router(forum.router)
 app.include_router(chat.router)
 app.include_router(schedule.router)
 app.include_router(admin.router)
+app.include_router(adaptation.router)
 
 
 @app.get("/api/v1/health")
 def health_check():
-    """Health check — verifies API is alive. Does not probe DB intentionally (lightweight)."""
+    """Liveness probe; intentionally does not touch the database."""
     return {"status": "ok", "service": "IVITSH Portal Backend API"}
-
-
-@app.get("/", response_class=HTMLResponse)
-def read_root(current_user: models.User = Depends(security.require_current_user)):
-    """Root landing page — returns API portal card for authenticated users."""
-    return """
-    <!DOCTYPE html>
-    <html lang="ru">
-      <head>
-        <meta charset="UTF-8">
-        <title>Портал ИВИТШ КГУ API</title>
-        <style>
-          body { font-family: 'Segoe UI', Arial, sans-serif; background: #F8F9FA; color: #1C1E21; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-          .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.06); text-align: center; max-width: 480px; }
-          h1 { color: #007FFF; margin-top: 0; }
-          .btn { display: inline-block; margin-top: 20px; padding: 14px 28px; background: #007FFF; color: white; text-decoration: none; border-radius: 12px; font-weight: 700; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <h1>🚀 REST API ИВИТШ КГУ</h1>
-          <p>Сервер бэкенда работает штатно на порту 8000.</p>
-          <a href="/docs" class="btn">Документация Swagger (/docs) ↗</a>
-        </div>
-      </body>
-    </html>
-    """
-
-
-# Serve static frontend build if folder exists (Production Container)
-static_dir = os.path.join(os.path.dirname(__file__), "static")
-if os.path.exists(static_dir):
-    assets_dir = os.path.join(static_dir, "assets")
-    if os.path.exists(assets_dir):
-        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
-
-    @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
-        if full_path.startswith("api/"):
-            raise HTTPException(status_code=404, detail="API route not found")
-
-        safe_base = os.path.abspath(static_dir)
-        requested_path = os.path.abspath(os.path.join(static_dir, full_path))
-        if not requested_path.startswith(safe_base):
-            raise HTTPException(status_code=403, detail="Доступ запрещен")
-
-        if os.path.exists(requested_path) and os.path.isfile(requested_path):
-            return FileResponse(requested_path)
-        return FileResponse(os.path.join(static_dir, "index.html"))
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

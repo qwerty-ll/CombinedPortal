@@ -1,0 +1,29 @@
+# The whole portal in one container — the quickest way to run it:
+#   docker compose up --build        then open http://localhost:8080
+#
+# Students sign in with their EIOS account. For the admin panel ("Сотрудник ИВИТШ") put
+# ADMIN_USERNAME and ADMIN_PASSWORD into a .env file next to this one (see .env.example).
+# Data lives in the "portal_data" volume; `docker compose down -v` deletes it.
+#
+# Production (PostgreSQL, HTTPS, separate services) is infrastructure/docker-compose.yml.
+services:
+  portal:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.standalone
+    image: ivitsh-portal:standalone
+    init: true
+    ports:
+      # Only reachable from this computer. Change the host port with PORT=8081 docker compose up.
+      - "127.0.0.1:${PORT:-8080}:8080"
+    environment:
+      PORT: ${PORT:-8080}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # Empty: a key is generated once and kept in the data volume.
+      SECRET_KEY: ${SECRET_KEY:-}
+    volumes:
+      - portal_data:/app/data
+
+volumes:
+  portal_data:

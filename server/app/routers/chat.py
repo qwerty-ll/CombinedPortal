@@ -1,26 +1,29 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from typing import Optional
 
-from app.db.database import get_db
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from app.core import rate_limit
 import app.models as models
 import app.schemas as schemas
+import app.core.security as security
 from app.services.rag_service import generate_chatbot_reply
 
 router = APIRouter(prefix="/api/v1/chat", tags=["Chatbot"])
 
+
 @router.post("", response_model=schemas.ChatResponse)
-async def chat_with_mascot(req: schemas.ChatRequest, db: Session = Depends(get_db)):
+async def chat_with_mascot(
+    req: schemas.ChatRequest,
+    request: Request,
+    current_user: Optional[models.User] = Depends(security.get_current_user),
+):
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="Сообщение не может быть пустым")
 
-    history_list = [h.dict() for h in (req.history or [])]
-    reply = await generate_chatbot_reply(req.message, history_list, db)
-    return schemas.ChatResponse(reply=reply)
+    limiter_key = f"user:{current_user.id}" if current_user else f"ip:{rate_limit.client_ip(request)}"
+    if not rate_limit.chat_requests.hit(limiter_key):
+        raise rate_limit.too_many_requests("Слишком много сообщений. Подожди минутку 🐱")
 
-@router.get("/top-questions", response_model=List[str])
-def get_top_analytics_questions(db: Session = Depends(get_db)):
-    top = db.query(models.AnalyticsQuestion).order_by(models.AnalyticsQuestion.ask_count.desc()).limit(5).all()
-    if not top:
-        return ["Где расписание?", "Как найти 209 кабинет?", "Про стипендию ИВИТШ", "Где коворкинг?"]
-    return [q.question_text for q in top]
+    history = [turn.model_dump() for turn in (req.history or [])]
+    reply = await generate_chatbot_reply(req.message, history, use_llm=current_user is not None)
+    return schemas.ChatResponse(reply=reply)

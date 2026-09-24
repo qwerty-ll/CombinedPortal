@@ -8,11 +8,11 @@
 
 - 🎓 **Путь первокурсника**: Чек-лист важных дел, интерактивные обучающие карточки адаптации.
 - 💬 **Студенческий Форум**: Обсуждения, вопросы, голосования за лучшие ответы и модерация.
-- 🤖 **ИИ Чат-бот ВИТШик (RAG Engine)**: Настоящий гид на базе GigaChat с распознаванием корпусов, аудиторий (101–409), расписаний и преподавателей с каскадным локальным фолбэком.
+- 🤖 **ИИ Чат-бот ВИТШик (RAG)**: отвечает по базе знаний ИВИТШ (аудитории 101–409, стипендии, клубы, преподаватели). Для вошедших пользователей ответ перефразирует GigaChat; гости получают ответ прямо из базы знаний.
 - 👨‍🏫 **Официальный Справочник Преподавателей**: Список кафедр, кабинеты, степени и официальные фотографии **17 реальных преподавателей ИВИТШ КГУ**.
-- 🗓️ **Интерактивное Расписание (EIOS КГУ Integration)**: Асинхронные запросы к ЭИОС КГУ с тайм-аутом 2.5с и мгновенным автономным кэшем для всех групп ИВИТШ (`24-ИСбо-1`, `25-ИВТбо-1` и др.).
+- 🗓️ **Расписание (интеграция с ЭИОС КГУ)**: данные ЭИОС кэшируются на сервере; если ЭИОС недоступна, показывается последняя сохранённая копия с пометкой либо честное сообщение об ошибке — без выдуманных занятий.
 - 🏛️ **Интерактивная Карта Корпуса Б**: Интерактивные схемы и расположения аудиторий 101–409 и Коворкинга ВИТШ (4 этаж).
-- 🔑 **Безопасное Администрирование**: Динамическая аутентификация через `.env` без хардкода, управление JWT-сессиями и мгновенный отзыв токенов.
+- 🔑 **Безопасность**: вход через ЭИОС с привязкой к ID пользователя ЭИОС, JWT только в httpOnly-куке, CSRF-защита, ограничение попыток входа, блокировка пользователей, HTTPS с HSTS и строгой CSP.
 
 ---
 
@@ -20,18 +20,22 @@
 
 ```text
 CombinedPortal/
-├── client/                     # React 18 + Vite SPA (Фронтенд)
-├── server/                     # Python 3.11 + FastAPI (REST API Бэкенд)
-├── infrastructure/             # DevOps конфигурации и скрипты запуска
-│   ├── docker/
-│   │   ├── Dockerfile.client   # Docker-образ фронтенда (Node build + Nginx)
-│   │   └── Dockerfile.server   # Docker-образ бэкенда (Python FastAPI)
-│   ├── docker-compose.yml      # Контейнеризация сервисов
-│   ├── nginx.conf              # Nginx прокси с HSTS, CSP и Rate Limiting
-│   └── DEPLOYMENT_GUIDE.md     # Инструкция по развертыванию
-├── push_and_merge.py           # Вспомогательный скрипт авто-пуша и мерджа в main
-├── .env.example                # Переменные окружения (без секретов)
-└── package.json                # Корневые команды управления
+├── client/                     # React 18 + Vite SPA
+├── server/                     # Python 3.11 + FastAPI
+│   ├── app/                    # routers, models, schemas, services, core (config, security, rate limit)
+│   ├── migrations/             # миграции Alembic
+│   └── tests/                  # pytest
+├── infrastructure/
+│   ├── docker/                 # Dockerfile.client (Node build + Nginx), Dockerfile.server,
+│   │                           # Dockerfile.standalone (всё в одном контейнере) + standalone/
+│   ├── nginx/                  # конфигурация Nginx (HTTPS, CSP, rate limiting)
+│   ├── certs/                  # TLS-сертификат (не коммитится)
+│   ├── docker-compose.yml
+│   └── DEPLOYMENT_GUIDE.md
+├── docs/                       # описание API ЭИОС и СДО КГУ
+├── docker-compose.yml          # всё в одном контейнере для быстрого запуска (не для продакшена)
+├── .env.example                # все переменные окружения (без секретов)
+└── package.json                # корневые команды
 ```
 
 ---
@@ -47,44 +51,71 @@ Nginx сконфигурирован на обработку домена `ivits
 
 ## 🚀 Быстрый запуск
 
-### Вариант 1: Запуск через Docker (Рекомендуемый для Сервера / ВМ)
+### Всё в одном контейнере (запуск одной командой)
 
-1. Подготовьте файл окружения в корне:
-   ```bash
-   cp .env.example .env
-   ```
+Нужен только Docker (Docker Desktop на Windows/macOS).
 
-2. Перейдите в папку `infrastructure` и запустите сборку контейнеров:
-   ```bash
-   cd infrastructure
-   docker compose up -d --build
-   ```
-   *(Или из корня репозитория: `docker compose -f infrastructure/docker-compose.yml up -d --build`)*
+```bash
+docker compose up --build        # первый запуск собирает образ ~2–3 минуты
+```
 
-3. Проверьте доступность:
-   - 💻 **Веб-портал**: `https://ivitsh-portal.kosgos.ru` (или `http://localhost`)
-   - 📖 **Swagger API Документация**: `http://localhost/docs` (управляется флагом `DOCS_ENABLED=true` в `.env`)
+Откройте **http://localhost:8080**. В контейнере сайт (Nginx) и backend (SQLite). Преподаватели и предметы
+загружаются из данных проекта (`server/app/db/seeds`), расписание — из ЭИОС; объявления, FAQ и форум
+в начале пустые и заполняются через сайт и панель управления.
+
+- Студенты входят своей учётной записью ЭИОС КГУ: «Личный кабинет» → «Студент ЭИОС КГУ».
+- Для панели управления задайте `ADMIN_USERNAME` и `ADMIN_PASSWORD` в файле `.env` рядом с
+  `docker-compose.yml` (см. `.env.example`) и войдите через «Сотрудник ИВИТШ».
+
+Остановить — `Ctrl+C` или `docker compose down`; удалить базу — `docker compose down -v`.
+Порт занят — `PORT=8081 docker compose up`. Портал слушает только `127.0.0.1` и работает по HTTP,
+поэтому для продакшена используйте вариант ниже.
+
+### Продакшен (Docker)
+
+```bash
+cp .env.example .env        # заполните SECRET_KEY, POSTGRES_PASSWORD, ADMIN_*, GIGACHAT_*
+# положите TLS-сертификат в infrastructure/certs/ (см. DEPLOYMENT_GUIDE.md)
+docker compose -f infrastructure/docker-compose.yml up -d --build
+```
+
+Портал: `https://ivitsh-portal.kosgos.ru` (или `https://localhost`).
+
+### Локальная разработка
+
+```bash
+cp .env.example .env        # задайте SECRET_KEY и ADMIN_*; для http://localhost можно COOKIE_SECURE=false
+
+# Backend
+python3 -m venv server/venv && source server/venv/bin/activate
+pip install -r server/requirements-dev.txt
+npm run server              # http://localhost:8000, миграции применяются при старте
+
+# Frontend (в другом терминале)
+npm --prefix client install
+npm run dev                 # http://localhost:5173, /api проксируется на :8000
+
+# Тесты backend
+npm test
+```
 
 ---
 
-### Вариант 2: Локальная разработка (без Docker)
+## 🎨 Дизайн
 
-**1. Бэкенд (FastAPI):**
-```bash
-python3 -m venv server/venv
-source server/venv/bin/activate
-pip install -r server/requirements.txt
-PYTHONPATH=server python3 -m uvicorn server.main:app --reload --port 8000
-```
+Интерфейс следует правилам [impeccable](https://github.com/pbakaus/impeccable) (основа) и
+[taste-skill](https://github.com/Leonxlnx/taste-skill) (числовые ограничения). Решения описаны в
+[docs/DESIGN.md](docs/DESIGN.md), сравнение исходного дизайна с текущим — в [docs/redesign/](docs/redesign/):
+[главная, путь, форум](docs/redesign/compare-desktop-1.jpg) · [преподаватели, FAQ, карта, профиль](docs/redesign/compare-desktop-2.jpg) ·
+[вход, админка, чат](docs/redesign/compare-desktop-3.jpg) · [телефон](docs/redesign/compare-mobile.jpg).
 
-**2. Фронтенд (React Vite):**
-```bash
-cd client
-npm install
-npm run dev
-```
+- Токены (цвет, типографика, отступы, радиусы, движение) — `client/src/styles/tokens.css`; новые hex-значения в коде не используются.
+- Общие компоненты — `client/src/styles/shared.css`; стили разделов — `client/src/styles/<раздел>.css`.
+- Шрифт Golos Text подключён локально (`@fontsource-variable/golos-text`), Google Fonts не нужен.
+- Проверка анти-паттернов: `npx -y impeccable detect http://localhost:5173/` (нужен Chrome).
 
 ---
 
-## 📖 Подробное руководство по развертыванию
-Полная инструкция по настройке SSL, проксированию Nginx и передаче проекта на Виртуальную Машину доступна в [infrastructure/DEPLOYMENT_GUIDE.md](infrastructure/DEPLOYMENT_GUIDE.md).
+## 📖 Развертывание
+Настройка HTTPS, сертификата GigaChat, базы данных и смена скомпрометированных секретов описаны в
+[infrastructure/DEPLOYMENT_GUIDE.md](infrastructure/DEPLOYMENT_GUIDE.md).

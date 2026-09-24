@@ -1,0 +1,487 @@
+/* admin — /admin panel. Operate mode: a dense, calm tool (see docs/DESIGN.md).
+   Structure: tab bar → per-tab toolbar (h2 + actions) → editor card (form) → list card (table).
+   Tables collapse to stacked rows at ≤768px. All colors/spacing via tokens. */
+
+.admin-page {
+  container: admin / inline-size;
+}
+
+/* ---------- Tab bar ---------- */
+.admin-tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-8);
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* hairline baseline the selected underline sits on */
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+.admin-tabs::-webkit-scrollbar { display: none; }
+
+.admin-tab {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+.admin-tab::after {
+  content: '';
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transform: scaleX(0);
+  transition: transform var(--dur) var(--ease);
+}
+.admin-tab[aria-selected='true'] { color: var(--text); }
+.admin-tab[aria-selected='true']::after { transform: scaleX(1); }
+.admin-tab:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  border-radius: var(--radius-sm);
+}
+
+.admin-tab-count {
+  min-width: 1.5rem;
+  justify-content: center;
+}
+.admin-tab[aria-selected='true'] .admin-tab-count {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+@media (hover: hover) {
+  .admin-tab:hover:not([aria-selected='true']) {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+}
+
+/* ---------- Toolbar (per tab) ---------- */
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-6);
+  margin-bottom: var(--space-5);
+}
+.admin-toolbar-text {
+  min-width: 0;
+  max-width: var(--prose-width);
+}
+.admin-toolbar h2 { font-size: var(--text-lg); }
+.admin-toolbar p {
+  margin-top: var(--space-1);
+  color: var(--text-2);
+}
+.admin-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ---------- Editor (create / edit form) ---------- */
+.admin-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
+  gap: var(--space-4) var(--space-8);
+  margin-bottom: var(--space-6);
+  scroll-margin-top: var(--space-16);
+}
+.admin-editor-head h3 { font-size: var(--text-md); }
+.admin-editor-head p {
+  margin-top: var(--space-2);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.admin-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.admin-grid-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.admin-span-full { grid-column: 1 / -1; }
+
+.admin-required { color: var(--danger); }
+
+.admin-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  align-self: flex-start;
+  min-height: var(--control-height);
+  cursor: pointer;
+}
+.admin-check input {
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.admin-file-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+.admin-file {
+  max-width: 100%;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+.admin-file::file-selector-button {
+  min-height: var(--control-height);
+  margin-right: var(--space-3);
+  padding: 0 var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit;
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+@media (hover: hover) {
+  .admin-file::file-selector-button:hover { background: var(--surface-hover); }
+}
+
+.admin-photo-preview {
+  width: 3rem;
+  height: 3rem;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+}
+.admin-photo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.admin-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+}
+
+/* ---------- List card + table ---------- */
+.admin-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.admin-table th {
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-align: left;
+  white-space: nowrap;
+}
+.admin-table td {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  vertical-align: middle;
+}
+.admin-table tbody tr {
+  transition: background-color var(--dur-fast) var(--ease);
+}
+.admin-table tbody tr.is-editing { background: var(--accent-soft); }
+
+@media (hover: hover) {
+  .admin-table tbody tr:hover { background: var(--surface-hover); }
+  .admin-table tbody tr.is-editing:hover { background: var(--accent-soft); }
+}
+
+.admin-cell-main { min-width: 14rem; }
+.admin-cell-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+.admin-cell-title {
+  color: var(--text);
+  font-weight: var(--weight-medium);
+}
+.admin-cell-sub {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  max-width: var(--prose-width);
+  margin-top: var(--space-1);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+.admin-cell-meta {
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.admin-cell-wrap { white-space: normal; min-width: 10rem; }
+.admin-cell-email {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-width: 10rem;
+}
+.admin-cell-muted { color: var(--text-3); }
+.admin-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.admin-table th.admin-num { text-align: right; }
+
+.admin-cell-actions,
+.admin-cell-controls {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+.admin-actions {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+.admin-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.admin-actions .btn-icon { color: var(--text-2); }
+
+@media (hover: hover) {
+  .btn.admin-icon-danger:hover:not(:disabled) {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+}
+
+/* Users: role column */
+.admin-cell-role { white-space: nowrap; }
+.admin-role-select {
+  width: auto;
+  min-width: 11rem;
+  min-height: 2.25rem;
+  padding-block: var(--space-1);
+  font-size: var(--text-sm);
+}
+.admin-role-fixed {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+.admin-role-fixed svg { color: var(--text-3); }
+
+/* Adaptation: progress column */
+.admin-cell-progress { width: 40%; }
+.admin-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 18rem;
+}
+.admin-progress .progress {
+  flex: 1 1 auto;
+  min-width: 6rem;
+}
+.admin-progress-complete { background: var(--success); }
+.admin-progress-pct {
+  min-width: 2.75rem;
+  color: var(--text);
+  font-weight: var(--weight-medium);
+  text-align: right;
+}
+.admin-progress-steps {
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+/* ---------- States: empty, loading, error ---------- */
+.admin-empty {
+  padding: var(--space-10) var(--space-6);
+  color: var(--text-2);
+  text-align: center;
+}
+
+.admin-skeleton-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+.admin-skeleton-row:first-of-type { border-top: none; }
+.admin-skeleton-line {
+  width: 60%;
+  height: 0.875rem;
+}
+.admin-skeleton-line-short {
+  width: 35%;
+  height: 0.75rem;
+}
+
+.admin-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.admin-error p {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+/* ---------- Narrow content column (sidebar open on a small laptop, tablets) ---------- */
+@container admin (max-width: 52rem) {
+  .admin-editor { grid-template-columns: minmax(0, 1fr); }
+  .admin-grid-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@container admin (max-width: 36rem) {
+  .admin-grid,
+  .admin-grid-3 { grid-template-columns: minmax(0, 1fr); }
+  .admin-grid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------- Phone: stacked rows, 44px targets ---------- */
+@media (max-width: 768px) {
+  .admin-tabs {
+    margin: 0 calc(var(--space-4) * -1) var(--space-6);
+    padding: 0 var(--space-4);
+  }
+
+  .admin-toolbar { align-items: flex-start; }
+
+  .admin-check { min-height: var(--touch-target); }
+  .admin-file::file-selector-button { min-height: var(--touch-target); }
+
+  .admin-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .admin-table,
+  .admin-table tbody { display: block; }
+  .admin-table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-1) var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--border);
+  }
+  .admin-table tbody tr:first-child { border-top: none; }
+  .admin-table td {
+    display: block;
+    order: 2;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+  .admin-table td:empty { display: none; }
+
+  /* first line: primary cell + icon actions on the right */
+  .admin-table td.admin-cell-main {
+    order: 0;
+    flex: 1 1 calc(100% - 7rem);
+    min-width: 0;
+  }
+  .admin-table td.admin-cell-actions {
+    order: 1;
+    width: auto;
+    margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1) 0 0;
+  }
+  .admin-actions .btn-icon {
+    width: var(--touch-target);
+    min-height: var(--touch-target);
+  }
+
+  /* labelled meta cells flow inline: "Семестр 1  Часы 108  …" */
+  .admin-table td[data-label] {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    white-space: normal;
+    text-align: left;
+  }
+  .admin-table td[data-label]::before {
+    content: attr(data-label);
+    color: var(--text-3);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-regular);
+  }
+  .admin-table td.admin-cell-email,
+  .admin-table td.admin-cell-wrap,
+  .admin-table td.admin-cell-role { flex-basis: 100%; }
+  .admin-cell-role .admin-role-select {
+    flex: 1 1 auto;
+    min-height: var(--touch-target);
+    font-size: var(--text-base); /* 16px keeps iOS from zooming on focus */
+  }
+
+  .admin-table td.admin-cell-controls,
+  .admin-table td.admin-cell-progress {
+    order: 3;
+    flex-basis: 100%;
+    width: auto;
+    text-align: left;
+  }
+  .admin-table td.admin-cell-controls { padding-top: var(--space-2); }
+  .admin-controls { justify-content: flex-start; }
+  .admin-controls .btn {
+    flex: 1 1 0;
+    min-height: var(--touch-target);
+  }
+  .admin-progress {
+    min-width: 0;
+    padding-top: var(--space-1);
+  }
+
+  .admin-empty { padding: var(--space-8) var(--space-4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-tab::after { transition: none; }
+}

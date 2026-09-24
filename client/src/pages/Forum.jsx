@@ -1,12 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search, Plus, MessageSquare, ThumbsUp, ThumbsDown, X, User, Trash2, LogIn, RefreshCw
+  Search, Plus, MessageSquare, ThumbsUp, ThumbsDown, X, Trash2, LogIn, RefreshCw, Pin, SearchX
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { forumApi } from '../services/api';
+import SectionIcon from '../components/SectionIcon';
+
+const ICON = { strokeWidth: 1.75 };
+const EASE = [0.16, 1, 0.3, 1];
+
+/** Russian plural: plural(3, ['ответ', 'ответа', 'ответов']) → 'ответа' */
+const plural = (n, [one, few, many]) => {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+};
 
 const Forum = () => {
   const navigate = useNavigate();
@@ -25,6 +38,7 @@ const Forum = () => {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const askTriggerRef = useRef(null);
 
   const categories = ['Все', 'Учеба', 'Расписание', 'Общежитие', 'Стипендия', 'Организационное'];
 
@@ -51,6 +65,18 @@ const Forum = () => {
     const timer = setTimeout(loadQuestions, searchQuery ? 400 : 0);
     return () => clearTimeout(timer);
   }, [loadQuestions]);
+
+  // Ask-question dialog: close on Escape, return focus to the button that opened it
+  useEffect(() => {
+    if (!isAskModalOpen) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') setIsAskModalOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      const trigger = askTriggerRef.current;
+      if (trigger && trigger.isConnected) trigger.focus();
+    };
+  }, [isAskModalOpen]);
 
   // ── Voting (API) ─────────────────────────────────────────────────────────
   const handleVote = async (id, type, e) => {
@@ -102,6 +128,8 @@ const Forum = () => {
     }
     if (Object.keys(tempErrors).length > 0) {
       setErrors(tempErrors);
+      const firstInvalid = document.getElementById(tempErrors.title ? 'ask-title' : 'ask-text');
+      if (firstInvalid) firstInvalid.focus();
       return;
     }
 
@@ -119,7 +147,7 @@ const Forum = () => {
       setNewText('');
       setNewCategory('Учеба');
       setErrors({});
-      toast.show('Вопрос опубликован!', 'success');
+      toast.show('Вопрос опубликован', 'success');
     } catch (err) {
       toast.show(err.message || 'Ошибка при публикации вопроса', 'warning');
     } finally {
@@ -134,9 +162,20 @@ const Forum = () => {
     try {
       await forumApi.deleteQuestion(id);
       setQuestions(prev => prev.filter(q => q.id !== id));
-      toast.show('Вопрос удалён с сервера', 'info');
+      toast.show('Вопрос удалён', 'info');
     } catch (err) {
       toast.show(err.message || 'Ошибка удаления вопроса', 'warning');
+    }
+  };
+
+  const handleTogglePin = async (id, e) => {
+    e.stopPropagation();
+    try {
+      const res = await forumApi.togglePin(id);
+      setQuestions(prev => prev.map(q => (q.id === id ? { ...q, is_pinned: res.is_pinned } : q)));
+      toast.show(res.is_pinned ? 'Вопрос закреплён' : 'Вопрос откреплён', 'info');
+    } catch (err) {
+      toast.show(err.message || 'Не удалось закрепить вопрос', 'warning');
     }
   };
 
@@ -179,9 +218,9 @@ const Forum = () => {
   };
 
   const getRoleBadge = (role) => {
-    if (role === 'admin') return <span className="role-badge admin">Админ</span>;
-    if (role === 'moderator') return <span className="role-badge moderator">Модератор</span>;
-    if (role === 'curator') return <span className="role-badge curator">Куратор</span>;
+    if (role === 'admin') return <span className="badge badge-accent">Админ</span>;
+    if (role === 'moderator') return <span className="badge badge-warning">Модератор</span>;
+    if (role === 'curator') return <span className="badge badge-success">Куратор</span>;
     return null;
   };
 
@@ -192,180 +231,297 @@ const Forum = () => {
     } catch { return dateStr; }
   };
 
-  return (
-    <div className="container">
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-        <h1>Форум студентов</h1>
-        <button onClick={loadQuestions} title="Обновить" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}>
-          <RefreshCw size={18} />
-        </button>
-      </div>
+  const openAskModal = (e) => { askTriggerRef.current = e ? e.currentTarget : null; setIsAskModalOpen(true); setErrors({}); };
+  const isFiltered = selectedCategory !== 'Все' || searchQuery.trim() !== '';
+  const resetFilters = () => { setSearchQuery(''); setSelectedCategory('Все'); };
 
-      {/* AUTH GATE BANNER */}
-      {!isLoggedIn && (
-        <div className="auth-gate-banner">
-          <div className="auth-gate-content">
-            <LogIn size={20} />
-            <div>
-              <strong>Для участия в форуме необходимо войти через СДО КГУ</strong>
-              <p>Вы можете просматривать темы, но для создания вопросов и ответов нужна авторизация</p>
-            </div>
+  const titleErrorId = 'ask-title-error';
+  const textErrorId = 'ask-text-error';
+
+  return (
+    <div className="container cm-page">
+      <header className="page-header">
+        <div className="page-heading">
+          <SectionIcon section="forum" size="lg" />
+          <div>
+            <h1>Форум студентов</h1>
+            <p className="page-subtitle">Вопросы об учёбе, расписании и жизни в ИВИТШ — отвечают сокурсники и кураторы.</p>
           </div>
-          <button className="btn-auth-gate" onClick={() => navigate('/profile')}>
-            Войти через СДО
+        </div>
+        {isLoggedIn && (
+          <div className="cm-header-actions">
+            <button type="button" className="btn btn-primary" onClick={openAskModal} aria-haspopup="dialog">
+              <Plus size={18} {...ICON} /> Задать вопрос
+            </button>
+          </div>
+        )}
+      </header>
+
+      {/* AUTH GATE */}
+      {!isLoggedIn && (
+        <div className="cm-notice">
+          <LogIn size={20} {...ICON} className="cm-notice-icon" aria-hidden="true" />
+          <div className="cm-notice-text">
+            <p className="cm-notice-title">Читать обсуждения можно без входа</p>
+            <p>Чтобы задавать вопросы, отвечать и голосовать, войдите через ЭИОС КГУ.</p>
+          </div>
+          <button type="button" className="btn btn-primary" onClick={() => navigate('/profile')}>
+            Войти через ЭИОС
           </button>
         </div>
       )}
 
-      {/* SEARCH BAR */}
-      <div className="forum-search-bar">
-        <div className="search-input-wrapper">
-          <Search size={18} className="search-icon-inside" />
+      {/* SEARCH + FILTERS */}
+      <div className="forum-toolbar">
+        <div className="cm-search">
+          <label htmlFor="forum-search" className="visually-hidden">Поиск по форуму</label>
+          <Search size={18} {...ICON} className="cm-search-icon" aria-hidden="true" />
           <input
-            type="text"
-            placeholder="Поиск по форуму..."
+            id="forum-search"
+            type="search"
+            className="input"
+            placeholder="Поиск по вопросам"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            autoComplete="off"
           />
         </div>
-      </div>
 
-      {/* CONTROLS */}
-      <div className="forum-controls">
-        <div className="category-filter-scroll">
+        <div className="cm-chips" role="group" aria-label="Категория вопросов">
           {categories.map(cat => (
             <button
               key={cat}
-              className={`filter-badge ${selectedCategory === cat ? 'active' : ''}`}
+              type="button"
+              className="chip"
+              aria-pressed={selectedCategory === cat}
               onClick={() => setSelectedCategory(cat)}
             >
               {cat}
             </button>
           ))}
         </div>
-
-        {isLoggedIn && (
-          <button className="btn-ask-question" onClick={() => { setIsAskModalOpen(true); setErrors({}); }}>
-            <Plus size={16} /> Задать вопрос
-          </button>
-        )}
       </div>
 
       {/* DISCUSSIONS FEED */}
-      <div className="posts-feed">
+      <section aria-labelledby="forum-list-heading" aria-busy={loading}>
+        <div className="forum-list-head">
+          <h2 id="forum-list-heading" className="visually-hidden">Вопросы</h2>
+          <p className="forum-count" aria-live="polite">
+            {loading ? 'Загружаем вопросы…' : normalisedQuestions.length > 0 && (
+              <>
+                <span className="tabular">{normalisedQuestions.length}</span>{' '}
+                {plural(normalisedQuestions.length, ['вопрос', 'вопроса', 'вопросов'])}
+                {isFiltered ? ' по фильтру' : ''}
+              </>
+            )}
+          </p>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm forum-refresh"
+            onClick={loadQuestions}
+            disabled={loading}
+          >
+            <RefreshCw size={16} {...ICON} /> Обновить список
+          </button>
+        </div>
+
         {loading ? (
-          <div className="empty-state-card">
-            <MessageSquare size={48} strokeWidth={1.5} />
-            <h4>Загрузка вопросов...</h4>
-          </div>
+          <ul className="forum-list" aria-label="Загрузка вопросов">
+            {[0, 1, 2].map(i => (
+              <li key={i} className="forum-row forum-row-skeleton" aria-hidden="true">
+                <span className="skeleton forum-skel-vote" />
+                <div className="forum-row-main">
+                  <span className="skeleton forum-skel-title" />
+                  <span className="skeleton forum-skel-line" />
+                  <span className="skeleton forum-skel-meta" />
+                </div>
+              </li>
+            ))}
+          </ul>
         ) : normalisedQuestions.length > 0 ? (
-          normalisedQuestions.map((q) => {
-            const canDelete = isOwnPost(q) || canModerate;
-            return (
-              <motion.div
-                key={q.id}
-                className="post-card-container"
-                onClick={() => navigate(`/forum/question/${q.id}`)}
-                initial={{ opacity: 0, y: 15 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-              >
-                <div className="post-top-row">
-                  <div className="post-author-badge">
-                    <div className="post-author-avatar" style={{ background: '#E0F2FE', color: '#0369A1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', overflow: 'hidden', flexShrink: 0 }}>
-                      <User size={18} />
+          <ul className="forum-list">
+            {normalisedQuestions.map((q) => {
+              const canDelete = isOwnPost(q) || canModerate;
+              const excerpt = (q.text || '').length > 150 ? `${(q.text || '').slice(0, 150)}…` : (q.text || '');
+              return (
+                <li key={q.id} className={`forum-row ${q.is_pinned ? 'is-pinned' : ''}`}>
+                  <div className="cm-vote forum-row-vote" role="group" aria-label="Оценка вопроса">
+                    <button
+                      type="button"
+                      className="cm-vote-btn"
+                      data-kind="like"
+                      aria-pressed={q.userVote === 'like'}
+                      aria-label="Полезный вопрос"
+                      title="Полезный вопрос"
+                      onClick={(e) => handleVote(q.id, 'like', e)}
+                    >
+                      <ThumbsUp size={16} {...ICON} />
+                    </button>
+                    <span className="cm-vote-count tabular" aria-label={`Рейтинг ${q.rating}`}>{q.rating}</span>
+                    <button
+                      type="button"
+                      className="cm-vote-btn"
+                      data-kind="dislike"
+                      aria-pressed={q.userVote === 'dislike'}
+                      aria-label="Бесполезный вопрос"
+                      title="Бесполезный вопрос"
+                      onClick={(e) => handleVote(q.id, 'dislike', e)}
+                    >
+                      <ThumbsDown size={16} {...ICON} />
+                    </button>
+                  </div>
+
+                  <div className="forum-row-main">
+                    <div className="forum-row-tags">
+                      {q.is_pinned && (
+                        <span className="badge badge-accent">
+                          <Pin size={12} {...ICON} aria-hidden="true" /> Закреплён
+                        </span>
+                      )}
+                      <span className="badge">{q.category}</span>
+                      {q.answersCount === 0 && <span className="badge badge-warning">Ждёт ответа</span>}
                     </div>
-                    <div className="post-author-meta">
-                      <h5>
+                    <h3 className="forum-row-title">
+                      <Link to={`/forum/question/${q.id}`}>{highlightText(q.title, searchQuery)}</Link>
+                    </h3>
+                    {excerpt && <p className="forum-row-excerpt">{highlightText(excerpt, searchQuery)}</p>}
+                    <p className="forum-row-meta">
+                      <span className="forum-row-author">
                         {q.author.name}
                         {getRoleBadge(q.author.role)}
-                      </h5>
-                      <span>{q.author.group}{q.author.group && ' • '}{q.category}</span>
-                    </div>
+                      </span>
+                      <time className="tabular cm-dot" dateTime={q.created_at}>{formatDate(q.created_at)}</time>
+                      <span className="forum-row-answers cm-dot">
+                        <MessageSquare size={14} {...ICON} aria-hidden="true" />
+                        <span className="tabular">{q.answersCount}</span>{' '}
+                        {plural(q.answersCount, ['ответ', 'ответа', 'ответов'])}
+                      </span>
+                    </p>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span className="post-time-ago">{formatDate(q.created_at)}</span>
-                    {canDelete && (
-                      <button
-                        className="vote-action-btn dislike"
-                        style={{ padding: '4px', height: 'auto', width: 'auto', borderRadius: '4px' }}
-                        onClick={(e) => handleDeleteQuestion(q.id, e)}
-                        title="Удалить вопрос"
-                      >
-                        <Trash2 size={16} style={{ color: '#E74C3C' }} />
-                      </button>
-                    )}
-                  </div>
-                </div>
 
-                <h3>{highlightText(q.title, searchQuery)}</h3>
-                <p className="post-excerpt">{highlightText((q.text || '').length > 150 ? `${(q.text || '').slice(0, 150)}...` : (q.text || ''), searchQuery)}</p>
-
-                <div className="post-bottom-row">
-                  <span className="post-tag-badge">{q.category}</span>
-                  <div className="post-stats-group">
-                    <span className="post-stat-item">
-                      <MessageSquare size={14} /> {q.answersCount} ответов
-                    </span>
-                    <div className="post-voting-buttons">
-                      <button
-                        className={`vote-action-btn like ${q.userVote === 'like' ? 'active' : ''}`}
-                        onClick={(e) => handleVote(q.id, 'like', e)}
-                        title="Нравится"
-                      >
-                        <ThumbsUp size={14} />
-                      </button>
-                      <span className="vote-count-number">{q.rating}</span>
-                      <button
-                        className={`vote-action-btn dislike ${q.userVote === 'dislike' ? 'active' : ''}`}
-                        onClick={(e) => handleVote(q.id, 'dislike', e)}
-                        title="Не нравится"
-                      >
-                        <ThumbsDown size={14} />
-                      </button>
+                  {(canModerate || canDelete) && (
+                    <div className="forum-row-actions">
+                      {canModerate && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm btn-icon cm-pin-btn"
+                          aria-pressed={!!q.is_pinned}
+                          onClick={(e) => handleTogglePin(q.id, e)}
+                          aria-label={q.is_pinned ? 'Открепить вопрос' : 'Закрепить вопрос'}
+                          title={q.is_pinned ? 'Открепить вопрос' : 'Закрепить вопрос'}
+                        >
+                          <Pin size={16} {...ICON} />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm btn-icon cm-delete-btn"
+                          onClick={(e) => handleDeleteQuestion(q.id, e)}
+                          aria-label="Удалить вопрос"
+                          title="Удалить вопрос"
+                        >
+                          <Trash2 size={16} {...ICON} />
+                        </button>
+                      )}
                     </div>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        ) : isFiltered ? (
+          <div className="empty-state">
+            <SearchX size={32} {...ICON} aria-hidden="true" />
+            <h3 className="cm-empty-title">Ничего не найдено</h3>
+            <p>
+              {searchQuery.trim()
+                ? <>По запросу «{searchQuery.trim()}»{selectedCategory !== 'Все' ? ` в категории «${selectedCategory}»` : ''} вопросов нет. </>
+                : <>В категории «{selectedCategory}» пока нет вопросов. </>}
+              Измените запрос или посмотрите все категории.
+            </p>
+            <button type="button" className="btn btn-secondary" onClick={resetFilters}>Сбросить фильтры</button>
+          </div>
         ) : (
-          <div className="empty-state-card">
-            <MessageSquare size={48} strokeWidth={1.5} />
-            <h4>На форуме пока нет вопросов</h4>
-            <p>{isLoggedIn ? 'Станьте первым, кто задаст вопрос!' : 'Войдите через СДО, чтобы задать вопрос'}</p>
+          <div className="empty-state">
+            <MessageSquare size={32} {...ICON} aria-hidden="true" />
+            <h3 className="cm-empty-title">На форуме пока нет вопросов</h3>
+            <p>
+              {isLoggedIn
+                ? 'Задайте первый вопрос — сокурсники и кураторы помогут разобраться.'
+                : 'Войдите через ЭИОС, чтобы задать первый вопрос.'}
+            </p>
+            {isLoggedIn ? (
+              <button type="button" className="btn btn-primary" onClick={openAskModal}>
+                <Plus size={18} {...ICON} /> Задать вопрос
+              </button>
+            ) : (
+              <button type="button" className="btn btn-secondary" onClick={() => navigate('/profile')}>
+                Войти через ЭИОС
+              </button>
+            )}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* CREATE QUESTION MODAL */}
+      {/* CREATE QUESTION DIALOG */}
       <AnimatePresence>
         {isAskModalOpen && (
-          <div className="modal-overlay" onClick={() => setIsAskModalOpen(false)}>
-            <div className="auth-modal" onClick={(e) => e.stopPropagation()} style={{ width: '500px' }}>
-              <button className="close-modal" onClick={() => setIsAskModalOpen(false)}><X size={20} /></button>
-              <h3 style={{ fontWeight: '800' }}>Новый вопрос на форум</h3>
+          <motion.div
+            className="modal-overlay"
+            onClick={() => setIsAskModalOpen(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: EASE }}
+          >
+            <motion.div
+              className="modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="ask-dialog-title"
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.24, ease: EASE }}
+            >
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setIsAskModalOpen(false)}
+                aria-label="Закрыть окно"
+              >
+                <X size={20} {...ICON} />
+              </button>
+              <h2 id="ask-dialog-title">Новый вопрос</h2>
 
-              <form onSubmit={handleCreateQuestion} className="ask-form-modal" style={{ marginTop: '20px' }}>
-                <div className="form-group-modal" style={{ display: 'flex', flexDirection: 'column' }}>
-                  <label>Заголовок вопроса</label>
+              <form onSubmit={handleCreateQuestion} className="cm-form" noValidate>
+                <div className="field">
+                  <label className="field-label" htmlFor="ask-title">Заголовок</label>
                   <input
+                    id="ask-title"
                     type="text"
-                    placeholder="Сформулируйте ваш вопрос кратко..."
+                    className="input"
                     value={newTitle}
                     onChange={(e) => { setNewTitle(e.target.value); if (errors.title) setErrors(prev => ({ ...prev, title: null })); }}
                     maxLength={300}
                     required
+                    autoFocus
+                    aria-invalid={errors.title ? 'true' : 'false'}
+                    aria-describedby={`ask-title-hint${errors.title ? ` ${titleErrorId}` : ''}`}
                   />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                    {errors.title ? <span className="form-field-error">{errors.title}</span> : <span />}
-                    <span className="form-char-counter">{newTitle.length} / 300</span>
+                  <div className="cm-field-meta">
+                    {errors.title
+                      ? <span className="field-error" id={titleErrorId}>{errors.title}</span>
+                      : <span className="field-hint" id="ask-title-hint">Коротко опишите суть, от 10 символов</span>}
+                    <span className="cm-counter tabular" aria-hidden="true">{newTitle.length} / 300</span>
                   </div>
                 </div>
 
-                <div className="form-group-modal">
-                  <label>Категория</label>
-                  <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
+                <div className="field">
+                  <label className="field-label" htmlFor="ask-category">Категория</label>
+                  <select id="ask-category" className="select" value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
                     <option value="Учеба">Учеба</option>
                     <option value="Расписание">Расписание</option>
                     <option value="Общежитие">Общежитие</option>
@@ -374,27 +530,37 @@ const Forum = () => {
                   </select>
                 </div>
 
-                <div className="form-group-modal" style={{ display: 'flex', flexDirection: 'column' }}>
-                  <label>Подробное описание</label>
+                <div className="field">
+                  <label className="field-label" htmlFor="ask-text">Подробное описание</label>
                   <textarea
-                    placeholder="Опишите детали вашего вопроса..."
+                    id="ask-text"
+                    className="textarea cm-textarea-lg"
                     value={newText}
                     onChange={(e) => { setNewText(e.target.value); if (errors.text) setErrors(prev => ({ ...prev, text: null })); }}
                     maxLength={10000}
                     required
+                    aria-invalid={errors.text ? 'true' : 'false'}
+                    aria-describedby={`ask-text-hint${errors.text ? ` ${textErrorId}` : ''}`}
                   />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                    {errors.text ? <span className="form-field-error">{errors.text}</span> : <span />}
-                    <span className="form-char-counter">{newText.length} / 10000</span>
+                  <div className="cm-field-meta">
+                    {errors.text
+                      ? <span className="field-error" id={textErrorId}>{errors.text}</span>
+                      : <span className="field-hint" id="ask-text-hint">Что уже пробовали и что осталось непонятным, от 20 символов</span>}
+                    <span className="cm-counter tabular" aria-hidden="true">{newText.length} / 10 000</span>
                   </div>
                 </div>
 
-                <button type="submit" className="btn-auth" style={{ marginTop: '10px' }} disabled={submitting}>
-                  {submitting ? 'Публикуем...' : 'Опубликовать'}
-                </button>
+                <div className="cm-form-actions">
+                  <button type="button" className="btn btn-ghost" onClick={() => setIsAskModalOpen(false)}>
+                    Отменить
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={submitting}>
+                    {submitting ? 'Публикуем…' : 'Опубликовать вопрос'}
+                  </button>
+                </div>
               </form>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
