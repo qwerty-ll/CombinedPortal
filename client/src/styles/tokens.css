@@ -35,6 +35,7 @@
   --warm-strong: #B04E0B;
   --warm-soft: #FFEBDA;
   --warm-soft-2: #FFDCBE;             /* the disc behind the mascot on warm panels */
+  --warm-ink: #9A4409;                /* text on --warm-soft-2, 5.1:1 */
 
   /* Section hues: soft tile + strong icon/text (strong ≥ 4.5:1 on its soft) */
   --hue-blue: #1C5ED6;    --hue-blue-soft: #E3ECFF;
