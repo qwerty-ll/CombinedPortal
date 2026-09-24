@@ -24,10 +24,11 @@ const AdminPanel = () => {
   }, [isAdmin, navigate]);
 
   // --- USERS ---
+  const [usersError, setUsersError] = useState('');
   const loadUsers = useCallback(() => {
     adminApi.getUsers()
-      .then(res => { if (Array.isArray(res)) setUsersList(res); })
-      .catch(e => console.warn('Failed to load users:', e));
+      .then(res => { setUsersError(''); if (Array.isArray(res)) setUsersList(res); })
+      .catch(e => { setUsersError(e.message || 'Не удалось загрузить пользователей'); setUsersList([]); });
   }, []);
 
   useEffect(() => {
@@ -362,10 +363,11 @@ const AdminPanel = () => {
 
   // --- ADAPTATIONS ---
   const [adaptationsList, setAdaptationsList] = useState([]);
+  const [adaptationsError, setAdaptationsError] = useState('');
   const loadAdaptations = useCallback(() => {
     adminApi.getAdaptations()
-      .then(res => { if (Array.isArray(res)) setAdaptationsList(res); })
-      .catch(e => console.warn('Failed to load adaptations:', e));
+      .then(res => { setAdaptationsError(''); if (Array.isArray(res)) setAdaptationsList(res); })
+      .catch(e => { setAdaptationsError(e.message || 'Не удалось загрузить прогресс адаптации'); setAdaptationsList([]); });
   }, []);
 
   useEffect(() => {
@@ -693,7 +695,9 @@ const AdminPanel = () => {
             </div>
 
             <div className="admin-items-list">
-              {usersList.length === 0 ? (
+              {usersError ? (
+                <div className="admin-empty" style={{ color: '#C53030' }}>Ошибка загрузки: {usersError}</div>
+              ) : usersList.length === 0 ? (
                 <div className="admin-empty">Нет зарегистрированных пользователей.</div>
               ) : usersList.map(u => {
                 const isSuperAdmin = u.auth_source === 'local';
@@ -800,7 +804,9 @@ const AdminPanel = () => {
             </div>
 
             <div className="admin-items-list">
-              {adaptationsList.length === 0 ? (
+              {adaptationsError ? (
+                <div className="admin-empty" style={{ color: '#C53030' }}>Ошибка загрузки: {adaptationsError}</div>
+              ) : adaptationsList.length === 0 ? (
                 <div className="admin-empty">Нет данных по адаптации студентов.</div>
               ) : adaptationsList.map(a => (
                 <div key={a.user_id} className="admin-item-row" style={{ alignItems: 'center', justifyContent: 'space-between' }}>

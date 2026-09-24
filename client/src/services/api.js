@@ -16,6 +16,11 @@ const CACHEABLE_PREFIXES = [
 
 const isCacheable = (endpoint) => CACHEABLE_PREFIXES.some((prefix) => endpoint.startsWith(prefix));
 
+// Fired when the server rejects the session (expired, revoked or blocked); AuthContext signs the user out.
+export const SESSION_EXPIRED_EVENT = 'portal:session-expired';
+// A 401 from these means wrong credentials, not an expired session.
+const LOGIN_ENDPOINTS = ['/api/v1/auth/eios-login', '/api/v1/auth/admin-login', '/api/v1/auth/logout'];
+
 export class ApiError extends Error {
   constructor(message, status) {
     super(message);
@@ -95,6 +100,9 @@ export const apiFetch = async (endpoint, options = {}) => {
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
       const detail = typeof errorData.detail === 'string' ? errorData.detail : `Ошибка сервера: ${res.status}`;
+      if (res.status === 401 && !LOGIN_ENDPOINTS.includes(endpoint)) {
+        window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+      }
       // The server answered: an HTTP error is authoritative and is never masked by cached data.
       throw new ApiError(detail, res.status);
     }

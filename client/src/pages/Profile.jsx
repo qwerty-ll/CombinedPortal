@@ -10,7 +10,7 @@ import { adaptationApi, forumApi } from '../services/api';
 import MiniGamesSection from '../components/MiniGamesSection';
 
 const Profile = () => {
-  const { user, isLoggedIn, login, adminLogin, logout, updateUserProfile } = useAuth();
+  const { user, isLoggedIn, login, adminLogin, logout, updateUserProfile, sessionExpired } = useAuth();
   const toast = useToast();
 
   // Login form states
@@ -210,6 +210,7 @@ const Profile = () => {
               )}
             </div>
 
+            {!loginError && sessionExpired && <div className="login-error">Сессия истекла — войдите снова.</div>}
             {loginError && <div className="login-error">{loginError}</div>}
 
             <button type="submit" className="btn-auth login-submit" disabled={isLoggingIn} style={{ background: loginMode === 'staff' ? '#059669' : 'var(--primary)' }}>

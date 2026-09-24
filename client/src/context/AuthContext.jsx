@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { authApi, clearApiCache } from '../services/api';
+import { authApi, clearApiCache, SESSION_EXPIRED_EVENT } from '../services/api';
 
 const AuthContext = createContext(null);
 const AUTH_STORAGE_KEY = 'portal_auth_user';
@@ -45,10 +45,26 @@ export const AuthProvider = ({ children }) => {
     } catch { /* storage unavailable */ }
   }, []);
 
+  // Set when the server ended the session on its own, so the login form can explain why.
+  const [sessionExpired, setSessionExpired] = useState(false);
+
+  // Signs out locally. Per-user data is only wiped when someone was actually signed in,
+  // so a guest's offline guide progress survives the 401s that guests always get.
   const resetSession = useCallback(() => {
+    let hadUser = false;
+    try { hadUser = !!localStorage.getItem(AUTH_STORAGE_KEY); } catch { /* ignore */ }
     setUser(null);
-    clearUserStorage();
+    if (hadUser) clearUserStorage();
+    return hadUser;
   }, []);
+
+  useEffect(() => {
+    const onExpired = () => {
+      if (resetSession()) setSessionExpired(true);
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, [resetSession]);
 
   // Restore & verify the session on app load
   useEffect(() => {
@@ -65,17 +81,17 @@ export const AuthProvider = ({ children }) => {
         saveUser(cached?.id === res.id && cached.photoUrl ? { ...fresh, photoUrl: cached.photoUrl } : fresh);
       })
       .catch((err) => {
-        if (err.status === 401) {
-          resetSession();
-        } else {
+        // A 401 is handled by the SESSION_EXPIRED_EVENT listener above.
+        if (err.status !== 401) {
           console.warn('[AuthContext] Could not verify session, keeping cached profile:', err.message);
         }
       });
-  }, [resetSession, saveUser]);
+  }, [saveUser]);
 
   const completeLogin = (res) => {
     if (!res || !res.user) return { error: 'Не удалось авторизоваться' };
     if (user && user.id !== res.user.id) clearUserStorage();
+    setSessionExpired(false);
     const nextUser = toClientUser(res.user);
     saveUser(nextUser);
     return nextUser;
@@ -104,7 +120,8 @@ export const AuthProvider = ({ children }) => {
     } catch {
       // The cookie expires on its own; local state is cleared regardless.
     }
-    resetSession();
+    setUser(null);
+    clearUserStorage();
   };
 
   const updateUserProfile = (data = {}) => {
@@ -130,6 +147,7 @@ export const AuthProvider = ({ children }) => {
       isModerator,
       isCurator,
       canModerate,
+      sessionExpired,
       login,
       adminLogin,
       logout,
