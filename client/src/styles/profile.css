@@ -1,9 +1,79 @@
 /* Profile area: login, student profile, mini-games, floating chat widget. Tokens only (see docs/DESIGN.md). */
 
 /* ================= Login (anonymous) ================= */
-.login-card {
-  max-width: 28rem;
+/* One card, two panes: the mascot's warm panel explains why to sign in, the form does it */
+.login-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  max-width: 60rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
 }
+.login-aside {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-8);
+  background: var(--warm-soft);
+  isolation: isolate;
+}
+.login-aside::after {
+  content: '';
+  position: absolute;
+  top: -4rem;
+  left: -4rem;
+  z-index: -1;
+  width: 14rem;
+  height: 14rem;
+  border-radius: 50%;
+  background: var(--warm-soft-2);
+}
+.login-mascot { width: 7.5rem; height: 7.5rem; margin: calc(-1 * var(--space-2)) 0 var(--space-4) calc(-1 * var(--space-2)); }
+.login-aside h1 { font-size: var(--text-xl); letter-spacing: -0.015em; }
+.login-aside-lead { margin-top: var(--space-2); color: var(--text-2); }
+.login-perks {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: auto;
+  padding-top: var(--space-8);
+}
+.login-perks li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+.login-perks .tile { background: var(--surface); }
+
+.login-card { padding: var(--space-8); }
+
+/* Text input with a trailing icon button (show password) */
+.input-wrap { position: relative; }
+.input-with-action { padding-right: calc(var(--control-height) + var(--space-1)); }
+.input-action {
+  position: absolute;
+  top: 50%;
+  right: var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  transform: translateY(-50%);
+}
+@media (hover: hover) {
+  .input-action:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+}
+.login-caps { color: var(--warning); font-weight: var(--weight-medium); }
 
 .login-modes {
   display: flex;
@@ -71,11 +141,20 @@
   min-width: 0;
 }
 
-/* Identity */
+/* Identity: a navy band with the avatar sitting on its edge */
 .profile-identity {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+  padding-top: 0;
+  overflow: hidden;
+}
+.profile-identity::before {
+  content: '';
+  display: block;
+  height: 4.5rem;
+  margin: 0 calc(-1 * var(--space-6));
+  background: var(--brand);
 }
 .profile-identity-main {
   display: flex;
@@ -91,9 +170,16 @@
   height: 5rem;
   flex-shrink: 0;
   overflow: hidden;
+  margin-top: calc(-2.5rem - var(--space-6));
+  border: 4px solid var(--surface);
   border-radius: var(--radius-lg);
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--tile-soft, var(--accent-soft));
+  color: var(--tile, var(--accent));
+}
+.profile-avatar-initials {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.02em;
 }
 .profile-avatar img {
   width: 100%;
@@ -137,17 +223,6 @@
   align-items: flex-start;
   gap: var(--space-4);
   padding: var(--space-4) 0;
-}
-.profile-stat-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  flex-shrink: 0;
-  border-radius: var(--radius);
-  background: var(--surface-2);
-  color: var(--text-2);
 }
 .profile-stat-body {
   display: flex;
@@ -705,7 +780,7 @@
 
   .profile-identity-main {
     flex-direction: row;
-    align-items: center;
+    align-items: flex-end;
   }
   .profile-identity-actions {
     flex-direction: row;
@@ -717,7 +792,15 @@
 }
 
 @media (max-width: 768px) {
-  .login-card { max-width: none; }
+  .login-shell { grid-template-columns: minmax(0, 1fr); }
+  .login-aside { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0 var(--space-4); padding: var(--space-5); }
+  .login-aside::after { width: 8rem; height: 8rem; top: -3rem; left: -3rem; }
+  .login-mascot { width: 4rem; height: 4rem; margin: 0; }
+  .login-aside h1 { flex: 1; font-size: var(--text-lg); }
+  .login-aside-lead { flex-basis: 100%; margin-top: var(--space-3); font-size: var(--text-sm); }
+  .login-perks { display: none; }
+  .login-card { padding: var(--space-5); }
+  .input-action { width: var(--touch-target); height: var(--touch-target); right: 0; }
   .login-modes .segmented-item {
     min-height: var(--touch-target);
     padding: var(--space-1) var(--space-2);
@@ -739,7 +822,7 @@
 
   .chat-toggle {
     right: var(--space-4);
-    bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+    bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom) + var(--space-3));
   }
 
   .chat-panel {

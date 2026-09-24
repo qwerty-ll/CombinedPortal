@@ -7,6 +7,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { forumApi } from '../services/api';
+import SectionIcon from '../components/SectionIcon';
+import { categoryBadgeClass } from '../data/forumCategories';
 
 const ICON = { strokeWidth: 1.75 };
 const EASE = [0.16, 1, 0.3, 1];
@@ -240,9 +242,12 @@ const Forum = () => {
   return (
     <div className="container cm-page">
       <header className="page-header">
-        <div>
-          <h1>Форум студентов</h1>
-          <p className="page-subtitle">Вопросы об учёбе, расписании и жизни в ИВИТШ — отвечают сокурсники и кураторы.</p>
+        <div className="page-heading">
+          <SectionIcon section="forum" size="lg" />
+          <div>
+            <h1>Форум студентов</h1>
+            <p className="page-subtitle">Вопросы об учёбе, расписании и жизни в ИВИТШ — отвечают сокурсники и кураторы.</p>
+          </div>
         </div>
         {isLoggedIn && (
           <div className="cm-header-actions">
@@ -374,7 +379,8 @@ const Forum = () => {
                           <Pin size={12} {...ICON} aria-hidden="true" /> Закреплён
                         </span>
                       )}
-                      <span className="badge">{q.category}</span>
+                      <span className={categoryBadgeClass(q.category)}>{q.category}</span>
+                      {q.answersCount === 0 && <span className="badge badge-hue hue-amber">Ждёт ответа</span>}
                     </div>
                     <h3 className="forum-row-title">
                       <Link to={`/forum/question/${q.id}`}>{highlightText(q.title, searchQuery)}</Link>

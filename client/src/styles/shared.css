@@ -17,6 +17,9 @@
   margin-bottom: var(--space-8);
 }
 .page-header h1 { font-size: var(--text-xl); }
+/* Title with its section tile */
+.page-heading { display: flex; align-items: flex-start; gap: var(--space-4); min-width: 0; }
+.page-heading > .tile { margin-top: 0.125rem; }
 .page-header p,
 .page-subtitle {
   margin-top: var(--space-2);
@@ -42,7 +45,32 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
+  box-shadow: var(--shadow-card);
 }
+
+/* ---------- Section hues & icon tiles ---------- */
+.hue-blue   { --tile: var(--hue-blue);   --tile-soft: var(--hue-blue-soft); }
+.hue-orange { --tile: var(--hue-orange); --tile-soft: var(--hue-orange-soft); }
+.hue-violet { --tile: var(--hue-violet); --tile-soft: var(--hue-violet-soft); }
+.hue-green  { --tile: var(--hue-green);  --tile-soft: var(--hue-green-soft); }
+.hue-pink   { --tile: var(--hue-pink);   --tile-soft: var(--hue-pink-soft); }
+.hue-amber  { --tile: var(--hue-amber);  --tile-soft: var(--hue-amber-soft); }
+.hue-cyan   { --tile: var(--hue-cyan);   --tile-soft: var(--hue-cyan-soft); }
+.hue-slate  { --tile: var(--hue-slate);  --tile-soft: var(--hue-slate-soft); }
+
+.tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius);
+  background: var(--tile-soft, var(--surface-2));
+  color: var(--tile, var(--text-2));
+}
+.tile-sm { width: 2rem; height: 2rem; border-radius: var(--radius-sm); }
+.tile-lg { width: 3rem; height: 3rem; border-radius: var(--radius-lg); }
 .card-compact { padding: var(--space-4); }
 
 /* Rows inside a card: separated by hairlines, never nested cards */
@@ -70,7 +98,7 @@
   justify-content: center;
   gap: var(--space-2);
   min-height: var(--control-height);
-  padding: 0 var(--space-4);
+  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius);
   border: 1px solid transparent;
   font-size: var(--text-sm);
@@ -88,7 +116,7 @@
 .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
 .btn-ghost { background: transparent; color: var(--text-2); }
 .btn-danger { background: var(--surface); color: var(--danger); border-color: var(--border-strong); }
-.btn-sm { min-height: 2rem; padding: 0 var(--space-3); font-size: var(--text-sm); }
+.btn-sm { min-height: 2rem; padding: var(--space-1) var(--space-3); font-size: var(--text-sm); }
 .btn-block { width: 100%; }
 .btn-icon { width: var(--control-height); padding: 0; }
 .btn-icon.btn-sm { width: 2rem; }
@@ -171,6 +199,7 @@
 .badge-success { background: var(--success-soft); color: var(--success); }
 .badge-warning { background: var(--warning-soft); color: var(--warning); }
 .badge-danger { background: var(--danger-soft); color: var(--danger); }
+.badge-hue { background: var(--tile-soft); color: var(--tile); }
 
 /* Filter chips (single-select) */
 .chip {
@@ -188,7 +217,7 @@
   transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 .chip[aria-pressed='true'],
-.chip.active { background: var(--text); border-color: var(--text); color: var(--surface); }
+.chip.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 @media (hover: hover) {
   .chip:hover:not([aria-pressed='true']):not(.active) { background: var(--surface-hover); color: var(--text); }
 }
@@ -210,7 +239,7 @@
   align-items: center;
   gap: var(--space-2);
   min-height: 2rem;
-  padding: 0 var(--space-3);
+  padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-sm);
   color: var(--text-2);
   font-size: var(--text-sm);
@@ -221,8 +250,8 @@
 .segmented-item[aria-selected='true'],
 .segmented-item.active {
   background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 1px 2px rgba(26, 32, 40, 0.08);
+  color: var(--accent);
+  box-shadow: 0 1px 2px rgba(21, 50, 107, 0.1);
 }
 @media (hover: hover) {
   .segmented-item:hover:not([aria-selected='true']):not(.active) { color: var(--text); }
@@ -273,7 +302,7 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-4);
-  background: rgba(26, 32, 40, 0.45);
+  background: rgba(21, 50, 107, 0.45);
 }
 .modal,
 .auth-modal {
@@ -334,4 +363,6 @@
   .chip { min-height: var(--touch-target); }
   .input, .select, .textarea { min-height: var(--touch-target); }
   .modal, .auth-modal { padding: var(--space-5); }
+  .page-heading { gap: var(--space-3); }
+  .page-heading > .tile-lg { width: 2.5rem; height: 2.5rem; border-radius: var(--radius); }
 }

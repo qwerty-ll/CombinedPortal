@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, Mail, MapPin, Phone, ChevronRight, SearchX, Users as UsersIcon, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { contentApi } from '../services/api';
+import SectionIcon from '../components/SectionIcon';
+import { hueFor, initialsOf } from '../utils/avatar';
 
 const ICON = { strokeWidth: 1.75 };
 const EASE = [0.16, 1, 0.3, 1];
@@ -15,14 +17,13 @@ const plural = (n, [one, few, many]) => {
   return many;
 };
 
-const initialsOf = (name = '') => name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
 /** Teacher photo from kosgos.ru with an initials fallback when the image is missing or fails to load. */
 const TeacherPhoto = ({ photo, name, size = 'md' }) => {
   const [failed, setFailed] = useState(false);
   const hasPhoto = photo && !photo.includes('nophoto') && !failed;
   return (
-    <span className={`cm-avatar cm-avatar-${size}`} aria-hidden="true">
+    <span className={`cm-avatar cm-avatar-${size} ${hasPhoto ? '' : `hue-${hueFor(name)} cm-avatar-hue`}`} aria-hidden="true">
       {hasPhoto ? (
         <img src={photo} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
       ) : (
@@ -106,9 +107,12 @@ const Teachers = () => {
   return (
     <div className="container cm-page">
       <header className="page-header">
-        <div>
-          <h1>Преподаватели</h1>
-          <p className="page-subtitle">Преподаватели ИВИТШ КГУ: должности, кабинеты и контакты.</p>
+        <div className="page-heading">
+          <SectionIcon section="teachers" size="lg" />
+          <div>
+            <h1>Преподаватели</h1>
+            <p className="page-subtitle">Преподаватели ИВИТШ КГУ: должности, кабинеты и контакты.</p>
+          </div>
         </div>
       </header>
 

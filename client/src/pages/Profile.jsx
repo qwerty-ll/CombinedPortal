@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
-  GraduationCap, ShieldCheck, BadgeCheck, Compass, MessageSquare, CheckCircle2,
-  LogIn, LogOut, User, Camera, AlertCircle, Clock, Loader2
+  GraduationCap, ShieldCheck, BadgeCheck, CheckCircle2,
+  LogIn, LogOut, Camera, AlertCircle, Clock, Loader2, Eye, EyeOff, CalendarDays
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { adaptationApi, forumApi } from '../services/api';
 import MiniGamesSection from '../components/MiniGamesSection';
+import SectionIcon from '../components/SectionIcon';
+import { hueFor, initialsOf } from '../utils/avatar';
 
 const ICON = { strokeWidth: 1.75, 'aria-hidden': true };
 
@@ -38,6 +40,8 @@ const Profile = () => {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [capsLockOn, setCapsLockOn] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 
   // Load stats from localStorage and API
@@ -147,22 +151,38 @@ const Profile = () => {
   if (!isLoggedIn) {
     const isStaff = loginMode === 'staff';
     const describedBy = [
+      capsLockOn ? 'login-caps' : null,
       !isStaff ? 'login-password-hint' : null,
       loginError ? 'login-error' : null
     ].filter(Boolean).join(' ') || undefined;
+    const trackCapsLock = (e) => setCapsLockOn(!!e.getModifierState?.('CapsLock'));
 
     return (
       <div className="container profile-page">
-        <header className="page-header">
-          <div>
-            <h1>Личный кабинет</h1>
-            <p className="page-subtitle">
-              Войдите, чтобы видеть свой путь адаптации, темы на форуме и мини-игры ВИТШика.
+        <section className="login-shell" aria-labelledby="login-page-title">
+          <div className="login-aside">
+            <img src="/img/mascot-320.png" alt="" className="login-mascot" width="120" height="120" />
+            <h1 id="login-page-title">Личный кабинет</h1>
+            <p className="login-aside-lead">
+              Войдите, и портал запомнит вас: прогресс, вопросы и расписание будут под рукой.
             </p>
+            <ul className="login-perks">
+              <li>
+                <SectionIcon section="guide" size="sm" />
+                <span>Путь первокурсника сохраняется на любом устройстве</span>
+              </li>
+              <li>
+                <SectionIcon section="forum" size="sm" />
+                <span>Вопросы и ответы на форуме от вашего имени</span>
+              </li>
+              <li>
+                <span className="tile tile-sm hue-blue" aria-hidden="true"><CalendarDays size={16} strokeWidth={1.75} /></span>
+                <span>Расписание вашей группы на главной</span>
+              </li>
+            </ul>
           </div>
-        </header>
 
-        <section className="card login-card" aria-labelledby="login-title">
+          <div className="login-card">
           <div
             className="segmented login-modes"
             role="tablist"
@@ -191,9 +211,7 @@ const Profile = () => {
             <h2 id="login-title" className="login-title">
               {isStaff ? 'Вход для администрации ИВИТШ' : 'Вход через ЭИОС КГУ'}
             </h2>
-            <p className="login-lead">
-              {isStaff ? 'Служебная авторизация администраторов и деканата' : 'Единая авторизация студентов eios.kosgos.ru'}
-            </p>
+            {isStaff && <p className="login-lead">Служебная авторизация администраторов и деканата</p>}
 
             <form onSubmit={handleLogin} className="login-form">
               <div className="field">
@@ -218,17 +236,36 @@ const Profile = () => {
 
               <div className="field">
                 <label className="field-label" htmlFor="login-password">Пароль</label>
-                <input
-                  id="login-password"
-                  className="input"
-                  type="password"
-                  autoComplete="current-password"
-                  value={loginForm.password}
-                  onChange={e => setLoginForm({ ...loginForm, password: e.target.value })}
-                  aria-describedby={describedBy}
-                  disabled={isLoggingIn}
-                  required
-                />
+                <div className="input-wrap">
+                  <input
+                    id="login-password"
+                    className="input input-with-action"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    value={loginForm.password}
+                    onChange={e => setLoginForm({ ...loginForm, password: e.target.value })}
+                    onKeyDown={trackCapsLock}
+                    onKeyUp={trackCapsLock}
+                    onBlur={() => setCapsLockOn(false)}
+                    aria-describedby={describedBy}
+                    disabled={isLoggingIn}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="input-action"
+                    onClick={() => setShowPassword(v => !v)}
+                    aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                    aria-pressed={showPassword}
+                    aria-controls="login-password"
+                    disabled={isLoggingIn}
+                  >
+                    {showPassword ? <EyeOff size={18} {...ICON} /> : <Eye size={18} {...ICON} />}
+                  </button>
+                </div>
+                {capsLockOn && (
+                  <p id="login-caps" className="field-hint login-caps" role="status">Включён Caps Lock</p>
+                )}
                 {!isStaff && (
                   <p id="login-password-hint" className="field-hint">
                     Используется единый логин и пароль от аккаунта ЭИОС КГУ (eios.kosgos.ru).
@@ -269,6 +306,7 @@ const Profile = () => {
               </button>
             </form>
           </div>
+          </div>
         </section>
       </div>
     );
@@ -282,18 +320,21 @@ const Profile = () => {
   return (
     <div className="container profile-page">
       <header className="page-header">
-        <h1>Личный кабинет</h1>
+        <div className="page-heading">
+          <SectionIcon section="profile" size="lg" />
+          <h1>Личный кабинет</h1>
+        </div>
       </header>
 
       <div className="profile-layout">
         {/* IDENTITY */}
         <section className="card profile-identity" aria-labelledby="profile-name">
           <div className="profile-identity-main">
-            <div className="profile-avatar">
+            <div className={`profile-avatar hue-${hueFor(user.fullName || user.username)}`}>
               {user.photoUrl && !avatarLoadError ? (
                 <img src={user.photoUrl} alt="" onError={() => setAvatarLoadError(true)} />
               ) : (
-                <User size={36} {...ICON} />
+                <span className="profile-avatar-initials" aria-hidden="true">{initialsOf(user.fullName || user.username)}</span>
               )}
             </div>
 
@@ -346,7 +387,7 @@ const Profile = () => {
 
             <ul className="card list profile-stats">
               <li className="list-row profile-stat">
-                <span className="profile-stat-icon"><Compass size={20} {...ICON} /></span>
+                <SectionIcon section="guide" />
                 <div className="profile-stat-body">
                   <div className="profile-stat-head">
                     <div className="profile-stat-text">
@@ -377,7 +418,7 @@ const Profile = () => {
               </li>
 
               <li className="list-row profile-stat">
-                <span className="profile-stat-icon"><MessageSquare size={20} {...ICON} /></span>
+                <SectionIcon section="forum" />
                 <div className="profile-stat-body">
                   <div className="profile-stat-head">
                     <div className="profile-stat-text">

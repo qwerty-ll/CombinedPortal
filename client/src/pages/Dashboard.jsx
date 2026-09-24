@@ -1,37 +1,57 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  HelpCircle, Users, Map, ChevronRight, ChevronDown, Circle, CheckCircle2, BellRing
+  ChevronRight, ChevronDown, Circle, CheckCircle2, BellRing, ArrowRight, MessageCircle, LogIn
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ScheduleWidget from '../components/ScheduleWidget';
-import { contentApi } from '../services/api';
+import SectionIcon from '../components/SectionIcon';
+import { SECTIONS } from '../data/sections';
+import { contentApi, adaptationApi } from '../services/api';
+import { openChat } from '../utils/chat';
 
 const ICON = { strokeWidth: 1.75, 'aria-hidden': true };
+
+const ROADMAP_STEPS = 9;
+// The guide has its own button in the hero, so it is not repeated here.
+const SHORTCUTS = ['forum', 'map', 'teachers', 'faq'];
+
+const pad2 = (n) => String(n).padStart(2, '0');
+const localIso = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const plural = (n, [one, few, many]) => {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+};
+const cleanTitle = (raw = '') => raw.replace(/^(лек|лаб|пр)\s+/i, '').replace(/,\s*п\/г\s*\d+$/i, '').trim();
+
+/** One line about today's lessons for the hero, or null while the schedule is unknown. */
+const summariseToday = (info) => {
+  if (!info) return null;
+  const now = new Date();
+  const today = localIso(now);
+  const nowHm = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+  const slots = new Map();
+  info.lessons
+    .filter(l => l.дата && l.дата.startsWith(today))
+    .forEach(l => { if (!slots.has(l.начало)) slots.set(l.начало, l); });
+  const lessons = [...slots.values()].sort((a, b) => a.начало.localeCompare(b.начало));
+  const group = info.group ? ` у группы ${info.group}` : '';
+
+  if (lessons.length === 0) return `Сегодня${group} пар нет.`;
+  const count = `Сегодня${group} ${lessons.length} ${plural(lessons.length, ['пара', 'пары', 'пар'])}.`;
+  const where = (l) => (l.аудитория ? `, ${l.аудитория}` : '');
+  const current = lessons.find(l => l.начало <= nowHm && nowHm < l.конец);
+  if (current) return `${count} Сейчас идёт «${cleanTitle(current.дисциплина)}»${where(current)} — до ${current.конец}.`;
+  const next = lessons.find(l => l.начало > nowHm);
+  if (next) return `${count} Следующая — «${cleanTitle(next.дисциплина)}» в ${next.начало}${where(next)}.`;
+  return `${count} На сегодня всё — пары закончились.`;
+};
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, isLoggedIn } = useAuth();
-
-  // --- Schedule group input ---
-  const [groupNumber, setGroupNumber] = useState(() => {
-    return localStorage.getItem('portal_group_number') || '';
-  });
-  const [groupSaved, setGroupSaved] = useState(() => !!localStorage.getItem('portal_group_number'));
-
-  const handleSaveGroup = (e) => {
-    e.preventDefault();
-    if (groupNumber.trim()) {
-      localStorage.setItem('portal_group_number', groupNumber.trim());
-      setGroupSaved(true);
-    }
-  };
-
-  const handleResetGroup = () => {
-    localStorage.removeItem('portal_group_number');
-    setGroupNumber('');
-    setGroupSaved(false);
-  };
 
   // --- Announcements from backend (the API client keeps an offline copy) ---
   const [announcements, setAnnouncements] = useState([]);
@@ -51,15 +71,41 @@ const Dashboard = () => {
     }).catch(e => console.warn('Failed to load DB announcements on Dashboard:', e));
   }, []);
 
+  // --- Adaptation progress for the hero button (server progress merged with this device) ---
+  const [roadmapDone, setRoadmapDone] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('freshman_roadmap_completed') || '[]');
+      return Array.isArray(saved) ? saved.length : 0;
+    } catch { return 0; }
+  });
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    adaptationApi.getMyProgress().then(res => {
+      if (res && Array.isArray(res.completed_steps)) {
+        try {
+          const local = JSON.parse(localStorage.getItem('freshman_roadmap_completed') || '[]');
+          setRoadmapDone(new Set([...local, ...res.completed_steps]).size);
+        } catch {
+          setRoadmapDone(res.completed_steps.length);
+        }
+      }
+    }).catch(() => {});
+  }, [isLoggedIn, user?.id]);
+
+  // --- Today's lessons, reported by the schedule widget ---
+  const [groupLessons, setGroupLessons] = useState(null);
+  const todaySummary = summariseToday(groupLessons);
+
   // Onboarding tasks definition
   const initialTasks = [
     { id: 'profile-curator', text: 'Зайти в личный кабинет', route: '/profile' },
     { id: 'schedule', text: 'Посмотреть расписание', isScheduleTrigger: true },
     { id: 'faq', text: 'Посмотреть частые вопросы', route: '/faq' },
     { id: 'teachers', text: 'Посмотреть преподавателей', route: '/teachers' },
-    { id: 'map', text: 'Перейти в раздел карта', route: '/map' },
-    { id: 'forum', text: 'Перейти в форум', route: '/forum' },
-    { id: 'ads', text: 'Посмотреть объявления', isAdTrigger: true },
+    { id: 'map', text: 'Открыть карту кампуса', route: '/map' },
+    { id: 'forum', text: 'Заглянуть на форум', route: '/forum' },
+    { id: 'ads', text: 'Прочитать объявления', isAdTrigger: true },
   ];
 
   const [completedTaskIds, setCompletedTaskIds] = useState(() => {
@@ -75,92 +121,111 @@ const Dashboard = () => {
     localStorage.setItem('onboarding_completed_tasks', JSON.stringify(completedTaskIds));
   }, [completedTaskIds]);
 
-  const handleTaskClick = (task) => {
-    let nextTaskIds = completedTaskIds;
-    if (!completedTaskIds.includes(task.id)) {
-      nextTaskIds = [...completedTaskIds, task.id];
-      setCompletedTaskIds(nextTaskIds);
-      try {
-        localStorage.setItem('onboarding_completed_tasks', JSON.stringify(nextTaskIds));
-      } catch (e) {}
-    }
+  const markTaskDone = (taskId) => {
+    setCompletedTaskIds(prev => (prev.includes(taskId) ? prev : [...prev, taskId]));
+  };
 
+  // Signing in is the first onboarding step
+  useEffect(() => {
+    if (isLoggedIn) markTaskDone('profile-curator');
+  }, [isLoggedIn]);
+
+  const handleTaskClick = (task) => {
+    markTaskDone(task.id);
     if (task.route) {
       navigate(task.route);
     } else if (task.isScheduleTrigger) {
-      const el = document.getElementById('schedule-section');
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
+      document.getElementById('schedule-section')?.scrollIntoView({ behavior: 'smooth' });
     } else if (task.isAdTrigger) {
-      const el = document.getElementById('announcements-section');
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
+      document.getElementById('announcements-section')?.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
   const toggleAdExpansion = (ad) => {
-    if (!completedTaskIds.includes('ads')) {
-      const nextTaskIds = [...completedTaskIds, 'ads'];
-      setCompletedTaskIds(nextTaskIds);
-      try {
-        localStorage.setItem('onboarding_completed_tasks', JSON.stringify(nextTaskIds));
-      } catch (e) {}
-    }
+    markTaskDone('ads');
     setExpandedAdIds(prev =>
       prev.includes(ad.id) ? prev.filter(id => id !== ad.id) : [...prev, ad.id]
     );
   };
 
-  const completedCount = completedTaskIds.length;
+  const completedCount = initialTasks.filter(t => completedTaskIds.includes(t.id)).length;
   const progressPercent = Math.round((completedCount / initialTasks.length) * 100);
+  const nextTask = initialTasks.find(t => !completedTaskIds.includes(t.id));
+  const [showAllSteps, setShowAllSteps] = useState(false);
 
-  // Once every step is done the checklist folds into a one-line summary (presentation only)
-  const isOnboardingComplete = completedCount >= initialTasks.length;
-  const [showCompletedSteps, setShowCompletedSteps] = useState(false);
-  const showSteps = !isOnboardingComplete || showCompletedSteps;
-
-  // Quick links mark the matching onboarding step as done (navigation itself is the link)
-  const markTaskDone = (taskId) => {
-    if (!completedTaskIds.includes(taskId)) {
-      setCompletedTaskIds(prev => [...prev, taskId]);
-    }
-  };
-
-  const quickLinks = [
-    { taskId: 'faq', to: '/faq', label: 'Частые вопросы', icon: HelpCircle },
-    { taskId: 'teachers', to: '/teachers', label: 'Преподаватели', icon: Users },
-    { taskId: 'map', to: '/map', label: 'Карта кампуса', icon: Map },
-  ];
-
-  // Greeting: a real "Фамилия Имя [Отчество]" becomes "Имя Фамилия"; anything else
-  // (e.g. "Администратор ИВИТШ КГУ", "Студент 24-isbo-085") is shown as is.
-  const greetingName = isLoggedIn
+  // Greeting: a real "Фамилия Имя [Отчество]" becomes "Имя"; anything else
+  // (e.g. "Администратор ИВИТШ КГУ", "Студент 24-isbo-085") keeps the generic greeting.
+  const firstName = isLoggedIn
     ? (() => {
         const parts = (user.fullName || '').trim().split(/\s+/);
         const looksLikeFio = parts.length >= 2 && parts.length <= 3 && parts.every(w => /^[А-ЯЁ][а-яё]+(-[А-ЯЁ]?[а-яё]+)?$/.test(w));
-        if (looksLikeFio) {
-          return `${parts[1]} ${parts[0]}`; // e.g. "Макар Смирнов"
-        }
-        return user.fullName || user.username;
+        return looksLikeFio ? parts[1] : null;
       })()
     : null;
 
   const todayLabel = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
+  const roadmapLeft = Math.max(0, ROADMAP_STEPS - roadmapDone);
 
   return (
     <div className="container dash">
-      {/* GREETING */}
-      <header className="page-header dash-header">
-        <div>
-          <h1>{isLoggedIn ? `Привет, ${greetingName}` : 'Добро пожаловать на портал'}</h1>
-          <p className="page-subtitle">
-            Сегодня {todayLabel}. Хорошего дня и продуктивных занятий.
+      {/* HERO: greeting, today's lessons, the next thing to do */}
+      <section className="dash-hero" aria-labelledby="dash-hello">
+        <div className="dash-hero-text">
+          <p className="dash-hero-date">{todayLabel.charAt(0).toUpperCase() + todayLabel.slice(1)}</p>
+          <h1 id="dash-hello">
+            {firstName ? `Привет, ${firstName}!` : isLoggedIn ? 'Добро пожаловать!' : 'Добро пожаловать на портал ИВИТШ'}
+          </h1>
+          <p className="dash-hero-lead" aria-live="polite">
+            {isLoggedIn
+              ? (todaySummary || 'Здесь расписание, объявления и путь первокурсника — всё в одном месте.')
+              : 'Войдите через ЭИОС: портал запомнит ваш путь адаптации, вопросы на форуме и прогресс.'}
           </p>
+          <div className="dash-hero-actions">
+            {isLoggedIn ? (
+              <Link to="/guide" className="btn btn-primary">
+                {roadmapLeft === 0 ? 'Путь пройден — смотреть награды' : roadmapDone === 0 ? 'Начать путь первокурсника' : 'Продолжить путь'}
+                {roadmapLeft > 0 && roadmapDone > 0 && <span className="dash-hero-count tabular">{roadmapDone} из {ROADMAP_STEPS}</span>}
+                <ArrowRight size={16} {...ICON} />
+              </Link>
+            ) : (
+              <Link to="/profile" className="btn btn-primary">
+                <LogIn size={16} {...ICON} />
+                Войти через ЭИОС
+              </Link>
+            )}
+            <button type="button" className="btn btn-secondary" onClick={openChat}>
+              <MessageCircle size={16} {...ICON} />
+              Спросить ВИТШика
+            </button>
+          </div>
         </div>
-      </header>
+        <img src="/img/mascot-320.png" alt="" className="dash-hero-mascot" width="160" height="160" />
+      </section>
+
+      {/* SECTION SHORTCUTS */}
+      <nav className="dash-shortcuts" aria-label="Разделы портала">
+        <ul>
+          {SHORTCUTS.map((id) => {
+            const { label, path, hint } = SECTIONS[id];
+            return (
+              <li key={id}>
+                <Link to={path} className="dash-shortcut" onClick={() => markTaskDone(id)}>
+                  <SectionIcon section={id} />
+                  <span className="dash-shortcut-text">
+                    <span className="dash-shortcut-label">{label}</span>
+                    <span className="dash-shortcut-hint">{hint}</span>
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
 
       <div className="dash-grid">
         {/* SCHEDULE */}
         <section id="schedule-section" className="dash-main" aria-labelledby="schedule-title">
-          <ScheduleWidget />
+          <ScheduleWidget onGroupLessons={setGroupLessons} />
         </section>
 
         <div className="dash-aside">
@@ -168,6 +233,7 @@ const Dashboard = () => {
           <section id="announcements-section" className="card dash-card" aria-labelledby="announcements-title">
             <div className="dash-card-head">
               <h2 id="announcements-title">Объявления</h2>
+              {announcements.length > 0 && <span className="dash-card-meta tabular">{announcements.length}</span>}
             </div>
 
             {announcements.length > 0 ? (
@@ -176,7 +242,7 @@ const Dashboard = () => {
                   const isExpanded = expandedAdIds.includes(ad.id);
                   const bodyId = `announcement-${ad.id}`;
                   return (
-                    <li key={ad.id} className={`dash-ann ${isExpanded ? 'is-open' : ''}`}>
+                    <li key={ad.id} className={`dash-ann ${isExpanded ? 'is-open' : ''} ${ad.important ? 'is-important' : ''}`}>
                       <h3 className="dash-ann-heading">
                         <button
                           type="button"
@@ -188,8 +254,8 @@ const Dashboard = () => {
                           <span className="dash-ann-text">
                             <span className="dash-ann-title">{ad.title}</span>
                             <span className="dash-ann-meta">
+                              {ad.important && <span className="badge badge-hue hue-orange">Важно</span>}
                               <span className="tabular">{ad.time}</span>
-                              {ad.important && <span className="badge badge-warning">Важно</span>}
                             </span>
                           </span>
                           <ChevronDown size={18} className="dash-chevron" {...ICON} />
@@ -209,15 +275,15 @@ const Dashboard = () => {
               <div className="dash-empty">
                 <BellRing size={24} {...ICON} />
                 <h3>Объявлений пока нет</h3>
-                <p>Администратор добавит объявления через панель управления.</p>
+                <p>Новости института появятся здесь, как только их опубликуют.</p>
               </div>
             )}
           </section>
 
-          {/* ONBOARDING PROGRESS */}
+          {/* ONBOARDING: progress and the one next step; the full list on demand */}
           <section className="card dash-card dash-onboarding" aria-labelledby="onboarding-title">
             <div className="dash-card-head">
-              <h2 id="onboarding-title">Обучение приложению</h2>
+              <h2 id="onboarding-title">Знакомство с порталом</h2>
               <span className="dash-card-meta tabular">
                 {completedCount} из {initialTasks.length}
                 <span className="visually-hidden"> шагов выполнено</span>
@@ -237,23 +303,30 @@ const Dashboard = () => {
               />
             </div>
 
-            {isOnboardingComplete && (
-              <div className="dash-onb-done">
-                <p>Все шаги пройдены.</p>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  aria-expanded={showCompletedSteps}
-                  aria-controls="onboarding-steps"
-                  onClick={() => setShowCompletedSteps(v => !v)}
-                >
-                  {showCompletedSteps ? 'Скрыть шаги' : 'Показать шаги'}
-                  <ChevronDown size={16} className="dash-chevron" {...ICON} />
-                </button>
-              </div>
+            {nextTask ? (
+              <button type="button" className="dash-onb-next" onClick={() => handleTaskClick(nextTask)}>
+                <span className="dash-onb-next-text">
+                  <span className="dash-onb-next-label">Следующий шаг</span>
+                  <span className="dash-onb-next-title">{nextTask.text}</span>
+                </span>
+                <ArrowRight size={18} {...ICON} />
+              </button>
+            ) : (
+              <p className="dash-onb-done">Все шаги пройдены — вы освоились на портале.</p>
             )}
 
-            {showSteps && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm dash-onb-toggle"
+              aria-expanded={showAllSteps}
+              aria-controls="onboarding-steps"
+              onClick={() => setShowAllSteps(v => !v)}
+            >
+              {showAllSteps ? 'Скрыть шаги' : 'Все шаги'}
+              <ChevronDown size={16} className="dash-chevron" {...ICON} />
+            </button>
+
+            {showAllSteps && (
               <ul id="onboarding-steps" className="list dash-rows dash-onb-list">
                 {initialTasks.map((task) => {
                   const isCompleted = completedTaskIds.includes(task.id);
@@ -279,24 +352,6 @@ const Dashboard = () => {
               </ul>
             )}
           </section>
-
-          {/* QUICK LINKS */}
-          <nav className="card dash-card" aria-labelledby="quick-links-title">
-            <div className="dash-card-head">
-              <h2 id="quick-links-title">Быстрые ссылки</h2>
-            </div>
-            <ul className="list dash-rows">
-              {quickLinks.map(({ taskId, to, label, icon: Icon }) => (
-                <li key={to}>
-                  <Link to={to} className="dash-row-btn dash-link-row" onClick={() => markTaskDone(taskId)}>
-                    <Icon size={18} className="dash-row-icon" {...ICON} />
-                    <span className="dash-row-label">{label}</span>
-                    <ChevronRight size={16} className="dash-row-arrow" {...ICON} />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
         </div>
       </div>
     </div>

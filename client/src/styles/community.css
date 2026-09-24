@@ -128,6 +128,7 @@
   object-fit: cover;
 }
 .cm-avatar-lg { width: 5rem; height: 5rem; }
+.cm-avatar-hue { background: var(--tile-soft); color: var(--tile); }
 .cm-avatar-initials {
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
@@ -417,10 +418,18 @@
    FAQ (Read mode)
    ========================================================================= */
 
-.faq-page .page-header,
-.faq-list,
-.faq-page .empty-state,
-.faq-help { max-width: 48rem; }
+.faq-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+@media (min-width: 1100px) {
+  .faq-layout { grid-template-columns: minmax(0, 1fr) 20rem; }
+  .faq-help { position: sticky; top: var(--space-6); }
+}
+.faq-main { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.faq-search { max-width: none; }
 
 .faq-list {
   list-style: none;
@@ -488,6 +497,13 @@
 }
 .faq-answer-body a { text-decoration: underline; }
 
+/* The mascot's warm panel: where to go when the list has no answer */
+.faq-help {
+  padding: var(--space-6);
+  background: var(--warm-soft);
+  border-radius: var(--radius-lg);
+}
+.faq-help-mascot { width: 4.5rem; height: 4.5rem; margin-bottom: var(--space-3); }
 .faq-help h2 { font-size: var(--text-lg); }
 .faq-help p {
   max-width: var(--prose-width);
@@ -496,7 +512,7 @@
 }
 .faq-help-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: var(--space-3);
   margin-top: var(--space-5);
 }
@@ -694,12 +710,28 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   color: var(--text);
   text-decoration: none;
   transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
 .map-route:focus-visible { border-radius: var(--radius-lg); }
-.map-route-icon { color: var(--accent); }
+
+/* Room finder */
+.map-finder { margin-bottom: var(--space-5); }
+.map-finder-row { display: flex; gap: var(--space-3); }
+.map-finder-row .cm-search { flex: 1; max-width: 28rem; }
+.map-finder-result {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--hue-green);
+}
+.map-finder-result:not(:empty) { margin-top: var(--space-3); }
+.map-finder-result svg { height: 1lh; flex-shrink: 0; }
+.map-finder-result strong { font-weight: var(--weight-semibold); }
+.map-finder-result.is-error { color: var(--danger); }
 .map-route-text {
   display: flex;
   flex: 1;
@@ -958,6 +990,8 @@
     padding: var(--space-4);
   }
   .map-route-action-label { display: none; }
+  .map-finder-row { flex-direction: column; }
+  .map-finder-row .cm-search { max-width: none; }
   .map-panel-head { align-items: stretch; }
   .map-viewport {
     aspect-ratio: auto;

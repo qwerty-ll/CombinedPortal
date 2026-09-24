@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, ExternalLink, Plus, Minus, RotateCcw } from 'lucide-react';
+import { MapPin, ExternalLink, Plus, Minus, RotateCcw, Search } from 'lucide-react';
+import SectionIcon from '../components/SectionIcon';
 
 const ICON = { strokeWidth: 1.75 };
 const FLOORS = [1, 2, 3, 4];
@@ -12,10 +13,45 @@ const FLOOR_PLACES = {
   4: ['Коворкинг ВИТШ'],
 };
 
+// "305", "Б-305", "б305", "ауд. 305" → { floor: 3, label: 'Б-305' }; other buildings and numbers → an error message.
+const findRoom = (raw) => {
+  const text = raw.trim();
+  const m = text.match(/(\d)(\d{2})/);
+  if (!m) return { error: 'Введите номер аудитории, например 305 или Б-305.' };
+  const letter = text.match(/([А-ЯЁA-Z])\s*-?\s*\d/i)?.[1]?.toUpperCase();
+  if (letter && letter !== 'Б') return { error: `Схемы есть только для корпуса Б, а ${text} — в другом корпусе.` };
+  const floor = Number(m[1]);
+  if (!FLOORS.includes(floor)) return { error: 'В корпусе Б аудитории с 101 по 409 — проверьте номер.' };
+  return { floor, label: `Б-${m[1]}${m[2]}` };
+};
+
 const CampusMap = () => {
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [selectedFloor, setSelectedFloor] = useState(1);
   const tabRefs = useRef({});
+
+  // Room finder: the first digit of a room number is its floor
+  const [roomQuery, setRoomQuery] = useState('');
+  const [roomResult, setRoomResult] = useState(null);
+  const showRoom = (value) => {
+    const result = findRoom(value);
+    setRoomResult(result);
+    if (result.floor) setSelectedFloor(result.floor);
+  };
+  const handleRoomSubmit = (e) => {
+    e.preventDefault();
+    showRoom(roomQuery);
+  };
+
+  // /map?room=Б-209 (links from the schedule) opens the right floor straight away
+  useEffect(() => {
+    const room = searchParams.get('room');
+    if (room) {
+      setRoomQuery(room);
+      showRoom(room);
+    }
+  }, [searchParams]);
 
   // Zoom & Pan states
   const [zoom, setZoom] = useState(1);
@@ -93,9 +129,12 @@ const CampusMap = () => {
   return (
     <div className="container cm-page">
       <header className="page-header">
-        <div>
-          <h1>Карта кампуса</h1>
-          <p className="page-subtitle">Корпус Б ИВИТШ КГУ: схемы этажей и подсказки, как найти аудиторию.</p>
+        <div className="page-heading">
+          <SectionIcon section="map" size="lg" />
+          <div>
+            <h1>Карта кампуса</h1>
+            <p className="page-subtitle">Корпус Б ИВИТШ КГУ: схемы этажей и подсказки, как найти аудиторию.</p>
+          </div>
         </div>
       </header>
 
@@ -106,7 +145,7 @@ const CampusMap = () => {
         rel="noopener noreferrer"
         className="map-route"
       >
-        <MapPin size={22} {...ICON} className="map-route-icon" aria-hidden="true" />
+        <span className="tile hue-green" aria-hidden="true"><MapPin size={20} {...ICON} /></span>
         <span className="map-route-text">
           <span className="map-route-title">Как добраться до корпуса ИВИТШ</span>
           <span className="map-route-address">г. Кострома, ул. Ивановская, 24а (корпус Б ИВИТШ КГУ)</span>
@@ -146,6 +185,38 @@ const CampusMap = () => {
             ))}
           </div>
         </div>
+
+          {/* ROOM FINDER */}
+          <form className="map-finder" onSubmit={handleRoomSubmit} role="search" aria-label="Найти аудиторию">
+            <div className="field map-finder-field">
+              <label className="field-label" htmlFor="room-search">Найти аудиторию</label>
+              <div className="map-finder-row">
+                <div className="cm-search">
+                  <Search size={18} {...ICON} className="cm-search-icon" aria-hidden="true" />
+                  <input
+                    id="room-search"
+                    className="input"
+                    inputMode="text"
+                    autoComplete="off"
+                    placeholder="Например, Б-305"
+                    value={roomQuery}
+                    onChange={(e) => setRoomQuery(e.target.value)}
+                    aria-describedby="room-result"
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary">Показать на схеме</button>
+              </div>
+            </div>
+            <p id="room-result" className={`map-finder-result ${roomResult?.error ? 'is-error' : ''}`} role="status">
+              {roomResult?.floor && (
+                <>
+                  <MapPin size={16} {...ICON} aria-hidden="true" />
+                  <span><strong>{roomResult.label}</strong> — {roomResult.floor} этаж корпуса Б. Схема этажа открыта ниже.</span>
+                </>
+              )}
+              {roomResult?.error}
+            </p>
+          </form>
 
         <div
           id="floor-panel"

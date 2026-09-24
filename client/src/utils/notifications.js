@@ -24,8 +24,8 @@ export const sendLocalNotification = (title, options = {}) => {
   }
 
   const defaultOptions = {
-    icon: '/img/mascot.png',
-    badge: '/img/mascot.png',
+    icon: '/img/mascot-160.png',
+    badge: '/img/mascot-160.png',
     vibrate: [100, 50, 100],
     ...options
   };

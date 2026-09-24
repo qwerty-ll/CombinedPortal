@@ -2,33 +2,54 @@
 :root {
   color-scheme: light;
 
-  /* Neutrals */
-  --bg: #F5F7F9;
-  --surface: #FCFDFE;
-  --surface-2: #EDF0F4;
-  --surface-hover: #F1F4F7;
-  --border: #DCE0E5;
-  --border-strong: #C2C8CF;
-  --border-input: #878D94;            /* 3.3:1 on surface: form control boundaries */
+  /* Neutrals: tinted toward the brand blue so surfaces separate from the page */
+  --bg: #EEF2F8;
+  --surface: #FDFEFF;
+  --surface-2: #E7ECF4;
+  --surface-hover: #F2F5FA;
+  --border: #D7DEE9;
+  --border-strong: #BCC6D4;
+  --border-input: #7F8899;            /* 3.5:1 on surface: form control boundaries */
 
   /* Text (all ≥ 4.5:1 on --bg, --surface and --surface-2) */
-  --text: #1A2028;
-  --text-2: #474E57;
-  --text-3: #5E646B;
+  --text: #172033;
+  --text-2: #44506A;
+  --text-3: #5A6478;
 
-  /* Accent */
-  --accent: #195FBF;
-  --accent-hover: #094EA6;
-  --accent-soft: #E4EFFF;
-  --on-accent: #FCFDFE;
+  /* Accent: KSU blue */
+  --accent: #1C5ED6;
+  --accent-hover: #164FB8;
+  --accent-soft: #E3ECFF;
+  --accent-soft-hover: #D3E2FF;
+  --on-accent: #FFFFFF;
+
+  /* Brand surfaces: navy panels (hero, login) and the mascot's warm orange */
+  --brand: #15326B;
+  --brand-2: #1C4390;
+  --on-brand: #FFFFFF;
+  --on-brand-2: #BFD0F2;             /* secondary text on --brand, 7.9:1 */
+  --warm: #F08A3C;                    /* decorative only, never text */
+  --warm-strong: #B04E0B;
+  --warm-soft: #FFEBDA;
+  --warm-soft-2: #FFDCBE;             /* the disc behind the mascot on warm panels */
+
+  /* Section hues: soft tile + strong icon/text (strong ≥ 4.5:1 on its soft) */
+  --hue-blue: #1C5ED6;    --hue-blue-soft: #E3ECFF;
+  --hue-orange: #B04E0B;  --hue-orange-soft: #FFEBDA;
+  --hue-violet: #6440C4;  --hue-violet-soft: #EEE8FF;
+  --hue-green: #0D7550;   --hue-green-soft: #DCF4E9;
+  --hue-pink: #B0305F;    --hue-pink-soft: #FFE4EC;
+  --hue-amber: #8F5B00;   --hue-amber-soft: #FFF0C7;
+  --hue-cyan: #0A6A86;    --hue-cyan-soft: #DCF1F8;
+  --hue-slate: #3F4B60;   --hue-slate-soft: #E4E9F1;
 
   /* States */
-  --success: #206B38;
-  --success-soft: #E0F7E4;
+  --success: #1D6B37;
+  --success-soft: #DFF5E5;
   --warning: #8A5100;
-  --warning-soft: #FFF0D0;
-  --danger: #B02A2D;
-  --danger-soft: #FFEAE8;
+  --warning-soft: #FFEFCF;
+  --danger: #B0282C;
+  --danger-soft: #FFE8E6;
 
   /* State colors on dark surfaces (toasts) */
   --on-dark-success: #8FE3A5;
@@ -63,20 +84,22 @@
   --space-16: 4rem;
 
   --content-width: 70rem;   /* 1120px */
-  --prose-width: 68ch;
+  --prose-width: 38em;      /* ~75 characters per line at any font size */
   --sidebar-width: 16rem;
   --sidebar-width-collapsed: 4.5rem;
   --control-height: 2.5rem;
   --touch-target: 2.75rem;  /* 44px */
+  --tab-bar-height: 4rem;
 
   /* Shape */
   --radius-sm: 6px;
   --radius: 8px;
-  --radius-lg: 12px;
+  --radius-lg: 14px;
   --radius-pill: 999px;
 
-  /* Elevation: surfaces use a border, overlays use this shadow */
-  --shadow-overlay: 0 12px 32px -8px rgba(26, 32, 40, 0.18), 0 2px 6px rgba(26, 32, 40, 0.06);
+  /* Elevation: cards get a border plus a faint lift, overlays a real shadow */
+  --shadow-card: 0 1px 2px rgba(21, 50, 107, 0.05), 0 2px 8px -4px rgba(21, 50, 107, 0.08);
+  --shadow-overlay: 0 12px 32px -8px rgba(21, 50, 107, 0.22), 0 2px 6px rgba(21, 50, 107, 0.08);
   --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
 
   /* Motion */

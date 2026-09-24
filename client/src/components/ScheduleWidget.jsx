@@ -3,6 +3,7 @@ import {
   Search, MapPin, User, AlertCircle, ChevronDown, GraduationCap, Check,
   ChevronLeft, ChevronRight, CalendarX2, CloudOff, RotateCw
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { scheduleApi } from '../services/api';
 
 const EIOS_DIRECT_URL = 'https://eios.kosgos.ru/api';
@@ -34,9 +35,9 @@ const cleanDisciplineTitle = (rawTitle) => {
 // Helper for lesson type badge (label + badge tone)
 const getLessonTypeBadge = (disciplineName) => {
   const lower = (disciplineName || '').toLowerCase();
-  if (lower.startsWith('лек') || lower.includes(' лек ')) return { label: 'Лекция', tone: '' };
-  if (lower.startsWith('лаб') || lower.includes(' лаб ')) return { label: 'Лабораторная', tone: '' };
-  if (lower.startsWith('пр') || lower.includes(' пр ')) return { label: 'Практика', tone: '' };
+  if (lower.startsWith('лек') || lower.includes(' лек ')) return { label: 'Лекция', tone: 'badge-hue hue-blue' };
+  if (lower.startsWith('лаб') || lower.includes(' лаб ')) return { label: 'Лабораторная', tone: 'badge-hue hue-violet' };
+  if (lower.startsWith('пр') || lower.includes(' пр ')) return { label: 'Практика', tone: 'badge-hue hue-green' };
   if (lower.includes('экз') || lower.includes('зач')) return { label: 'Аттестация', tone: 'badge-warning' };
   return { label: 'Занятие', tone: '' };
 };
@@ -58,7 +59,9 @@ const TARGET_TYPES = [
   { id: 'aud', label: 'Аудитории', field: 'Аудитория', placeholder: 'Найти аудиторию, например Б-304' },
 ];
 
-const ScheduleWidget = () => {
+// onGroupLessons({ group, lessons }) receives the loaded lessons whenever a group's schedule is shown,
+// so the dashboard can summarise today without fetching the schedule twice.
+const ScheduleWidget = ({ onGroupLessons }) => {
   const [targetType, setTargetType] = useState('group'); // 'group' | 'teacher' | 'aud'
   const availableYears = ['2025-2026', '2024-2025', '2023-2024', '2026-2027'];
 
@@ -129,6 +132,8 @@ const ScheduleWidget = () => {
   const [catalogItems, setCatalogItems] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [rawLessons, setRawLessons] = useState([]);
+  // Which target the loaded lessons belong to (the tab can change before the next fetch finishes)
+  const [lessonsOwner, setLessonsOwner] = useState(null);
   const [lessonsLoading, setLessonsLoading] = useState(false);
   const [error, setError] = useState(null);
   // Set when the backend served the last saved copy because EIOS is unreachable.
@@ -244,6 +249,7 @@ const ScheduleWidget = () => {
     setLessonsLoading(true);
     setError(null);
     setStaleSince(null);
+    setLessonsOwner(null);
     try {
       const res = await scheduleApi.getSchedule(
         targetType === 'group' ? id : null,
@@ -255,11 +261,13 @@ const ScheduleWidget = () => {
 
       const raspData = res?.data?.rasp || (Array.isArray(res?.data) ? res.data : []);
       setRawLessons(raspData);
+      setLessonsOwner({ type: targetType, name });
       setStaleSince(res?.stale && res.cached_at ? new Date(res.cached_at * 1000) : null);
     } catch (err) {
       console.error('[ScheduleWidget] Fetch schedule error:', err);
       setError(err.message || 'Не удалось загрузить расписание.');
       setRawLessons([]);
+      if (targetType === 'group') onGroupLessons?.(null);
     } finally {
       setLessonsLoading(false);
     }
@@ -284,6 +292,12 @@ const ScheduleWidget = () => {
     });
     return result;
   }, [rawLessons]);
+
+  useEffect(() => {
+    if (onGroupLessons && lessonsOwner?.type === 'group') {
+      onGroupLessons({ group: lessonsOwner.name, lessons: deduplicatedLessons });
+    }
+  }, [deduplicatedLessons, lessonsOwner]);
 
   // Get start & end dates for Monday to Saturday of the selectedDate's week
   const weekStartEndDates = useMemo(() => {
@@ -426,16 +440,23 @@ const ScheduleWidget = () => {
           )}
           {iIdx === 0 && slot.lessonNum ? <span className="sched-lesson-num tabular">{slot.lessonNum} пара</span> : null}
           {iIdx === 0 && marker === 'now' && <span className="badge badge-accent sched-marker">Идёт сейчас</span>}
-          {iIdx === 0 && marker === 'next' && <span className="badge sched-marker">Следующая</span>}
+          {iIdx === 0 && marker === 'next' && <span className="badge badge-hue hue-orange sched-marker">Следующая</span>}
         </p>
         <h4 className="sched-lesson-title">{cleanedTitle}</h4>
         <p className="sched-lesson-meta">
-          {item.аудитория && (
+          {item.аудитория && (/^Б-?\d{3}/i.test(item.аудитория) ? (
+            // Rooms in building Б open the floor plan on the campus map
+            <Link to={`/map?room=${encodeURIComponent(item.аудитория)}`} className="sched-lesson-room sched-room-link">
+              <MapPin size={15} {...ICON} />
+              <span className="visually-hidden">Аудитория </span>{item.аудитория}
+              <span className="visually-hidden"> — показать на карте</span>
+            </Link>
+          ) : (
             <span className="sched-lesson-room">
               <MapPin size={15} {...ICON} />
               <span className="visually-hidden">Аудитория </span>{item.аудитория}
             </span>
-          )}
+          ))}
           {item.преподаватель && (
             <span>
               <User size={15} {...ICON} />

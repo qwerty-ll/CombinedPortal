@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, CircleStop, ExternalLink, Maximize2 } from 'lucide-react';
 import { chatApi } from '../services/api';
 import { mapImageNameToPath } from '../utils/chatImages';
+import { OPEN_CHAT_EVENT } from '../utils/chat';
 
 const ICON = { strokeWidth: 1.75, 'aria-hidden': true };
 const EASE = [0.16, 1, 0.3, 1];
@@ -47,6 +48,13 @@ const ChatWidget = () => {
   const [isTyping, setIsTyping] = useState(false);
 
   const isMobile = useIsMobile();
+
+  // Pages open the chat through openChat() (utils/chat.js).
+  useEffect(() => {
+    const open = () => setIsChatOpen(true);
+    window.addEventListener(OPEN_CHAT_EVENT, open);
+    return () => window.removeEventListener(OPEN_CHAT_EVENT, open);
+  }, []);
   const toggleRef = useRef(null);
   const panelRef = useRef(null);
   const bodyRef = useRef(null);
@@ -225,7 +233,7 @@ const ChatWidget = () => {
           tabIndex={-1}
           aria-label="Погладить ВИТШика"
         >
-          <img src="/img/mascot.png" alt="" />
+          <img src="/img/mascot-160.png" alt="" />
         </button>
         <div className="message bot">
           <div className="chat-text">{formattedLines}</div>
@@ -283,7 +291,7 @@ const ChatWidget = () => {
             >
               <header className="chat-header">
                 <span className="chat-avatar">
-                  <img src="/img/mascot.png" alt="" />
+                  <img src="/img/mascot-160.png" alt="" />
                 </span>
                 <div className="chat-header-text">
                   <h2 id="chat-title" className="chat-title">ВИТШик</h2>
@@ -327,7 +335,7 @@ const ChatWidget = () => {
                 {isTyping && (
                   <div className="message-wrapper bot">
                     <span className="chat-msg-avatar" aria-hidden="true">
-                      <img src="/img/mascot.png" alt="" />
+                      <img src="/img/mascot-160.png" alt="" />
                     </span>
                     <div className="message bot chat-typing" role="status">
                       <span className="chat-typing-dots" aria-hidden="true">
@@ -436,7 +444,7 @@ const ChatWidget = () => {
         aria-expanded={isChatOpen}
         aria-haspopup="dialog"
       >
-        <img src="/img/mascot.png" alt="" />
+        <img src="/img/mascot-160.png" alt="" />
       </button>
     </>
   );

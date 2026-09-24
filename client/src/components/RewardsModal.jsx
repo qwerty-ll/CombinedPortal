@@ -109,7 +109,7 @@ export default function RewardsModal({ isOpen, onClose }) {
         <div className="rewards">
           <div className="rewards-hero">
             <motion.img
-              src="/img/mascot.png"
+              src="/img/mascot-160.png"
               alt=""
               className="rewards-mascot"
               width="88"
@@ -170,7 +170,7 @@ export default function RewardsModal({ isOpen, onClose }) {
             <div className="diploma-footer">
               <span>Академический год: <span className="tabular">2025–2026</span></span>
               <span className="diploma-seal">
-                <img src="/img/mascot.png" alt="" width="40" height="40" />
+                <img src="/img/mascot-160.png" alt="" width="40" height="40" />
                 Дирекция ИВИТШ КГУ (Б-209)
               </span>
             </div>

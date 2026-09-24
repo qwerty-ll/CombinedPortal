@@ -2,16 +2,6 @@
    Uses shared primitives from shared.css; everything here is scoped to the guide. */
 
 /* ---------- Page header ---------- */
-.guide-header {
-  flex-wrap: nowrap;
-  align-items: center;
-}
-.guide-header-mascot {
-  width: 72px;
-  height: 72px;
-  object-fit: contain;
-  flex-shrink: 0;
-}
 .guide-header + .section { margin-top: 0; }
 
 /* ---------- Roadmap ---------- */
@@ -70,7 +60,7 @@
   border-radius: 1px;
   background: var(--border);
 }
-.roadmap-step[data-state='done']:not(:last-child)::before { background: var(--accent); }
+.roadmap-step[data-state='done']:not(:last-child)::before { background: var(--success); }
 
 .roadmap-marker {
   position: relative;
@@ -89,11 +79,11 @@
   align-items: center;
   justify-content: center;
 }
-.roadmap-step[data-state='done'] .roadmap-marker { background: var(--accent); color: var(--on-accent); }
+.roadmap-step[data-state='done'] .roadmap-marker { background: var(--success); color: var(--on-accent); }
 .roadmap-step[data-state='current'] .roadmap-marker {
   background: var(--surface);
-  color: var(--accent);
-  box-shadow: inset 0 0 0 2px var(--accent);
+  color: var(--warm-strong);
+  box-shadow: inset 0 0 0 2px var(--warm-strong);
 }
 
 .roadmap-step-text {
@@ -112,9 +102,10 @@
   font-size: var(--text-sm);
   color: var(--text-2);
 }
-.roadmap-step-status { color: var(--accent); font-weight: var(--weight-medium); }
+.roadmap-step-status { color: var(--success); font-weight: var(--weight-medium); }
 
-.roadmap-step[data-state='current'] { background: var(--accent-soft); }
+/* Done = green status; the current step wears the guide's warm hue; the button stays the blue action */
+.roadmap-step[data-state='current'] { background: var(--warm-soft); }
 .roadmap-step[data-state='current'] .roadmap-step-name { font-weight: var(--weight-semibold); }
 
 .roadmap-step[data-state='locked'] .roadmap-step-name { color: var(--text-2); }
@@ -736,9 +727,6 @@
 
 /* ---------- Responsive ---------- */
 @media (max-width: 768px) {
-  .guide-header { align-items: flex-start; }
-  .guide-header-mascot { width: 48px; height: 48px; }
-
   .guide-page .segmented-item { min-height: var(--touch-target); }
   .guide-modal .modal-close {
     top: var(--space-2);

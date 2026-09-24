@@ -227,7 +227,7 @@ export default function MiniGamesSection() {
                       transition={{ duration: 0.12, ease: EASE }}
                       aria-label="Погладить ВИТШика"
                     >
-                      <img src="/img/mascot.png" alt="" draggable="false" />
+                      <img src="/img/mascot-320.png" alt="" draggable="false" />
                     </motion.button>
 
                     {/* Floating Hearts */}

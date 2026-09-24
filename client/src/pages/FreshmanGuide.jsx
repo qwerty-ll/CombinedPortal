@@ -12,6 +12,7 @@ import ChecklistModal from '../components/ChecklistModal';
 import FunLayerModal from '../components/FunLayerModal';
 import RewardsModal, { GuideDialog } from '../components/RewardsModal';
 import { contentApi, adaptationApi } from '../services/api';
+import SectionIcon from '../components/SectionIcon';
 
 const EASE = [0.16, 1, 0.3, 1];
 
@@ -240,13 +241,15 @@ const FreshmanGuide = () => {
     <div className="container guide-page">
 
       <header className="page-header guide-header">
-        <div>
-          <h1>Путь первокурсника</h1>
-          <p className="page-subtitle">
-            Пройди 9 этапов адаптации вместе с ВИТШиком: изучи правила, проверь знания, найди кабинеты и получи диплом.
-          </p>
+        <div className="page-heading">
+          <SectionIcon section="guide" size="lg" />
+          <div>
+            <h1>Путь первокурсника</h1>
+            <p className="page-subtitle">
+              Пройди 9 этапов адаптации вместе с ВИТШиком: изучи правила, проверь знания, найди кабинеты и получи диплом.
+            </p>
+          </div>
         </div>
-        <img src="/img/mascot.png" alt="" className="guide-header-mascot" width="72" height="72" />
       </header>
 
       {/* 9-Step Roadmap Engine */}

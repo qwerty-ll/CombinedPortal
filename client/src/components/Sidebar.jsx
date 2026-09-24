@@ -1,31 +1,19 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import {
-  PanelLeftClose, PanelLeftOpen, LayoutDashboard, Compass,
-  MessageSquare, Map, UserSquare, HelpCircle, Users, Shield, LogIn, User
-} from 'lucide-react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { PanelLeftClose, PanelLeftOpen, LogIn, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { SECTIONS, NAV_ORDER } from '../data/sections';
 
-const ICON = { size: 20, strokeWidth: 1.75 };
+const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 
 const ROLE_LABEL = { admin: 'Администратор', moderator: 'Модератор', curator: 'Куратор' };
 
 const Sidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen }) => {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { user, isLoggedIn, isAdmin } = useAuth();
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Главная', path: '/', icon: <LayoutDashboard {...ICON} /> },
-    { id: 'guide', label: 'Путь первокурсника', path: '/guide', icon: <Compass {...ICON} /> },
-    { id: 'forum', label: 'Форум', path: '/forum', icon: <MessageSquare {...ICON} /> },
-    { id: 'map', label: 'Карта кампуса', path: '/map', icon: <Map {...ICON} /> },
-    { id: 'teachers', label: 'Преподаватели', path: '/teachers', icon: <Users {...ICON} /> },
-    { id: 'faq', label: 'Вопросы и ответы', path: '/faq', icon: <HelpCircle {...ICON} /> },
-    { id: 'profile', label: 'Личный кабинет', path: '/profile', icon: <UserSquare {...ICON} /> },
-  ];
-  if (isAdmin) {
-    menuItems.push({ id: 'admin', label: 'Панель управления', path: '/admin', icon: <Shield {...ICON} /> });
-  }
+  const items = isAdmin ? [...NAV_ORDER, 'admin'] : NAV_ORDER;
 
   const goTo = (path) => {
     navigate(path);
@@ -39,26 +27,34 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen })
       aria-label="Основная навигация"
     >
       <NavLink to="/" className="sidebar-brand" onClick={() => setIsMobileOpen(false)}>
-        <img src="/img/mascot.png" alt="" className="sidebar-brand-mark" />
-        <span className="sidebar-brand-text">Портал ИВИТШ</span>
+        <span className="sidebar-brand-mark">
+          <img src="/img/mascot-160.png" alt="" />
+        </span>
+        <span className="sidebar-brand-text">
+          <span className="sidebar-brand-name">Портал ИВИТШ</span>
+          <span className="sidebar-brand-sub">КГУ · Высшая IT-школа</span>
+        </span>
       </NavLink>
 
       <nav className="sidebar-nav">
         <ul>
-          {menuItems.map((item) => (
-            <li key={item.id}>
-              <NavLink
-                to={item.path}
-                end={item.path === '/'}
-                className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-                title={isCollapsed ? item.label : undefined}
-                onClick={() => setIsMobileOpen(false)}
-              >
-                {item.icon}
-                <span className="sidebar-link-label">{item.label}</span>
-              </NavLink>
-            </li>
-          ))}
+          {items.map((id) => {
+            const { label, path, Icon, hue } = SECTIONS[id];
+            return (
+              <li key={id}>
+                <NavLink
+                  to={path}
+                  end={path === '/'}
+                  className={({ isActive }) => `sidebar-link hue-${hue} ${isActive ? 'active' : ''}`}
+                  title={isCollapsed ? label : undefined}
+                  onClick={() => setIsMobileOpen(false)}
+                >
+                  <Icon {...ICON} />
+                  <span className="sidebar-link-label">{label}</span>
+                </NavLink>
+              </li>
+            );
+          })}
         </ul>
       </nav>
 
@@ -69,7 +65,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen })
               {user.photoUrl ? (
                 <img src={user.photoUrl} alt="" onError={(e) => { e.target.style.display = 'none'; }} />
               ) : (
-                <User size={18} strokeWidth={1.75} />
+                <User size={18} strokeWidth={1.75} aria-hidden="true" />
               )}
             </span>
             <span className="sidebar-user-info">
@@ -77,9 +73,10 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen })
               <span className="sidebar-user-role">{ROLE_LABEL[user.role] || 'Студент'}</span>
             </span>
           </button>
-        ) : (
-          <button className="btn btn-primary sidebar-login" onClick={() => goTo('/profile')} title={isCollapsed ? 'Войти через ЭИОС' : undefined}>
-            <LogIn size={18} strokeWidth={1.75} />
+        ) : pathname !== '/profile' && (
+          // Hidden on the login page itself, where the form is the only way in.
+          <button className="btn sidebar-login" onClick={() => goTo('/profile')} title={isCollapsed ? 'Войти через ЭИОС' : undefined}>
+            <LogIn size={18} strokeWidth={1.75} aria-hidden="true" />
             <span className="sidebar-link-label">Войти через ЭИОС</span>
           </button>
         )}

@@ -55,7 +55,7 @@ export default function QuizModal({ onComplete, onClose }) {
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
       >
-        <img src="/img/mascot.png" alt="" className="quiz-result-mascot" width="72" height="72" />
+        <img src="/img/mascot-160.png" alt="" className="quiz-result-mascot" width="72" height="72" />
         <h3 className="quiz-result-title">{isGreat ? 'Отличный результат' : 'Хорошая попытка'}</h3>
         <p className="quiz-result-text">
           {isGreat

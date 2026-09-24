@@ -18,7 +18,7 @@ export function StepFoundation({ onComplete }) {
   return (
     <div className="step-body">
       <div className="mascot-say">
-        <img src="/img/mascot.png" alt="" className="mascot-say-avatar" width="56" height="56" />
+        <img src="/img/mascot-160.png" alt="" className="mascot-say-avatar" width="56" height="56" />
         <div className="message bot">
           <strong className="mascot-say-title">Добро пожаловать в ИВИТШ</strong>
           Я ВИТШик — твой персональный гид по студенческой жизни Высшей ИТ-школы КГУ.
@@ -83,7 +83,7 @@ export function StepChatbot({ onComplete }) {
         <div className="chat-sample-thread">
           <div className="message user chat-sample-user">Где находится дирекция?</div>
           <div className="chat-sample-bot">
-            <img src="/img/mascot.png" alt="" className="chat-sample-avatar" width="28" height="28" />
+            <img src="/img/mascot-160.png" alt="" className="chat-sample-avatar" width="28" height="28" />
             <div className="message bot">
               <span className="visually-hidden">ВИТШик: </span>
               Дирекция ИВИТШ находится в корпусе Б на 2 этаже, кабинет Б-209. Работает пн–пт с 9:00 до 17:00.

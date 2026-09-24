@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, HelpCircle } from 'lucide-react';
+import { ChevronDown, HelpCircle, Search, MessageCircle, MessageSquarePlus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import DOMPurify from 'dompurify';
 import { contentApi } from '../services/api';
+import { openChat } from '../utils/chat';
+import SectionIcon from '../components/SectionIcon';
 
 const ICON = { strokeWidth: 1.75 };
 
@@ -48,6 +50,18 @@ const FaqPage = () => {
 
   const [faqItems, setFaqItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+
+  // Search questions and answer text (answers are HTML, so tags are ignored)
+  const visibleItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const indexed = faqItems.map((item, idx) => ({ item, idx }));
+    if (!q) return indexed;
+    return indexed.filter(({ item }) => {
+      const answerText = (item.answer || '').replace(/<[^>]*>/g, ' ');
+      return `${item.question} ${answerText}`.toLowerCase().includes(q);
+    });
+  }, [faqItems, query]);
 
   useEffect(() => {
     contentApi.getFaq()
@@ -59,56 +73,85 @@ const FaqPage = () => {
   return (
     <div className="container cm-page faq-page">
       <header className="page-header">
-        <div>
-          <h1>Частые вопросы</h1>
-          <p className="page-subtitle">Короткие ответы на то, что первокурсники спрашивают чаще всего.</p>
+        <div className="page-heading">
+          <SectionIcon section="faq" size="lg" />
+          <div>
+            <h1>Частые вопросы</h1>
+            <p className="page-subtitle">Короткие ответы на то, что первокурсники спрашивают чаще всего.</p>
+          </div>
         </div>
       </header>
 
-      {loading ? (
-        <ul className="faq-list" aria-busy="true" aria-label="Загрузка вопросов">
-          {[0, 1, 2].map(i => (
-            <li key={i} className="faq-item faq-item-skeleton" aria-hidden="true">
-              <span className="skeleton faq-skel" />
-            </li>
-          ))}
-        </ul>
-      ) : faqItems.length > 0 ? (
-        <ul className="faq-list">
-          {faqItems.map((item, idx) => (
-            <FAQItem
-              key={item.id || idx}
-              id={item.id || idx}
-              question={item.question}
-              answer={item.answer}
-              isOpen={openIndex === idx}
-              onClick={() => setOpenIndex(openIndex === idx ? null : idx)}
-            />
-          ))}
-        </ul>
-      ) : (
-        <div className="empty-state">
-          <HelpCircle size={32} {...ICON} aria-hidden="true" />
-          <h2 className="cm-empty-title">Список частых вопросов пока пуст</h2>
-          <p>Администратор добавляет вопросы через панель управления. А пока спросите на форуме — там отвечают студенты и кураторы.</p>
-        </div>
-      )}
+      <div className="faq-layout">
+        <div className="faq-main">
+          {faqItems.length > 3 || query ? (
+            <div className="cm-search faq-search">
+              <label htmlFor="faq-search" className="visually-hidden">Поиск по вопросам</label>
+              <Search size={18} {...ICON} className="cm-search-icon" aria-hidden="true" />
+              <input
+                id="faq-search"
+                type="search"
+                className="input"
+                placeholder="Например, стипендия или студенческий"
+                value={query}
+                onChange={(e) => { setQuery(e.target.value); setOpenIndex(null); }}
+              />
+            </div>
+          ) : null}
 
-      {/* NOT FOUND AN ANSWER */}
-      <section className="section faq-help" aria-labelledby="faq-help-heading">
-        <h2 id="faq-help-heading">Не нашли ответ на свой вопрос?</h2>
-        <p>
-          Студенты и кураторы часто делятся ответами на форуме. Посмотрите обсуждения или задайте свой вопрос.
-        </p>
-        <div className="faq-help-actions">
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/forum')}>
-            Задать вопрос
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('/forum')}>
-            Перейти на форум
-          </button>
+          {loading ? (
+            <ul className="faq-list" aria-busy="true" aria-label="Загрузка вопросов">
+              {[0, 1, 2].map(i => (
+                <li key={i} className="faq-item faq-item-skeleton" aria-hidden="true">
+                  <span className="skeleton faq-skel" />
+                </li>
+              ))}
+            </ul>
+          ) : visibleItems.length > 0 ? (
+            <ul className="faq-list">
+              {visibleItems.map(({ item, idx }) => (
+                <FAQItem
+                  key={item.id || idx}
+                  id={item.id || idx}
+                  question={item.question}
+                  answer={item.answer}
+                  isOpen={openIndex === idx}
+                  onClick={() => setOpenIndex(openIndex === idx ? null : idx)}
+                />
+              ))}
+            </ul>
+          ) : query ? (
+            <div className="empty-state" role="status">
+              <Search size={32} {...ICON} aria-hidden="true" />
+              <h2 className="cm-empty-title">Ничего не нашлось по запросу «{query.trim()}»</h2>
+              <p>Попробуйте другое слово или спросите ВИТШика — он знает больше, чем написано здесь.</p>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <HelpCircle size={32} {...ICON} aria-hidden="true" />
+              <h2 className="cm-empty-title">Список частых вопросов пока пуст</h2>
+              <p>Администратор добавляет вопросы через панель управления. А пока спросите на форуме — там отвечают студенты и кураторы.</p>
+            </div>
+          )}
         </div>
-      </section>
+
+        {/* NOT FOUND AN ANSWER */}
+        <aside className="faq-help" aria-labelledby="faq-help-heading">
+          <img src="/img/mascot-160.png" alt="" className="faq-help-mascot" width="72" height="72" />
+          <h2 id="faq-help-heading">Не нашли ответ?</h2>
+          <p>ВИТШик ответит сразу, а на форуме помогут сокурсники и кураторы.</p>
+          <div className="faq-help-actions">
+            <button type="button" className="btn btn-primary" onClick={openChat}>
+              <MessageCircle size={16} {...ICON} aria-hidden="true" />
+              Спросить ВИТШика
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => navigate('/forum')}>
+              <MessageSquarePlus size={16} {...ICON} aria-hidden="true" />
+              Спросить на форуме
+            </button>
+          </div>
+        </aside>
+      </div>
     </div>
   );
 };

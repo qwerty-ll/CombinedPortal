@@ -1,10 +1,11 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { X, Menu } from 'lucide-react';
 import './styles/index.css';
 
 // Components
 import Sidebar from './components/Sidebar';
+import TabBar from './components/TabBar';
 import ChatWidget from './components/ChatWidget';
 
 // Lazy Loaded Pages for Optimal Bundle Splitting
@@ -64,7 +65,10 @@ function App() {
         >
           {isMobileMenuOpen ? <X size={22} strokeWidth={1.75} /> : <Menu size={22} strokeWidth={1.75} />}
         </button>
-        <span className="mobile-bar-title">Портал ИВИТШ</span>
+        <Link to="/" className="mobile-bar-brand">
+          <img src="/img/mascot-160.png" alt="" className="mobile-bar-mark" />
+          <span className="mobile-bar-title">Портал ИВИТШ</span>
+        </Link>
       </header>
 
       {isMobileMenuOpen && <div className="drawer-backdrop" onClick={() => setIsMobileMenuOpen(false)} aria-hidden="true" />}
@@ -94,6 +98,7 @@ function App() {
         </Suspense>
       </main>
 
+      <TabBar />
       <ChatWidget />
     </div>
   );

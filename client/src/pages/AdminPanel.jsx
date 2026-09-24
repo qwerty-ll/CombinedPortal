@@ -5,6 +5,7 @@ import { Pencil, Trash2, Save, RefreshCw, Lock, LockOpen, CircleAlert } from 'lu
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { adminApi } from '../services/api';
+import SectionIcon from '../components/SectionIcon';
 
 const ICON = { size: 16, strokeWidth: 1.75, 'aria-hidden': true };
 
@@ -495,7 +496,10 @@ const AdminPanel = () => {
   return (
     <div className="container admin-page">
       <div className="page-header">
-        <h1>Панель управления</h1>
+        <div className="page-heading">
+          <SectionIcon section="admin" size="lg" />
+          <h1>Панель управления</h1>
+        </div>
       </div>
 
       {/* TABS */}

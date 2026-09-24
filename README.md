@@ -122,7 +122,9 @@ npm run dev                                                        # http://loca
 
 Интерфейс следует правилам [impeccable](https://github.com/pbakaus/impeccable) (основа) и
 [taste-skill](https://github.com/Leonxlnx/taste-skill) (числовые ограничения). Решения описаны в
-[docs/DESIGN.md](docs/DESIGN.md), сравнение «до/после» — в [docs/redesign/](docs/redesign/).
+[docs/DESIGN.md](docs/DESIGN.md), сравнение исходного дизайна с текущим — в [docs/redesign/](docs/redesign/):
+[главная, путь, форум](docs/redesign/compare-desktop-1.jpg) · [преподаватели, FAQ, карта, профиль](docs/redesign/compare-desktop-2.jpg) ·
+[вход, админка, чат](docs/redesign/compare-desktop-3.jpg) · [телефон](docs/redesign/compare-mobile.jpg).
 
 - Токены (цвет, типографика, отступы, радиусы, движение) — `client/src/styles/tokens.css`; новые hex-значения в коде не используются.
 - Общие компоненты — `client/src/styles/shared.css`; стили разделов — `client/src/styles/<раздел>.css`.

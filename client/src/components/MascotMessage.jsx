@@ -24,7 +24,7 @@ const MascotMessage = ({ text, position = "left" }) => {
         animate={isMeowing ? { scale: 1.06 } : { scale: 1 }}
         transition={{ duration: 0.2, ease: EASE }}
       >
-        <img src="/img/mascot.png" alt="" className="mascot-say-avatar" width="56" height="56" />
+        <img src="/img/mascot-160.png" alt="" className="mascot-say-avatar" width="56" height="56" />
         <AnimatePresence>
           {isMeowing && (
             <motion.span
