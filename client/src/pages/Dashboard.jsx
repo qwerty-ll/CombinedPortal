@@ -96,6 +96,12 @@ const Dashboard = () => {
 
   // --- Today's lessons, reported by the schedule widget ---
   const [groupLessons, setGroupLessons] = useState(null);
+  // Re-render every 30 s so "сейчас идёт / следующая" follows the clock
+  const [, setClockTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setClockTick(t => t + 1), 30000);
+    return () => clearInterval(timer);
+  }, []);
   const todaySummary = summariseToday(groupLessons);
 
   // Onboarding tasks definition

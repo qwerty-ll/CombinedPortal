@@ -463,7 +463,53 @@
   color: var(--text);
 }
 .sched-time-end { font-size: var(--text-sm); color: var(--text-3); }
+
+/* Lessons against the clock: past ones fade back, upcoming ones carry the accent,
+   the one in progress is a highlighted block with a countdown and a progress line. */
+.sched-slot.is-past .sched-time-start,
+.sched-slot.is-past .sched-lesson-title,
+.sched-slot.is-past .sched-lesson-meta,
+.sched-slot.is-past .sched-lesson-room { color: var(--text-3); }
+.sched-slot.is-past .sched-time-start { font-weight: var(--weight-medium); }
+.sched-slot.is-past .sched-lesson-title,
+.sched-slot.is-past .sched-lesson-room { font-weight: var(--weight-regular); }
+.sched-slot.is-past .sched-room-link { text-decoration-color: var(--border); }
+.sched-slot.is-past .sched-lesson-meta svg { color: var(--border-strong); }
+.sched-slot.is-past .badge { background: transparent; box-shadow: inset 0 0 0 1px var(--border); color: var(--text-3); }
+
+.sched-slot.is-upcoming .sched-time-start { color: var(--accent); }
+
+.sched-slot.is-now {
+  margin: var(--space-1) calc(-1 * var(--space-3));
+  padding: var(--space-4) var(--space-3);
+  border-top-color: transparent;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--hue-blue-edge);
+}
+.sched-slot.is-now + .sched-slot { border-top-color: transparent; }
 .sched-slot.is-now .sched-time-start { color: var(--accent); }
+.sched-now-badge { background: var(--accent); color: var(--on-accent); }
+.sched-countdown {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--accent-hover);
+}
+.sched-now-progress {
+  grid-column: 1 / -1;
+  height: 4px;
+  margin-top: var(--space-3);
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--hue-blue-edge);
+}
+.sched-now-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left center;
+  transition: transform var(--dur-slow) var(--ease);
+}
 
 .sched-slot-body {
   display: flex;
