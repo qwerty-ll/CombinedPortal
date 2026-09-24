@@ -28,13 +28,7 @@
   background: var(--warm-soft-2);
 }
 .dash-hero-text { min-width: 0; max-width: 42rem; }
-.dash-hero-date {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--warm-strong);
-}
 .dash-hero h1 {
-  margin-top: var(--space-1);
   font-size: var(--text-2xl);
   letter-spacing: -0.02em;
 }
@@ -52,23 +46,24 @@
   max-width: 60ch;
 }
 .dash-hero-lead strong { font-weight: var(--weight-semibold); }
+.dash-hero-group { white-space: nowrap; }
 
-/* The current / next lesson sits on its own white card instead of blending into the warm panel.
-   Everything inside stays in the panel's warm family; the only blue in the hero is the main button. */
+/* The lesson as a white slip: title first, then one warm status chip, the clock time and the room.
+   Warm means "now" here, blue means "do"; no pastel-on-pastel inside the white slip. */
 .dash-hero-lesson {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
+  display: grid;
+  justify-items: start;
+  row-gap: var(--space-2);
+  width: fit-content;
+  min-width: min(100%, 20rem);
   max-width: 100%;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4) var(--space-5);
   background: var(--surface);
-  border-radius: var(--radius);
-  box-shadow: 0 1px 2px rgba(176, 78, 11, 0.08), 0 2px 8px -4px rgba(176, 78, 11, 0.14);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-warm);
 }
-/* Same peach as the disc behind the mascot */
-.dash-hero-badge-now { background: var(--warm-soft-2); color: var(--warm-ink); }
 .dash-hero-lesson-title {
+  font-size: var(--text-md);
   font-weight: var(--weight-semibold);
   color: var(--text);
   line-height: 1.35;
@@ -77,11 +72,24 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-1) var(--space-3);
-  flex-basis: 100%;
+  gap: var(--space-2) var(--space-3);
   font-size: var(--text-sm);
   color: var(--text-2);
 }
+.dash-hero-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-half) var(--space-2);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 0 1px var(--warm-strong);
+  color: var(--warm-strong);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.dash-hero-chip.is-now { background: var(--warm-strong); box-shadow: none; color: var(--on-warm); }
+.dash-hero-clock { color: var(--text-2); }
 .dash-hero-room {
   display: inline-flex;
   align-items: center;
@@ -98,17 +106,17 @@ a.dash-hero-room {
 @media (hover: hover) {
   a.dash-hero-room:hover { color: var(--accent); text-decoration-color: currentColor; }
 }
-.dash-hero-lesson-when { font-weight: var(--weight-medium); color: var(--warm-strong); }
 .dash-hero-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
   margin-top: var(--space-6);
 }
+.dash-hero .btn-secondary { border-color: var(--warm-border); }
 .dash-hero-count {
   padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-pill);
-  background: rgba(10, 30, 80, 0.3);   /* darkens the button blue: white text stays above 7:1 */
+  border-radius: var(--radius-sm);
+  background: var(--accent-deep);
   font-size: var(--text-xs);
   line-height: 1.2;
 }
@@ -690,8 +698,9 @@ a.dash-hero-room {
   .dash-hero-actions { margin-top: var(--space-4); }
   .dash-hero-actions .btn { flex: 1 1 100%; }
   .dash-hero-mascot { order: -1; position: absolute; top: var(--space-3); right: var(--space-3); width: 4.5rem; height: 4.5rem; margin: 0; }
-  .dash-hero-date,
   .dash-hero h1 { padding-right: 4.5rem; }
+  .dash-hero-lesson { width: 100%; padding: var(--space-4); }
+  .dash-hero-lesson-title { font-size: var(--text-base); }
 
   /* Shortcuts scroll sideways instead of stacking five rows */
   .dash-shortcuts { margin: 0 calc(-1 * var(--space-4)) var(--space-4); }
