@@ -46,6 +46,13 @@ const getLessonTypeBadge = (disciplineName) => {
 const pad2 = (n) => String(n).padStart(2, '0');
 const capitalize = (str) => (str ? str.charAt(0).toUpperCase() + str.slice(1) : '');
 const localIso = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const toMinutes = (hm = '') => {
+  const [h, m] = hm.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+const formatDuration = (mins) => (mins < 60
+  ? `${mins} мин`
+  : `${Math.floor(mins / 60)} ч${mins % 60 ? ` ${mins % 60} мин` : ''}`);
 const mondayIsoOf = (iso) => {
   const d = new Date(iso);
   const day = d.getDay();
@@ -105,6 +112,13 @@ const ScheduleWidget = ({ onGroupLessons }) => {
 
   // View Mode: 'day' (1 день) | 'week' (1 неделя)
   const [viewMode, setViewMode] = useState('day');
+
+  // Clock for the past / now / upcoming highlighting: it moves on without a page reload
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Selected date ISO string (default to today)
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -385,9 +399,8 @@ const ScheduleWidget = ({ onGroupLessons }) => {
 
   // ---------- Presentation-only derived values ----------
   const todayIso = new Date().toISOString().split('T')[0]; // same expression as the default date
-  const now = new Date();
   const localTodayIso = localIso(now);
-  const nowHm = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+  const nowMin = now.getHours() * 60 + now.getMinutes();
   const isOnToday = viewMode === 'day'
     ? selectedDate === todayIso
     : mondayIsoOf(todayIso) === weekStartEndDates.monIso;
@@ -395,13 +408,18 @@ const ScheduleWidget = ({ onGroupLessons }) => {
   const listboxId = 'schedule-target-listbox';
   const optionId = (item) => `schedule-target-option-${item.id}`;
 
-  // Marks the lesson in progress and the next one — only for today's date group
-  const slotMarker = (dGroup, slot, slotIdx) => {
-    if (dGroup.dateIso !== localTodayIso) return null;
-    if (slot.timeStart <= nowHm && nowHm < slot.timeEnd) return 'now';
-    const firstUpcoming = dGroup.slots.findIndex(s => s.timeStart > nowHm);
-    return firstUpcoming === slotIdx ? 'next' : null;
+  // Where a lesson stands against the clock: 'past' (faded), 'now' (highlighted block) or 'upcoming' (accent)
+  const slotState = (dGroup, slot) => {
+    if (dGroup.dateIso < localTodayIso) return 'past';
+    if (dGroup.dateIso > localTodayIso) return 'upcoming';
+    if (toMinutes(slot.timeEnd) <= nowMin) return 'past';
+    if (toMinutes(slot.timeStart) <= nowMin) return 'now';
+    return 'upcoming';
   };
+  // The first lesson of today that has not started yet
+  const nextSlotIndex = (dGroup) => (dGroup.dateIso === localTodayIso
+    ? dGroup.slots.findIndex(s => toMinutes(s.timeStart) > nowMin)
+    : -1);
 
   const handleComboKeyDown = (e) => {
     if (e.key === 'ArrowDown') {
@@ -428,7 +446,7 @@ const ScheduleWidget = ({ onGroupLessons }) => {
     }
   };
 
-  const renderLesson = (slot, marker) => (item, iIdx) => {
+  const renderLesson = (slot, state, isNext) => (item, iIdx) => {
     const typeBadge = getLessonTypeBadge(item.дисциплина);
     const cleanedTitle = cleanDisciplineTitle(item.дисциплина);
     return (
@@ -439,8 +457,15 @@ const ScheduleWidget = ({ onGroupLessons }) => {
             <span className="badge">Подгруппа {item.номерПодгруппы}</span>
           )}
           {iIdx === 0 && slot.lessonNum ? <span className="sched-lesson-num tabular">{slot.lessonNum} пара</span> : null}
-          {iIdx === 0 && marker === 'now' && <span className="badge badge-accent sched-marker">Идёт сейчас</span>}
-          {iIdx === 0 && marker === 'next' && <span className="badge sched-marker">Следующая</span>}
+          {iIdx === 0 && state === 'now' && (
+            <>
+              <span className="badge sched-now-badge">Идёт сейчас</span>
+              <span className="sched-countdown tabular">ещё {formatDuration(toMinutes(slot.timeEnd) - nowMin)}</span>
+            </>
+          )}
+          {iIdx === 0 && isNext && (
+            <span className="badge badge-accent tabular">Следующая · через {formatDuration(toMinutes(slot.timeStart) - nowMin)}</span>
+          )}
         </p>
         <h4 className="sched-lesson-title">{cleanedTitle}</h4>
         <p className="sched-lesson-meta">
@@ -727,18 +752,27 @@ const ScheduleWidget = ({ onGroupLessons }) => {
 
               <ul className="sched-slots">
                 {dGroup.slots.map((slot, sIdx) => {
-                  const marker = slotMarker(dGroup, slot, sIdx);
+                  const state = slotState(dGroup, slot);
+                  const isNext = sIdx === nextSlotIndex(dGroup);
+                  const start = toMinutes(slot.timeStart);
+                  const length = Math.max(1, toMinutes(slot.timeEnd) - start);
                   return (
-                    <li key={sIdx} className={`sched-slot ${marker ? `is-${marker}` : ''}`}>
+                    <li key={sIdx} className={`sched-slot is-${state}`}>
                       <p className="sched-time tabular">
+                        {state === 'past' && <span className="visually-hidden">Пара прошла. </span>}
                         <span className="sched-time-start">{slot.timeStart}</span>
                         <span className="sched-time-end">
                           <span className="visually-hidden">до </span>{slot.timeEnd}
                         </span>
                       </p>
                       <div className="sched-slot-body">
-                        {slot.items.map(renderLesson(slot, marker))}
+                        {slot.items.map(renderLesson(slot, state, isNext))}
                       </div>
+                      {state === 'now' && (
+                        <span className="sched-now-progress" aria-hidden="true">
+                          <span style={{ transform: `scaleX(${Math.min(1, (nowMin - start) / length)})` }} />
+                        </span>
+                      )}
                     </li>
                   );
                 })}

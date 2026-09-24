@@ -19,7 +19,7 @@
 .page-header h1 { font-size: var(--text-xl); }
 /* Title with its section tile */
 .page-heading { display: flex; align-items: flex-start; gap: var(--space-4); min-width: 0; }
-.page-heading > .tile { margin-top: 0.125rem; }
+.page-heading > .tile { margin-top: var(--space-half); }
 .page-header p,
 .page-subtitle {
   margin-top: var(--space-2);
@@ -192,7 +192,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: 0.125rem var(--space-2);
+  padding: var(--space-half) var(--space-2);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--text-2);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  ChevronRight, ChevronDown, Circle, CheckCircle2, BellRing, ArrowRight, MessageCircle, LogIn
+  ChevronRight, ChevronDown, Circle, CheckCircle2, BellRing, ArrowRight, MessageCircle, LogIn, MapPin
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ScheduleWidget from '../components/ScheduleWidget';
@@ -27,27 +27,96 @@ const plural = (n, [one, few, many]) => {
 };
 const cleanTitle = (raw = '') => raw.replace(/^(лек|лаб|пр)\s+/i, '').replace(/,\s*п\/г\s*\d+$/i, '').trim();
 
-/** One line about today's lessons for the hero, or null while the schedule is unknown. */
+const toMinutes = (hm = '') => {
+  const [h, m] = hm.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+const formatDuration = (mins) => (mins < 60
+  ? `${mins} мин`
+  : `${Math.floor(mins / 60)} ч${mins % 60 ? ` ${mins % 60} мин` : ''}`);
+
+/**
+ * Today's lessons for the hero: how many, the one in progress or the next one, and — once today
+ * is over or free — the first lesson of the next study day. Null while the schedule is unknown.
+ */
 const summariseToday = (info) => {
   if (!info) return null;
   const now = new Date();
   const today = localIso(now);
-  const nowHm = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const lesson = (l) => ({ title: cleanTitle(l.дисциплина), room: l.аудитория || '', start: l.начало, end: l.конец });
+
   const slots = new Map();
   info.lessons
     .filter(l => l.дата && l.дата.startsWith(today))
     .forEach(l => { if (!slots.has(l.начало)) slots.set(l.начало, l); });
-  const lessons = [...slots.values()].sort((a, b) => a.начало.localeCompare(b.начало));
-  const group = info.group ? ` у группы ${info.group}` : '';
+  const lessons = [...slots.values()].sort((a, b) => toMinutes(a.начало) - toMinutes(b.начало));
 
-  if (lessons.length === 0) return `Сегодня${group} пар нет.`;
-  const count = `Сегодня${group} ${lessons.length} ${plural(lessons.length, ['пара', 'пары', 'пар'])}.`;
-  const where = (l) => (l.аудитория ? `, ${l.аудитория}` : '');
-  const current = lessons.find(l => l.начало <= nowHm && nowHm < l.конец);
-  if (current) return `${count} Сейчас идёт «${cleanTitle(current.дисциплина)}»${where(current)} — до ${current.конец}.`;
-  const next = lessons.find(l => l.начало > nowHm);
-  if (next) return `${count} Следующая — «${cleanTitle(next.дисциплина)}» в ${next.начало}${where(next)}.`;
-  return `${count} На сегодня всё — пары закончились.`;
+  const current = lessons.find(l => toMinutes(l.начало) <= nowMin && nowMin < toMinutes(l.конец));
+  const next = lessons.find(l => toMinutes(l.начало) > nowMin);
+
+  let later = null;
+  if (!current && !next) {
+    const upcoming = info.lessons
+      .filter(l => l.дата && l.дата.slice(0, 10) > today)
+      .sort((a, b) => a.дата.localeCompare(b.дата) || toMinutes(a.начало) - toMinutes(b.начало))[0];
+    if (upcoming) {
+      const day = upcoming.дата.slice(0, 10);
+      const tomorrow = new Date(now);
+      tomorrow.setDate(now.getDate() + 1);
+      const dayLabel = day === localIso(tomorrow)
+        ? 'Завтра'
+        : new Date(`${day}T00:00:00`).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' });
+      later = { ...lesson(upcoming), dayLabel: dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1) };
+    }
+  }
+
+  return {
+    group: info.group || '',
+    count: lessons.length,
+    current: current ? { ...lesson(current), left: toMinutes(current.конец) - nowMin } : null,
+    next: !current && next ? { ...lesson(next), in: toMinutes(next.начало) - nowMin } : null,
+    later,
+    done: lessons.length > 0 && !current && !next,
+  };
+};
+
+/**
+ * The lesson in progress, the next one, or the first one of the next study day, as a white slip.
+ * One warm chip carries the status and the time left: filled while the lesson is on, outlined before it.
+ */
+const HeroLesson = ({ lesson, kind }) => {
+  const chip = kind === 'now'
+    ? `Идёт · ещё ${formatDuration(lesson.left)}`
+    : kind === 'next'
+      ? `Следующая · через ${formatDuration(lesson.in)}`
+      : lesson.dayLabel;
+  return (
+    <div className="dash-hero-lesson">
+      <span className="dash-hero-lesson-title">{lesson.title}</span>
+      <span className="dash-hero-lesson-meta tabular">
+        <span className={`dash-hero-chip ${kind === 'now' ? 'is-now' : ''}`}>{chip}</span>
+        <span className="dash-hero-clock">{kind === 'now' ? `до ${lesson.end}` : `в ${lesson.start}`}</span>
+        {lesson.room && (/^Б-?\d{3}/i.test(lesson.room) ? (
+          <Link to={`/map?room=${encodeURIComponent(lesson.room)}`} className="dash-hero-room">
+            <MapPin size={15} {...ICON} />
+            <span className="visually-hidden">Аудитория </span>{lesson.room}
+          </Link>
+        ) : (
+          <span className="dash-hero-room"><MapPin size={15} {...ICON} />{lesson.room}</span>
+        ))}
+      </span>
+    </div>
+  );
+};
+
+// What a screen reader hears: only when the status changes, not on every minute of the countdown
+const heroStatus = (t) => {
+  if (!t) return '';
+  if (t.current) return `Сейчас идёт ${t.current.title}, до ${t.current.end}`;
+  if (t.next) return `Следующая пара — ${t.next.title} в ${t.next.start}`;
+  if (t.later) return `Следующая пара — ${t.later.dayLabel.toLowerCase()}, ${t.later.title} в ${t.later.start}`;
+  return t.done ? 'На сегодня пары закончились' : '';
 };
 
 const Dashboard = () => {
@@ -96,6 +165,12 @@ const Dashboard = () => {
 
   // --- Today's lessons, reported by the schedule widget ---
   const [groupLessons, setGroupLessons] = useState(null);
+  // Re-render every 30 s so "сейчас идёт / следующая" follows the clock
+  const [, setClockTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setClockTick(t => t + 1), 30000);
+    return () => clearInterval(timer);
+  }, []);
   const todaySummary = summariseToday(groupLessons);
 
   // Onboarding tasks definition
@@ -155,6 +230,10 @@ const Dashboard = () => {
     : null;
 
   const todayLabel = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
+  // The date opens the lead line instead of sitting above the heading as a kicker
+  const dateLead = todayLabel.charAt(0).toUpperCase() + todayLabel.slice(1);
+  // A group name like "24-ИСбо-1" must not break at its hyphens
+  const whose = todaySummary?.group ? <>У группы <span className="dash-hero-group">{todaySummary.group}</span></> : 'У вас';
   const roadmapLeft = Math.max(0, ROADMAP_STEPS - roadmapDone);
 
   return (
@@ -162,15 +241,31 @@ const Dashboard = () => {
       {/* HERO: greeting, today's lessons, the next thing to do */}
       <section className="dash-hero" aria-labelledby="dash-hello">
         <div className="dash-hero-text">
-          <p className="dash-hero-date">{todayLabel.charAt(0).toUpperCase() + todayLabel.slice(1)}</p>
           <h1 id="dash-hello">
             {firstName ? `Привет, ${firstName}!` : isLoggedIn ? 'Добро пожаловать!' : 'Добро пожаловать на портал ИВИТШ'}
           </h1>
-          <p className="dash-hero-lead" aria-live="polite">
-            {isLoggedIn
-              ? (todaySummary || 'Здесь расписание, объявления и путь первокурсника — всё в одном месте.')
-              : 'Войдите через ЭИОС: портал запомнит ваш путь адаптации, вопросы на форуме и прогресс.'}
-          </p>
+          <div className="dash-hero-today">
+            {!isLoggedIn ? (
+              <p className="dash-hero-lead">{dateLead}. Войдите через ЭИОС: портал запомнит ваш путь адаптации, вопросы на форуме и прогресс.</p>
+            ) : !todaySummary ? (
+              <p className="dash-hero-lead">{dateLead}. Здесь расписание, объявления и путь первокурсника — всё в одном месте.</p>
+            ) : (
+              <>
+                <p className="dash-hero-lead">
+                  {dateLead}.{' '}
+                  {todaySummary.count === 0
+                    ? <>{whose} сегодня пар нет</>
+                    : todaySummary.done
+                      ? <>{whose} сегодня было <strong className="tabular">{todaySummary.count} {plural(todaySummary.count, ['пара', 'пары', 'пар'])}</strong>, занятия закончились</>
+                      : <>{whose} сегодня <strong className="tabular">{todaySummary.count} {plural(todaySummary.count, ['пара', 'пары', 'пар'])}</strong></>}
+                </p>
+                {todaySummary.current && <HeroLesson lesson={todaySummary.current} kind="now" />}
+                {todaySummary.next && <HeroLesson lesson={todaySummary.next} kind="next" />}
+                {todaySummary.later && <HeroLesson lesson={todaySummary.later} kind="later" />}
+              </>
+            )}
+            <p className="visually-hidden" aria-live="polite">{heroStatus(todaySummary)}</p>
+          </div>
           <div className="dash-hero-actions">
             {isLoggedIn ? (
               <Link to="/guide" className="btn btn-primary">

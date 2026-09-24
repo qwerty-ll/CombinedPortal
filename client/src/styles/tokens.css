@@ -21,6 +21,7 @@
   --accent-hover: #164FB8;
   --accent-soft: #E3ECFF;
   --accent-soft-hover: #D3E2FF;
+  --accent-deep: #174BAE;             /* a chip inside a primary button: white text 7.9:1 */
   --on-accent: #FFFFFF;
 
   /* Navigation panel (sidebar, phone header, profile card band): light blue with dark text */
@@ -35,6 +36,7 @@
   --warm-strong: #B04E0B;
   --warm-soft: #FFEBDA;
   --warm-soft-2: #FFDCBE;             /* the disc behind the mascot on warm panels */
+  --on-warm: #FFFFFF;                 /* text on --warm-strong, 5.3:1 */
 
   /* Section hues: soft tile + strong icon/text (strong ≥ 4.5:1 on its soft) */
   --hue-blue: #1C5ED6;    --hue-blue-soft: #E3ECFF;
@@ -84,6 +86,7 @@
   --weight-semibold: 600;
 
   /* Space (4px base) */
+  --space-half: 0.125rem;   /* 2px: badge insets and hairline gaps */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -111,6 +114,7 @@
 
   /* Elevation: cards get a border plus a faint lift, overlays a real shadow */
   --shadow-card: 0 1px 2px rgba(21, 50, 107, 0.05), 0 2px 8px -4px rgba(21, 50, 107, 0.08);
+  --shadow-warm: 0 1px 2px rgba(176, 78, 11, 0.08), 0 2px 8px -4px rgba(176, 78, 11, 0.14);
   --shadow-overlay: 0 12px 32px -8px rgba(21, 50, 107, 0.22), 0 2px 6px rgba(21, 50, 107, 0.08);
   --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
 

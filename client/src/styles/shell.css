@@ -70,7 +70,7 @@
 .sidebar-brand-sub { font-size: var(--text-xs); color: var(--nav-text-2); }
 
 .sidebar-nav { flex: 1; overflow-y: auto; }
-.sidebar-nav ul { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.sidebar-nav ul { list-style: none; display: flex; flex-direction: column; gap: var(--space-half); }
 
 .sidebar-link {
   display: flex;
@@ -216,7 +216,7 @@
   .mobile-bar-mark {
     width: 2rem;
     height: 2rem;
-    padding: 2px;
+    padding: var(--space-half);
     border-radius: var(--radius);
     background: var(--warm-soft);
     object-fit: contain;
@@ -271,7 +271,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
+    gap: var(--space-half);
     height: var(--tab-bar-height);
     color: var(--text-3);
     font-size: var(--text-xs);
