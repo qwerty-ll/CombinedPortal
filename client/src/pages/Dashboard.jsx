@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  UserCheck, CalendarDays, HelpCircle, UserCheck2, 
-  MapPin, MessageSquare, BellRing, ChevronRight, Zap, ExternalLink, Search
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  HelpCircle, Users, Map, ChevronRight, ChevronDown, Circle, CheckCircle2, BellRing
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import ScheduleWidget from '../components/ScheduleWidget';
 import { contentApi } from '../services/api';
 
+const ICON = { strokeWidth: 1.75, 'aria-hidden': true };
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, isLoggedIn } = useAuth();
-  
+
   // --- Schedule group input ---
   const [groupNumber, setGroupNumber] = useState(() => {
     return localStorage.getItem('portal_group_number') || '';
@@ -44,6 +44,7 @@ const Dashboard = () => {
           id: a.id,
           title: a.title,
           text: a.content,
+          important: !!a.is_important,
           time: new Date(a.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
         })));
       }
@@ -52,13 +53,13 @@ const Dashboard = () => {
 
   // Onboarding tasks definition
   const initialTasks = [
-    { id: 'profile-curator', text: 'Зайти в личный кабинет', icon: <UserCheck size={18} />, route: '/profile' },
-    { id: 'schedule', text: 'Посмотреть расписание', icon: <CalendarDays size={18} />, isScheduleTrigger: true },
-    { id: 'faq', text: 'Посмотреть частые вопросы', icon: <HelpCircle size={18} />, route: '/faq' },
-    { id: 'teachers', text: 'Посмотреть преподавателей', icon: <UserCheck2 size={18} />, route: '/teachers' },
-    { id: 'map', text: 'Перейти в раздел карта', icon: <MapPin size={18} />, route: '/map' },
-    { id: 'forum', text: 'Перейти в форум', icon: <MessageSquare size={18} />, route: '/forum' },
-    { id: 'ads', text: 'Посмотреть объявления', icon: <BellRing size={18} />, isAdTrigger: true },
+    { id: 'profile-curator', text: 'Зайти в личный кабинет', route: '/profile' },
+    { id: 'schedule', text: 'Посмотреть расписание', isScheduleTrigger: true },
+    { id: 'faq', text: 'Посмотреть частые вопросы', route: '/faq' },
+    { id: 'teachers', text: 'Посмотреть преподавателей', route: '/teachers' },
+    { id: 'map', text: 'Перейти в раздел карта', route: '/map' },
+    { id: 'forum', text: 'Перейти в форум', route: '/forum' },
+    { id: 'ads', text: 'Посмотреть объявления', isAdTrigger: true },
   ];
 
   const [completedTaskIds, setCompletedTaskIds] = useState(() => {
@@ -103,7 +104,7 @@ const Dashboard = () => {
         localStorage.setItem('onboarding_completed_tasks', JSON.stringify(nextTaskIds));
       } catch (e) {}
     }
-    setExpandedAdIds(prev => 
+    setExpandedAdIds(prev =>
       prev.includes(ad.id) ? prev.filter(id => id !== ad.id) : [...prev, ad.id]
     );
   };
@@ -111,189 +112,192 @@ const Dashboard = () => {
   const completedCount = completedTaskIds.length;
   const progressPercent = Math.round((completedCount / initialTasks.length) * 100);
 
-  // Greeting based on auth state (formats "Фамилия Имя Отчество" -> "Имя Фамилия" or full name)
+  // Once every step is done the checklist folds into a one-line summary (presentation only)
+  const isOnboardingComplete = completedCount >= initialTasks.length;
+  const [showCompletedSteps, setShowCompletedSteps] = useState(false);
+  const showSteps = !isOnboardingComplete || showCompletedSteps;
+
+  // Quick links mark the matching onboarding step as done (navigation itself is the link)
+  const markTaskDone = (taskId) => {
+    if (!completedTaskIds.includes(taskId)) {
+      setCompletedTaskIds(prev => [...prev, taskId]);
+    }
+  };
+
+  const quickLinks = [
+    { taskId: 'faq', to: '/faq', label: 'Частые вопросы', icon: HelpCircle },
+    { taskId: 'teachers', to: '/teachers', label: 'Преподаватели', icon: Users },
+    { taskId: 'map', to: '/map', label: 'Карта кампуса', icon: Map },
+  ];
+
+  // Greeting: a real "Фамилия Имя [Отчество]" becomes "Имя Фамилия"; anything else
+  // (e.g. "Администратор ИВИТШ КГУ", "Студент 24-isbo-085") is shown as is.
   const greetingName = isLoggedIn
     ? (() => {
         const parts = (user.fullName || '').trim().split(/\s+/);
-        if (parts.length >= 2) {
+        const looksLikeFio = parts.length >= 2 && parts.length <= 3 && parts.every(w => /^[А-ЯЁ][а-яё]+(-[А-ЯЁ]?[а-яё]+)?$/.test(w));
+        if (looksLikeFio) {
           return `${parts[1]} ${parts[0]}`; // e.g. "Макар Смирнов"
         }
         return user.fullName || user.username;
       })()
     : null;
 
+  const todayLabel = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
+
   return (
-    <div className="container">
-      <div className="dashboard-container">
-        
-        {/* GREETING */}
-        <section className="greeting-card">
-          <motion.h1
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-          >
-            {isLoggedIn ? (
-              <>Привет, <span style={{ color: 'var(--primary)', fontWeight: '800' }}>{greetingName}</span>! 👋</>
-            ) : (
-              <>Добро пожаловать на портал! 👋</>
-            )}
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            Хорошего дня и продуктивных занятий в Высшей ИТ-школе!
-          </motion.p>
+    <div className="container dash">
+      {/* GREETING */}
+      <header className="page-header dash-header">
+        <div>
+          <h1>{isLoggedIn ? `Привет, ${greetingName}` : 'Добро пожаловать на портал'}</h1>
+          <p className="page-subtitle">
+            Сегодня {todayLabel}. Хорошего дня и продуктивных занятий.
+          </p>
+        </div>
+      </header>
+
+      <div className="dash-grid">
+        {/* SCHEDULE */}
+        <section id="schedule-section" className="dash-main" aria-labelledby="schedule-title">
+          <ScheduleWidget />
         </section>
 
-        {/* ONBOARDING PROGRESS */}
-        <motion.section 
-          className="onboarding-card"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <div className="onboarding-header">
-            <h3>Обучение приложению</h3>
-            <span className="progress-text">{completedCount} из {initialTasks.length} шагов выполнено</span>
-          </div>
-          <div className="progress-bar-container">
-            <div className="progress-bar-fill" style={{ width: `${progressPercent}%` }}></div>
-          </div>
-          <div className="onboarding-tasks">
-            {initialTasks.map((task) => {
-              const isCompleted = completedTaskIds.includes(task.id);
-              return (
-                <div 
-                  key={task.id}
-                  className={`onboarding-task-item ${isCompleted ? 'completed' : ''}`}
-                  onClick={() => handleTaskClick(task)}
-                >
-                  <div className="onboarding-task-left">
-                    {task.icon}
-                    <span>{task.text}</span>
-                  </div>
-                  <div className="onboarding-status-icon">
-                    ✓
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </motion.section>
+        <div className="dash-aside">
+          {/* ANNOUNCEMENTS */}
+          <section id="announcements-section" className="card dash-card" aria-labelledby="announcements-title">
+            <div className="dash-card-head">
+              <h2 id="announcements-title">Объявления</h2>
+            </div>
 
-        {/* SCHEDULE SECTION WITH DIRECT EIOS API CLIENT */}
-        <motion.section 
-          id="schedule-section"
-          className="schedule-section"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <ScheduleWidget />
-        </motion.section>
-
-        {/* ANNOUNCEMENTS */}
-        <motion.section 
-          id="announcements-section"
-          className="announcements-section"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <h2>Объявления</h2>
-          <div className="announcements-list" style={{ marginTop: '15px' }}>
             {announcements.length > 0 ? (
-              announcements.map((ad) => {
-                const isExpanded = expandedAdIds.includes(ad.id);
-                return (
-                  <div 
-                    key={ad.id} 
-                    className={`announcement-card-item ${isExpanded ? 'expanded' : ''}`}
-                    onClick={() => toggleAdExpansion(ad)}
-                    style={{ display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <div className="announcement-card-left">
-                        <div className={`announcement-icon-box ${!ad.read ? 'unread' : ''}`}>
-                          <BellRing size={20} />
+              <ul className="list dash-rows">
+                {announcements.map((ad) => {
+                  const isExpanded = expandedAdIds.includes(ad.id);
+                  const bodyId = `announcement-${ad.id}`;
+                  return (
+                    <li key={ad.id} className={`dash-ann ${isExpanded ? 'is-open' : ''}`}>
+                      <h3 className="dash-ann-heading">
+                        <button
+                          type="button"
+                          className="dash-row-btn dash-ann-toggle"
+                          aria-expanded={isExpanded}
+                          aria-controls={bodyId}
+                          onClick={() => toggleAdExpansion(ad)}
+                        >
+                          <span className="dash-ann-text">
+                            <span className="dash-ann-title">{ad.title}</span>
+                            <span className="dash-ann-meta">
+                              <span className="tabular">{ad.time}</span>
+                              {ad.important && <span className="badge badge-warning">Важно</span>}
+                            </span>
+                          </span>
+                          <ChevronDown size={18} className="dash-chevron" {...ICON} />
+                        </button>
+                      </h3>
+
+                      {isExpanded && (
+                        <div id={bodyId} className="dash-ann-body">
+                          <p>{ad.text}</p>
                         </div>
-                        <div className="announcement-details">
-                          <h4>{ad.title}</h4>
-                          <span>{ad.time}</span>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {!ad.read && <div className="unread-dot"></div>}
-                        <span style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: '600' }}>
-                          {isExpanded ? 'Свернуть' : 'Подробнее'}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {isExpanded && (
-                      <div className="announcement-card-expanded-content">
-                        <p style={{ margin: 0, color: 'var(--text)' }}>{ad.text}</p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
             ) : (
-              <div className="empty-state-card">
-                <BellRing size={40} strokeWidth={1.5} />
-                <h4>Объявлений пока нет</h4>
-                <p>Администратор добавит объявления через панель управления</p>
+              <div className="dash-empty">
+                <BellRing size={24} {...ICON} />
+                <h3>Объявлений пока нет</h3>
+                <p>Администратор добавит объявления через панель управления.</p>
               </div>
             )}
-          </div>
-        </motion.section>
+          </section>
 
-        {/* QUICK ACTIONS */}
-        <motion.section 
-          className="actions-section"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <h2>Быстрые действия</h2>
-          <div className="actions-grid-box" style={{ marginTop: '15px' }}>
-            <div className="action-tile-btn" onClick={() => {
-              if (!completedTaskIds.includes('faq')) {
-                setCompletedTaskIds(prev => [...prev, 'faq']);
-              }
-              navigate('/faq');
-            }}>
-              <HelpCircle size={24} />
-              <span>Частые вопросы</span>
-              <ChevronRight size={16} style={{ marginLeft: 'auto' }} />
+          {/* ONBOARDING PROGRESS */}
+          <section className="card dash-card dash-onboarding" aria-labelledby="onboarding-title">
+            <div className="dash-card-head">
+              <h2 id="onboarding-title">Обучение приложению</h2>
+              <span className="dash-card-meta tabular">
+                {completedCount} из {initialTasks.length}
+                <span className="visually-hidden"> шагов выполнено</span>
+              </span>
+            </div>
+            <div
+              className="progress"
+              role="progressbar"
+              aria-labelledby="onboarding-title"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.min(progressPercent, 100)}
+            >
+              <div
+                className="progress-value"
+                style={{ transform: `scaleX(${Math.min(progressPercent, 100) / 100})` }}
+              />
             </div>
 
-            <div className="action-tile-btn" onClick={() => {
-              if (!completedTaskIds.includes('teachers')) {
-                setCompletedTaskIds(prev => [...prev, 'teachers']);
-              }
-              navigate('/teachers');
-            }}>
-              <UserCheck2 size={24} />
-              <span>Преподаватели</span>
-              <ChevronRight size={16} style={{ marginLeft: 'auto' }} />
-            </div>
+            {isOnboardingComplete && (
+              <div className="dash-onb-done">
+                <p>Все шаги пройдены.</p>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  aria-expanded={showCompletedSteps}
+                  aria-controls="onboarding-steps"
+                  onClick={() => setShowCompletedSteps(v => !v)}
+                >
+                  {showCompletedSteps ? 'Скрыть шаги' : 'Показать шаги'}
+                  <ChevronDown size={16} className="dash-chevron" {...ICON} />
+                </button>
+              </div>
+            )}
 
-            <div className="action-tile-btn" onClick={() => {
-              if (!completedTaskIds.includes('map')) {
-                setCompletedTaskIds(prev => [...prev, 'map']);
-              }
-              navigate('/map');
-            }}>
-              <Zap size={24} />
-              <span>Карта кампуса</span>
-              <ChevronRight size={16} style={{ marginLeft: 'auto' }} />
-            </div>
-          </div>
-        </motion.section>
+            {showSteps && (
+              <ul id="onboarding-steps" className="list dash-rows dash-onb-list">
+                {initialTasks.map((task) => {
+                  const isCompleted = completedTaskIds.includes(task.id);
+                  return (
+                    <li key={task.id}>
+                      <button
+                        type="button"
+                        className={`dash-row-btn dash-onb-row ${isCompleted ? 'is-done' : ''}`}
+                        onClick={() => handleTaskClick(task)}
+                      >
+                        {isCompleted
+                          ? <CheckCircle2 size={20} className="dash-onb-status" {...ICON} />
+                          : <Circle size={20} className="dash-onb-status" {...ICON} />}
+                        <span className="dash-row-label">
+                          {task.text}
+                          {isCompleted && <span className="visually-hidden"> — выполнено</span>}
+                        </span>
+                        <ChevronRight size={16} className="dash-row-arrow" {...ICON} />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
 
+          {/* QUICK LINKS */}
+          <nav className="card dash-card" aria-labelledby="quick-links-title">
+            <div className="dash-card-head">
+              <h2 id="quick-links-title">Быстрые ссылки</h2>
+            </div>
+            <ul className="list dash-rows">
+              {quickLinks.map(({ taskId, to, label, icon: Icon }) => (
+                <li key={to}>
+                  <Link to={to} className="dash-row-btn dash-link-row" onClick={() => markTaskDone(taskId)}>
+                    <Icon size={18} className="dash-row-icon" {...ICON} />
+                    <span className="dash-row-label">{label}</span>
+                    <ChevronRight size={16} className="dash-row-arrow" {...ICON} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
       </div>
     </div>
   );

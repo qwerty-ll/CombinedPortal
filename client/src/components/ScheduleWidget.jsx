@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { 
-  CalendarDays, Search, Clock, MapPin, User, BookOpen, AlertCircle, 
-  ChevronDown, GraduationCap, Building2, UserCheck, Calendar,
-  ChevronLeft, ChevronRight
+import {
+  Search, MapPin, User, AlertCircle, ChevronDown, GraduationCap, Check,
+  ChevronLeft, ChevronRight, CalendarX2, CloudOff, RotateCw
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { scheduleApi } from '../services/api';
 
 const EIOS_DIRECT_URL = 'https://eios.kosgos.ru/api';
+
+const ICON = { strokeWidth: 1.75, 'aria-hidden': true };
 
 // Automatically calculate academic year from date string (YYYY-MM-DD)
 const calculateAcademicYear = (dateStr) => {
@@ -31,15 +31,32 @@ const cleanDisciplineTitle = (rawTitle) => {
   return clean;
 };
 
-// Helper for lesson type badge
+// Helper for lesson type badge (label + badge tone)
 const getLessonTypeBadge = (disciplineName) => {
   const lower = (disciplineName || '').toLowerCase();
-  if (lower.startsWith('лек') || lower.includes(' лек ')) return { label: 'Лекция', bg: '#E6F4EA', color: '#137333' };
-  if (lower.startsWith('лаб') || lower.includes(' лаб ')) return { label: 'Лабораторная', bg: '#F3E8FF', color: '#7E22CE' };
-  if (lower.startsWith('пр') || lower.includes(' пр ')) return { label: 'Практическое', bg: '#FEF3C7', color: '#B45309' };
-  if (lower.includes('экз') || lower.includes('зач')) return { label: 'Аттестация', bg: '#FEE2E2', color: '#B91C1C' };
-  return { label: 'Занятие', bg: '#E0F2FE', color: '#0369A1' };
+  if (lower.startsWith('лек') || lower.includes(' лек ')) return { label: 'Лекция', tone: '' };
+  if (lower.startsWith('лаб') || lower.includes(' лаб ')) return { label: 'Лабораторная', tone: '' };
+  if (lower.startsWith('пр') || lower.includes(' пр ')) return { label: 'Практика', tone: '' };
+  if (lower.includes('экз') || lower.includes('зач')) return { label: 'Аттестация', tone: 'badge-warning' };
+  return { label: 'Занятие', tone: '' };
 };
+
+// Presentation helpers (local calendar date / time, used only for "today" and "now" markers)
+const pad2 = (n) => String(n).padStart(2, '0');
+const capitalize = (str) => (str ? str.charAt(0).toUpperCase() + str.slice(1) : '');
+const localIso = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const mondayIsoOf = (iso) => {
+  const d = new Date(iso);
+  const day = d.getDay();
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+  return d.toISOString().split('T')[0];
+};
+
+const TARGET_TYPES = [
+  { id: 'group', label: 'Группы', field: 'Группа', placeholder: 'Найти группу, например 24-ИСбо-1' },
+  { id: 'teacher', label: 'Преподаватели', field: 'Преподаватель', placeholder: 'Найти преподавателя по ФИО' },
+  { id: 'aud', label: 'Аудитории', field: 'Аудитория', placeholder: 'Найти аудиторию, например Б-304' },
+];
 
 const ScheduleWidget = () => {
   const [targetType, setTargetType] = useState('group'); // 'group' | 'teacher' | 'aud'
@@ -78,9 +95,13 @@ const ScheduleWidget = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  // Keyboard highlight inside the combobox list (presentation only)
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const inputRef = useRef(null);
+  const listRef = useRef(null);
 
   // View Mode: 'day' (1 день) | 'week' (1 неделя)
-  const [viewMode, setViewMode] = useState('day'); 
+  const [viewMode, setViewMode] = useState('day');
 
   // Selected date ISO string (default to today)
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -156,7 +177,7 @@ const ScheduleWidget = () => {
             const activeId = currentTarget?.id;
             const exists = activeId ? items.find(i => Number(i.id) === Number(activeId)) : null;
             if (!exists) {
-              const defaultItem = targetType === 'group' 
+              const defaultItem = targetType === 'group'
                 ? (items.find(g => g.name && g.name.includes('24-ИСбо-1')) || items.find(g => g.facul === 'ИВИТШ') || items[0])
                 : (items.find(a => a.name && (a.name.includes('Б-') || a.name.includes('Б2'))) || items[0]);
               if (defaultItem) handleSelectItem(defaultItem);
@@ -200,12 +221,22 @@ const ScheduleWidget = () => {
   const filteredCatalog = useMemo(() => {
     if (!searchQuery.trim()) return catalogItems.slice(0, 30);
     const query = searchQuery.toLowerCase().trim();
-    return catalogItems.filter(item => 
-      (item.name && item.name.toLowerCase().includes(query)) || 
+    return catalogItems.filter(item =>
+      (item.name && item.name.toLowerCase().includes(query)) ||
       (item.facul && item.facul.toLowerCase().includes(query)) ||
       (item.kaf && item.kaf.toLowerCase().includes(query))
     ).slice(0, 40);
   }, [catalogItems, searchQuery]);
+
+  // Reset the keyboard highlight whenever the list changes or closes
+  useEffect(() => { setActiveIndex(-1); }, [searchQuery, isDropdownOpen, targetType]);
+
+  // Keep the highlighted option visible while moving with the keyboard
+  useEffect(() => {
+    if (activeIndex < 0 || !listRef.current) return;
+    const el = listRef.current.children[activeIndex];
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex]);
 
   // 2. Fetch Lessons Schedule
   const fetchSchedule = async (id, name) => {
@@ -221,7 +252,7 @@ const ScheduleWidget = () => {
         targetType === 'teacher' ? id : null,
         targetType === 'aud' ? id : null
       );
-      
+
       const raspData = res?.data?.rasp || (Array.isArray(res?.data) ? res.data : []);
       setRawLessons(raspData);
       setStaleSince(res?.stale && res.cached_at ? new Date(res.cached_at * 1000) : null);
@@ -292,10 +323,14 @@ const ScheduleWidget = () => {
       const dateKey = lesson.дата ? lesson.дата.split('T')[0] : 'неизвестно';
       if (!dateMap[dateKey]) {
         const dObj = new Date(dateKey);
-        const dayTitle = `${lesson.день_недели || dObj.toLocaleDateString('ru-RU', { weekday: 'long' })} (${dObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })})`;
+        const weekday = lesson.день_недели || dObj.toLocaleDateString('ru-RU', { weekday: 'long' });
+        const dateLabel = dObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+        const dayTitle = `${weekday} (${dateLabel})`;
         dateMap[dateKey] = {
           dateIso: dateKey,
           dayTitle: dayTitle,
+          weekday,
+          dateLabel,
           slotsMap: {}
         };
       }
@@ -306,7 +341,7 @@ const ScheduleWidget = () => {
           timeStart: lesson.начало,
           timeEnd: lesson.конец,
           lessonNum: lesson.номерЗанятия,
-          color: lesson.цвет || 'var(--primary)',
+          color: lesson.цвет || 'var(--accent)',
           items: []
         };
       }
@@ -334,230 +369,276 @@ const ScheduleWidget = () => {
     handleDateChange(d.toISOString().split('T')[0]);
   };
 
-  return (
-    <div style={{
-      background: 'white',
-      borderRadius: '24px',
-      padding: '28px',
-      border: '1px solid #E9ECEF',
-      boxShadow: '0 10px 30px rgba(0, 0, 0, 0.03)',
-      maxWidth: '100%',
-      margin: '0 auto'
-    }}>
-      {/* 1. TOP BAR: TITLE & TYPE SWITCHER */}
-      <div className="schedule-widget-header">
-        <div>
-          <h3 style={{ margin: 0, fontSize: '1.35rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text)' }}>
-            <CalendarDays size={22} style={{ color: 'var(--primary)' }} />
-            Расписание КГУ
-          </h3>
-        </div>
+  // ---------- Presentation-only derived values ----------
+  const todayIso = new Date().toISOString().split('T')[0]; // same expression as the default date
+  const now = new Date();
+  const localTodayIso = localIso(now);
+  const nowHm = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+  const isOnToday = viewMode === 'day'
+    ? selectedDate === todayIso
+    : mondayIsoOf(todayIso) === weekStartEndDates.monIso;
+  const targetMeta = TARGET_TYPES.find(t => t.id === targetType) || TARGET_TYPES[0];
+  const listboxId = 'schedule-target-listbox';
+  const optionId = (item) => `schedule-target-option-${item.id}`;
 
-        {/* Category Switcher */}
-        <div className="schedule-target-tabs">
-          <button 
-            type="button"
-            onClick={() => handleSwitchTargetType('group')}
-            className={`schedule-target-tab-btn ${targetType === 'group' ? 'active' : ''}`}
-          >
-            <GraduationCap size={15} /> <span>Группы</span>
-          </button>
-          <button 
-            type="button"
-            onClick={() => handleSwitchTargetType('teacher')}
-            className={`schedule-target-tab-btn ${targetType === 'teacher' ? 'active' : ''}`}
-          >
-            <UserCheck size={15} /> <span>Преподаватели</span>
-          </button>
-          <button 
-            type="button"
-            onClick={() => handleSwitchTargetType('aud')}
-            className={`schedule-target-tab-btn ${targetType === 'aud' ? 'active' : ''}`}
-          >
-            <Building2 size={15} /> <span>Аудитории</span>
-          </button>
+  // Marks the lesson in progress and the next one — only for today's date group
+  const slotMarker = (dGroup, slot, slotIdx) => {
+    if (dGroup.dateIso !== localTodayIso) return null;
+    if (slot.timeStart <= nowHm && nowHm < slot.timeEnd) return 'now';
+    const firstUpcoming = dGroup.slots.findIndex(s => s.timeStart > nowHm);
+    return firstUpcoming === slotIdx ? 'next' : null;
+  };
+
+  const handleComboKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!isDropdownOpen) { setIsDropdownOpen(true); return; }
+      setActiveIndex(i => Math.min(i + 1, filteredCatalog.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex(i => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter') {
+      if (isDropdownOpen && activeIndex >= 0 && filteredCatalog[activeIndex]) {
+        e.preventDefault();
+        handleSelectItem(filteredCatalog[activeIndex]);
+        requestAnimationFrame(() => inputRef.current?.select());
+      }
+    } else if (e.key === 'Escape') {
+      if (isDropdownOpen) {
+        e.preventDefault();
+        setIsDropdownOpen(false);
+        requestAnimationFrame(() => inputRef.current?.select());
+      }
+    } else if (e.key === 'Tab') {
+      setIsDropdownOpen(false);
+    }
+  };
+
+  const renderLesson = (slot, marker) => (item, iIdx) => {
+    const typeBadge = getLessonTypeBadge(item.дисциплина);
+    const cleanedTitle = cleanDisciplineTitle(item.дисциплина);
+    return (
+      <div key={item.код || iIdx} className="sched-lesson">
+        <p className="sched-lesson-tags">
+          <span className={`badge ${typeBadge.tone}`}>{typeBadge.label}</span>
+          {item.номерПодгруппы > 0 && (
+            <span className="badge">Подгруппа {item.номерПодгруппы}</span>
+          )}
+          {iIdx === 0 && slot.lessonNum ? <span className="sched-lesson-num tabular">{slot.lessonNum} пара</span> : null}
+          {iIdx === 0 && marker === 'now' && <span className="badge badge-accent sched-marker">Идёт сейчас</span>}
+          {iIdx === 0 && marker === 'next' && <span className="badge sched-marker">Следующая</span>}
+        </p>
+        <h4 className="sched-lesson-title">{cleanedTitle}</h4>
+        <p className="sched-lesson-meta">
+          {item.аудитория && (
+            <span className="sched-lesson-room">
+              <MapPin size={15} {...ICON} />
+              <span className="visually-hidden">Аудитория </span>{item.аудитория}
+            </span>
+          )}
+          {item.преподаватель && (
+            <span>
+              <User size={15} {...ICON} />
+              <span className="visually-hidden">Преподаватель </span>{item.преподаватель}
+            </span>
+          )}
+          {item.группа && targetType !== 'group' && (
+            <span>
+              <GraduationCap size={15} {...ICON} />
+              <span className="visually-hidden">Группа </span>{item.группа}
+            </span>
+          )}
+        </p>
+      </div>
+    );
+  };
+
+  return (
+    <div className="card sched">
+      {/* 1. TITLE & TYPE SWITCHER */}
+      <div className="sched-head">
+        <h2 id="schedule-title">Расписание</h2>
+        <div className="segmented sched-types" role="group" aria-label="Чьё расписание показать">
+          {TARGET_TYPES.map(t => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => handleSwitchTargetType(t.id)}
+              className={`segmented-item ${targetType === t.id ? 'active' : ''}`}
+              aria-pressed={targetType === t.id}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* 2. UNIFIED SEARCH COMBOBOX & ACADEMIC YEAR SELECT */}
-      <div className="schedule-search-year-row" ref={dropdownRef}>
-        
-        {/* Search Combobox Input */}
-        <div className="schedule-search-box-wrap">
-          <div 
-            onClick={() => setIsDropdownOpen(true)}
-            className={`schedule-search-input-box ${isDropdownOpen ? 'focused' : ''}`}
-          >
-            <Search size={16} className="schedule-search-icon" />
-            <input 
-              type="text" 
-              placeholder={
-                currentTarget?.name 
-                  ? (isDropdownOpen ? 'Поиск другого...' : 'Поиск...')
-                  : (
-                    targetType === 'group' ? 'Поиск группы (напр. 24-ИСбо-1)...' :
-                    targetType === 'teacher' ? 'Поиск ФИО преподавателя...' :
-                    'Поиск кабинета (напр. Б-304)...'
-                  )
-              }
-              value={searchQuery}
+      {/* 2. SEARCH COMBOBOX & ACADEMIC YEAR SELECT */}
+      <div className="sched-filters">
+        <div className="field sched-combo" ref={dropdownRef}>
+          <label className="field-label" htmlFor="schedule-target-input">{targetMeta.field}</label>
+          <div className="sched-combo-control">
+            <Search size={16} className="sched-combo-icon" {...ICON} />
+            <input
+              ref={inputRef}
+              id="schedule-target-input"
+              type="text"
+              role="combobox"
+              aria-expanded={isDropdownOpen}
+              aria-controls={listboxId}
+              aria-autocomplete="list"
+              aria-activedescendant={isDropdownOpen && activeIndex >= 0 && filteredCatalog[activeIndex] ? optionId(filteredCatalog[activeIndex]) : undefined}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={isDropdownOpen && currentTarget?.name ? currentTarget.name : targetMeta.placeholder}
+              value={isDropdownOpen ? searchQuery : (currentTarget?.name || searchQuery)}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
                 setIsDropdownOpen(true);
               }}
               onFocus={() => setIsDropdownOpen(true)}
-              className="schedule-search-input"
+              onClick={() => setIsDropdownOpen(true)}
+              onKeyDown={handleComboKeyDown}
+              className="input sched-combo-input"
             />
-            {currentTarget?.name && !searchQuery && (
-              <span className="schedule-target-badge" title={currentTarget.name}>
-                {currentTarget.name}
-              </span>
-            )}
-            <ChevronDown size={16} className="schedule-chevron-icon" />
+            <ChevronDown size={16} className="sched-combo-chevron" {...ICON} />
           </div>
 
-          {/* Floating Results Card */}
+          {/* Results popover */}
           {isDropdownOpen && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              background: 'white',
-              borderRadius: '14px',
-              border: '1px solid #E9ECEF',
-              boxShadow: '0 12px 32px rgba(0,0,0,0.12)',
-              marginTop: '6px',
-              zIndex: 100,
-              maxHeight: '260px',
-              overflowY: 'auto',
-              padding: '4px 0'
-            }}>
+            <div className="sched-popover">
               {catalogLoading ? (
-                <div style={{ padding: '14px', textAlign: 'center', color: '#888', fontSize: '0.85rem' }}>
-                  Загрузка данных...
+                <div className="sched-popover-loading" role="status">
+                  <span className="visually-hidden">Загрузка списка…</span>
+                  <span className="skeleton sched-skel-line" />
+                  <span className="skeleton sched-skel-line sched-skel-line--mid" />
+                  <span className="skeleton sched-skel-line sched-skel-line--short" />
                 </div>
               ) : filteredCatalog.length > 0 ? (
-                filteredCatalog.map(item => (
-                  <div 
-                    key={item.id}
-                    onClick={() => handleSelectItem(item)}
-                    style={{
-                      padding: '10px 16px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                      borderBottom: '1px solid #F1F3F5',
-                      fontSize: '0.9rem'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#F0F7FF'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
-                  >
-                    <div>
-                      <strong style={{ color: 'var(--text)' }}>{item.name}</strong>
-                      {item.facul && <span style={{ marginLeft: '8px', color: '#666', fontSize: '0.78rem' }}>({item.facul})</span>}
-                    </div>
-                    {Number(item.id) === Number(currentTarget?.id) && (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: '800' }}>✓ Выбрано</span>
-                    )}
-                  </div>
-                ))
+                <ul className="sched-options" role="listbox" id={listboxId} ref={listRef} aria-label={targetMeta.label}>
+                  {filteredCatalog.map((item, idx) => {
+                    const isCurrent = Number(item.id) === Number(currentTarget?.id);
+                    return (
+                      <li
+                        key={item.id}
+                        id={optionId(item)}
+                        role="option"
+                        aria-selected={isCurrent}
+                        className={`sched-option ${idx === activeIndex ? 'is-active' : ''}`}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          handleSelectItem(item);
+                          inputRef.current?.blur();
+                        }}
+                      >
+                        <span className="sched-option-text">
+                          <span className="sched-option-name">{item.name}</span>
+                          {item.facul && <span className="sched-option-meta">{item.facul}</span>}
+                          {!item.facul && item.kaf && <span className="sched-option-meta">{item.kaf}</span>}
+                        </span>
+                        {isCurrent && <Check size={16} className="sched-option-check" {...ICON} />}
+                      </li>
+                    );
+                  })}
+                </ul>
               ) : (
-                <div style={{ padding: '14px', textAlign: 'center', color: '#888', fontSize: '0.85rem' }}>
-                  Ничего не найдено
-                </div>
+                <p className="sched-popover-empty">Ничего не найдено</p>
               )}
             </div>
           )}
         </div>
 
-        {/* Academic Year Select */}
-        <div className="schedule-year-select-wrap">
-          <select 
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            className="schedule-year-select"
-          >
-            {availableYears.map(y => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-          <ChevronDown size={16} className="schedule-year-chevron" />
+        <div className="field sched-year">
+          <label className="field-label" htmlFor="schedule-year-select">Учебный год</label>
+          <div className="sched-select-wrap">
+            <select
+              id="schedule-year-select"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="select sched-select tabular"
+            >
+              {availableYears.map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <ChevronDown size={16} className="sched-select-chevron" {...ICON} />
+          </div>
         </div>
       </div>
 
-      {/* 3. CLEAN TOOLBAR: MODE SWITCHER (ДЕНЬ / НЕДЕЛЯ) & DATE NAVIGATION */}
-      <div className="schedule-toolbar-container">
-        <div className="schedule-toolbar-inner">
-          
-          {/* Mode Switcher */}
-          <div className="schedule-mode-switcher">
-            <button 
-              type="button"
-              onClick={() => setViewMode('day')}
-              className={`schedule-mode-btn ${viewMode === 'day' ? 'active' : ''}`}
-            >
-              📅 1 день
-            </button>
-            <button 
-              type="button"
-              onClick={() => setViewMode('week')}
-              className={`schedule-mode-btn ${viewMode === 'week' ? 'active' : ''}`}
-            >
-              🗓️ За неделю
-            </button>
-          </div>
+      {/* 3. MODE SWITCHER (ДЕНЬ / НЕДЕЛЯ) & DATE NAVIGATION */}
+      <div className="sched-nav">
+        <div className="segmented sched-modes" role="group" aria-label="Период">
+          <button
+            type="button"
+            onClick={() => setViewMode('day')}
+            className={`segmented-item ${viewMode === 'day' ? 'active' : ''}`}
+            aria-pressed={viewMode === 'day'}
+          >
+            День
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('week')}
+            className={`segmented-item ${viewMode === 'week' ? 'active' : ''}`}
+            aria-pressed={viewMode === 'week'}
+          >
+            Неделя
+          </button>
+        </div>
 
-          {/* Controls for Day Mode */}
-          {viewMode === 'day' && (
-            <div className="schedule-date-controls">
-              <button 
+        <div className="sched-nav-end">
+          {!isOnToday && (
+            <button type="button" className="btn btn-secondary sched-today" onClick={() => handleDateChange(todayIso)}>
+              {viewMode === 'day' ? 'Сегодня' : 'Эта неделя'}
+            </button>
+          )}
+          {viewMode === 'day' ? (
+            <div className="sched-dates">
+              <button
                 type="button"
                 onClick={() => changeDateByDays(-1)}
-                className="schedule-date-btn"
+                className="btn btn-secondary btn-icon"
+                aria-label="Предыдущий день"
               >
-                <ChevronLeft size={16} /> <span>Вчера</span>
+                <ChevronLeft size={18} {...ICON} />
               </button>
-
-              <input 
+              <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => handleDateChange(e.target.value)}
-                className="schedule-date-input"
+                className="input sched-date-input tabular"
+                aria-label="Дата"
               />
-
-              <button 
+              <button
                 type="button"
                 onClick={() => changeDateByDays(1)}
-                className="schedule-date-btn"
+                className="btn btn-secondary btn-icon"
+                aria-label="Следующий день"
               >
-                <span>Завтра</span> <ChevronRight size={16} />
+                <ChevronRight size={18} {...ICON} />
               </button>
             </div>
-          )}
-
-          {/* Controls for Week Mode */}
-          {viewMode === 'week' && (
-            <div className="schedule-date-controls">
-              <button 
+          ) : (
+            <div className="sched-dates">
+              <button
                 type="button"
                 onClick={() => changeDateByWeeks(-1)}
-                className="schedule-date-btn"
+                className="btn btn-secondary btn-icon"
+                aria-label="Предыдущая неделя"
               >
-                <ChevronLeft size={16} /> <span>Пред. неделя</span>
+                <ChevronLeft size={18} {...ICON} />
               </button>
-
-              <span className="schedule-week-range">
+              <span className="sched-week-range tabular" aria-live="polite">
                 {new Date(weekStartEndDates.monIso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} — {new Date(weekStartEndDates.satIso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
               </span>
-
-              <button 
+              <button
                 type="button"
                 onClick={() => changeDateByWeeks(1)}
-                className="schedule-date-btn"
+                className="btn btn-secondary btn-icon"
+                aria-label="Следующая неделя"
               >
-                <span>След. неделя</span> <ChevronRight size={16} />
+                <ChevronRight size={18} {...ICON} />
               </button>
             </div>
           )}
@@ -565,110 +646,95 @@ const ScheduleWidget = () => {
       </div>
 
       {staleSince && !lessonsLoading && !error && (
-        <div style={{ padding: '10px 14px', marginBottom: '12px', background: '#FFFBEB', borderRadius: '12px', color: '#92400E', border: '1px solid #FDE68A', fontSize: '0.85rem', fontWeight: '600' }}>
-          ЭИОС сейчас недоступна — показана сохранённая копия от {staleSince.toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}.
-        </div>
+        <p className="sched-notice" role="status">
+          <CloudOff size={18} {...ICON} />
+          <span>
+            ЭИОС сейчас недоступна — показана сохранённая копия от{' '}
+            <span className="tabular">{staleSince.toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}</span>.
+          </span>
+        </p>
       )}
 
-      {/* 4. COMPACT TIME-SLOT CARDS DISPLAY */}
+      {/* 4. LESSONS */}
       {lessonsLoading ? (
-        <div style={{ textAlign: 'center', padding: '45px 0', color: '#666' }}>
-          <div className="spinner" style={{ margin: '0 auto 10px auto' }}></div>
-          <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>Загрузка расписания для "{currentTarget?.name || 'выбранного объекта'}"...</span>
+        <div className="sched-body" aria-busy="true">
+          <p className="visually-hidden" role="status">
+            Загрузка расписания для «{currentTarget?.name || 'выбранного объекта'}»…
+          </p>
+          <span className="skeleton sched-skel-heading" />
+          <ul className="sched-slots" aria-hidden="true">
+            {[0, 1, 2].map(i => (
+              <li key={i} className="sched-slot">
+                <span className="sched-time">
+                  <span className="skeleton sched-skel-time" />
+                </span>
+                <span className="sched-skel-body">
+                  <span className="skeleton sched-skel-badge" />
+                  <span className="skeleton sched-skel-line sched-skel-line--mid" />
+                  <span className="skeleton sched-skel-line sched-skel-line--short" />
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : error ? (
-        <div style={{ textAlign: 'center', padding: '24px', background: '#FFF5F5', borderRadius: '16px', color: '#C53030', border: '1px solid #FEB2B2' }}>
-          <AlertCircle size={32} style={{ marginBottom: '6px' }} />
-          <h4 style={{ margin: '0 0 4px 0', fontSize: '0.98rem', fontWeight: '800' }}>{error}</h4>
+        <div className="sched-alert" role="alert">
+          <AlertCircle size={20} {...ICON} />
+          <div className="sched-alert-text">
+            <p className="sched-alert-title">{error}</p>
+            <p>Проверьте подключение к интернету и загрузите расписание ещё раз.</p>
+            {currentTarget?.id && (
+              <button
+                type="button"
+                className="btn btn-secondary sched-alert-retry"
+                onClick={() => fetchSchedule(currentTarget.id, currentTarget.name)}
+              >
+                <RotateCw size={16} {...ICON} />
+                Загрузить снова
+              </button>
+            )}
+          </div>
         </div>
       ) : groupedByDateAndSlot.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="sched-body">
           {groupedByDateAndSlot.map((dGroup) => (
-            <div key={dGroup.dateIso}>
-              <h4 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: '800', color: 'var(--text)', borderBottom: '2px solid rgba(0,127,255,0.12)', paddingBottom: '6px' }}>
-                📅 {dGroup.dayTitle}
-              </h4>
+            <section key={dGroup.dateIso} className="sched-day" aria-labelledby={`sched-day-${dGroup.dateIso}`}>
+              <h3 className="sched-day-title" id={`sched-day-${dGroup.dateIso}`}>
+                <span>{capitalize(dGroup.weekday)}, {dGroup.dateLabel}</span>
+                {dGroup.dateIso === localTodayIso && <span className="badge badge-accent">Сегодня</span>}
+              </h3>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {dGroup.slots.map((slot, sIdx) => (
-                  <motion.div 
-                    key={sIdx}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    style={{
-                      background: 'white',
-                      borderLeft: `5px solid ${slot.color}`,
-                      borderTop: '1px solid #F1F3F5',
-                      borderRight: '1px solid #F1F3F5',
-                      borderBottom: '1px solid #F1F3F5',
-                      borderRadius: '16px',
-                      padding: '16px 20px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                    }}
-                  >
-                    {/* Slot Time Header */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', borderBottom: '1px dashed #E9ECEF', paddingBottom: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ background: 'rgba(0,127,255,0.08)', padding: '4px 10px', borderRadius: '8px', fontWeight: '800', fontSize: '0.92rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Clock size={13} /> {slot.timeStart} - {slot.timeEnd}
-                        </div>
-                        <span style={{ fontSize: '0.8rem', color: '#888', fontWeight: '700' }}>{slot.lessonNum} пара</span>
+              <ul className="sched-slots">
+                {dGroup.slots.map((slot, sIdx) => {
+                  const marker = slotMarker(dGroup, slot, sIdx);
+                  return (
+                    <li key={sIdx} className={`sched-slot ${marker ? `is-${marker}` : ''}`}>
+                      <p className="sched-time tabular">
+                        <span className="sched-time-start">{slot.timeStart}</span>
+                        <span className="sched-time-end">
+                          <span className="visually-hidden">до </span>{slot.timeEnd}
+                        </span>
+                      </p>
+                      <div className="sched-slot-body">
+                        {slot.items.map(renderLesson(slot, marker))}
                       </div>
-                    </div>
-
-                    {/* Slot Sub-Items */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {slot.items.map((item, iIdx) => {
-                        const typeBadge = getLessonTypeBadge(item.дисциплина);
-                        const cleanedTitle = cleanDisciplineTitle(item.дисциплина);
-                        return (
-                          <div key={item.код || iIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                              <span style={{ background: typeBadge.bg, color: typeBadge.color, padding: '2px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: '800' }}>
-                                {typeBadge.label}
-                              </span>
-                              {item.номерПодгруппы > 0 && (
-                                <span style={{ background: '#E3F2FD', color: '#0D47A1', padding: '2px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: '800' }}>
-                                  {item.номерПодгруппы} п/г
-                                </span>
-                              )}
-                              <h5 style={{ margin: 0, fontSize: '0.98rem', fontWeight: '800', color: 'var(--text)', flex: 1, wordBreak: 'break-word', lineHeight: '1.35' }}>
-                                {cleanedTitle}
-                              </h5>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '18px', fontSize: '0.84rem', color: '#555', flexWrap: 'wrap', paddingLeft: '2px' }}>
-                              {item.преподаватель && (
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <User size={13} style={{ color: '#777' }} /> {item.преподаватель}
-                                </span>
-                              )}
-                              {item.аудитория && (
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '800', color: 'var(--primary)' }}>
-                                  <MapPin size={13} /> Кабинет: {item.аудитория}
-                                </span>
-                              )}
-                              {item.группа && targetType !== 'group' && (
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <GraduationCap size={13} style={{ color: '#777' }} /> Группа: {item.группа}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
           ))}
         </div>
       ) : (
-        <div className="schedule-empty-card">
-          <BookOpen size={38} strokeWidth={1.5} className="schedule-empty-icon" />
-          <h4>Занятий нет</h4>
-          <p>На выбранный день или неделю пары не запланированы</p>
+        <div className="sched-empty">
+          <CalendarX2 size={28} {...ICON} />
+          <h3>Занятий нет</h3>
+          <p>На выбранный день или неделю пары не запланированы.</p>
+          {viewMode === 'day' && (
+            <button type="button" className="btn btn-secondary" onClick={() => setViewMode('week')}>
+              Показать всю неделю
+            </button>
+          )}
         </div>
       )}
     </div>

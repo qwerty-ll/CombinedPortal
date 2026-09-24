@@ -1,13 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Mail, GraduationCap, Award, Compass, MessageSquare, Star, CheckCircle2, 
-  Lock, RefreshCw, LogIn, Shield, LogOut, FileText, Download, User, Camera, BookOpen, Edit3, Check, UserCheck
+import {
+  GraduationCap, ShieldCheck, BadgeCheck, Compass, MessageSquare, CheckCircle2,
+  LogIn, LogOut, User, Camera, AlertCircle, Clock, Loader2
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { adaptationApi, forumApi } from '../services/api';
 import MiniGamesSection from '../components/MiniGamesSection';
+
+const ICON = { strokeWidth: 1.75, 'aria-hidden': true };
+
+const LOGIN_MODES = [
+  { id: 'sdo', label: 'Студент ЭИОС КГУ', Icon: GraduationCap },
+  { id: 'staff', label: 'Сотрудник ИВИТШ', Icon: ShieldCheck }
+];
+
+// Arrow-key navigation between role="tab" buttons (WAI-ARIA tabs pattern).
+const handleTabsKeyDown = (e, ids, current, select, idPrefix) => {
+  const idx = ids.indexOf(current);
+  let next = null;
+  if (e.key === 'ArrowRight') next = ids[(idx + 1) % ids.length];
+  else if (e.key === 'ArrowLeft') next = ids[(idx - 1 + ids.length) % ids.length];
+  else if (e.key === 'Home') next = ids[0];
+  else if (e.key === 'End') next = ids[ids.length - 1];
+  if (next === null) return;
+  e.preventDefault();
+  select(next);
+  document.getElementById(`${idPrefix}${next}`)?.focus();
+};
 
 const Profile = () => {
   const { user, isLoggedIn, login, adminLogin, logout, updateUserProfile, sessionExpired } = useAuth();
@@ -58,7 +78,7 @@ const Profile = () => {
     e.preventDefault();
     setLoginError('');
     setIsLoggingIn(true);
-    
+
     if (!loginForm.username.trim()) {
       setLoginError(loginMode === 'sdo' ? 'Введите логин ЭИОС КГУ' : 'Введите логин администратора');
       setIsLoggingIn(false);
@@ -99,13 +119,13 @@ const Profile = () => {
 
     const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
     if (!file.type || !allowedMimeTypes.includes(file.type.toLowerCase())) {
-      toast.show('Ошибка формата! Разрешены только изображения PNG, JPEG, JPG и WebP', 'warning');
+      toast.show('Неподходящий формат. Загрузите изображение PNG, JPEG, JPG или WebP', 'warning');
       e.target.value = '';
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      toast.show('Файл слишком большой! Максимальный размер 2МБ', 'warning');
+      toast.show('Файл больше 2 МБ. Выберите изображение поменьше', 'warning');
       return;
     }
 
@@ -118,229 +138,262 @@ const Profile = () => {
     reader.readAsDataURL(file);
   };
 
+  const selectLoginMode = (mode) => {
+    setLoginMode(mode);
+    setLoginError('');
+  };
+
   // --- NOT LOGGED IN: SHOW LOGIN FORM WITH MODE SWITCHER ---
   if (!isLoggedIn) {
+    const isStaff = loginMode === 'staff';
+    const describedBy = [
+      !isStaff ? 'login-password-hint' : null,
+      loginError ? 'login-error' : null
+    ].filter(Boolean).join(' ') || undefined;
+
     return (
-      <div className="container">
-        <div className="page-header">
-          <h1>Личный кабинет</h1>
-        </div>
+      <div className="container profile-page">
+        <header className="page-header">
+          <div>
+            <h1>Личный кабинет</h1>
+            <p className="page-subtitle">
+              Войдите, чтобы видеть свой путь адаптации, темы на форуме и мини-игры ВИТШика.
+            </p>
+          </div>
+        </header>
 
-        <motion.div 
-          className="login-card"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          {/* Mode Switcher Tabs */}
-          <div style={{ display: 'flex', background: '#F1F3F5', padding: '4px', borderRadius: '14px', marginBottom: '20px', gap: '4px' }}>
-            <button
-              type="button"
-              onClick={() => { setLoginMode('sdo'); setLoginError(''); }}
-              style={{
-                flex: 1,
-                border: 'none',
-                padding: '10px 14px',
-                borderRadius: '10px',
-                fontWeight: '700',
-                fontSize: '0.88rem',
-                cursor: 'pointer',
-                background: loginMode === 'sdo' ? 'white' : 'transparent',
-                color: loginMode === 'sdo' ? 'var(--primary)' : '#666',
-                boxShadow: loginMode === 'sdo' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                transition: 'all 0.2s'
-              }}
-            >
-              🎓 Студент ЭИОС КГУ
-            </button>
-            <button
-              type="button"
-              onClick={() => { setLoginMode('staff'); setLoginError(''); }}
-              style={{
-                flex: 1,
-                border: 'none',
-                padding: '10px 14px',
-                borderRadius: '10px',
-                fontWeight: '700',
-                fontSize: '0.88rem',
-                cursor: 'pointer',
-                background: loginMode === 'staff' ? 'white' : 'transparent',
-                color: loginMode === 'staff' ? '#059669' : '#666',
-                boxShadow: loginMode === 'staff' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                transition: 'all 0.2s'
-              }}
-            >
-              🛡️ Сотрудник ИВИТШ
-            </button>
+        <section className="card login-card" aria-labelledby="login-title">
+          <div
+            className="segmented login-modes"
+            role="tablist"
+            aria-label="Способ входа"
+            onKeyDown={(e) => handleTabsKeyDown(e, LOGIN_MODES.map(m => m.id), loginMode, selectLoginMode, 'login-tab-')}
+          >
+            {LOGIN_MODES.map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                id={`login-tab-${id}`}
+                type="button"
+                role="tab"
+                aria-selected={loginMode === id}
+                aria-controls="login-panel"
+                tabIndex={loginMode === id ? 0 : -1}
+                className="segmented-item"
+                onClick={() => selectLoginMode(id)}
+              >
+                <Icon size={16} {...ICON} />
+                <span>{label}</span>
+              </button>
+            ))}
           </div>
 
-          <div className="login-card-header">
-            <div className="login-icon-box" style={{ background: loginMode === 'staff' ? 'rgba(5,150,105,0.1)' : 'rgba(0,127,255,0.1)', color: loginMode === 'staff' ? '#059669' : 'var(--primary)' }}>
-              {loginMode === 'staff' ? <UserCheck size={32} /> : <GraduationCap size={32} />}
-            </div>
-            <h2>{loginMode === 'staff' ? 'Вход для Администрации ИВИТШ' : 'Вход через ЭИОС КГУ'}</h2>
-            <p>{loginMode === 'staff' ? 'Служебная авторизация администраторов и деканата' : 'Единая авторизация студентов eios.kosgos.ru'}</p>
+          <div id="login-panel" role="tabpanel" aria-labelledby={`login-tab-${loginMode}`}>
+            <h2 id="login-title" className="login-title">
+              {isStaff ? 'Вход для администрации ИВИТШ' : 'Вход через ЭИОС КГУ'}
+            </h2>
+            <p className="login-lead">
+              {isStaff ? 'Служебная авторизация администраторов и деканата' : 'Единая авторизация студентов eios.kosgos.ru'}
+            </p>
+
+            <form onSubmit={handleLogin} className="login-form">
+              <div className="field">
+                <label className="field-label" htmlFor="login-username">
+                  {isStaff ? 'Логин администратора' : 'Логин ЭИОС КГУ'}
+                </label>
+                <input
+                  id="login-username"
+                  className="input"
+                  type="text"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  placeholder={isStaff ? 'Учётная запись деканата' : 'Например, 22-isbo-035'}
+                  value={loginForm.username}
+                  onChange={e => setLoginForm({ ...loginForm, username: e.target.value })}
+                  aria-describedby={loginError ? 'login-error' : undefined}
+                  required
+                  disabled={isLoggingIn}
+                />
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="login-password">Пароль</label>
+                <input
+                  id="login-password"
+                  className="input"
+                  type="password"
+                  autoComplete="current-password"
+                  value={loginForm.password}
+                  onChange={e => setLoginForm({ ...loginForm, password: e.target.value })}
+                  aria-describedby={describedBy}
+                  disabled={isLoggingIn}
+                  required
+                />
+                {!isStaff && (
+                  <p id="login-password-hint" className="field-hint">
+                    Используется единый логин и пароль от аккаунта ЭИОС КГУ (eios.kosgos.ru).
+                  </p>
+                )}
+              </div>
+
+              {!loginError && sessionExpired && (
+                <p className="login-alert login-alert-warning" role="status">
+                  <Clock size={16} {...ICON} />
+                  <span>Сессия истекла — войдите снова.</span>
+                </p>
+              )}
+              {loginError && (
+                <p id="login-error" className="login-alert" role="alert">
+                  <AlertCircle size={16} {...ICON} />
+                  <span>{loginError}</span>
+                </p>
+              )}
+
+              <button
+                type="submit"
+                className="btn btn-primary btn-block login-submit"
+                disabled={isLoggingIn}
+                data-loading={isLoggingIn || undefined}
+              >
+                {isLoggingIn ? (
+                  <>
+                    <Loader2 size={16} className="spin-icon" {...ICON} />
+                    Проверка авторизации…
+                  </>
+                ) : (
+                  <>
+                    <LogIn size={16} {...ICON} />
+                    {isStaff ? 'Войти в админку' : 'Войти через ЭИОС'}
+                  </>
+                )}
+              </button>
+            </form>
           </div>
-
-          <form onSubmit={handleLogin} className="login-form">
-            <div className="login-field">
-              <label>{loginMode === 'staff' ? 'Логин администратора' : 'Логин ЭИОС КГУ'}</label>
-              <input 
-                type="text"
-                placeholder={loginMode === 'staff' ? 'Учетная запись деканата' : 'Логин учетной записи ЭИОС КГУ (напр. 22-isbo-035)'}
-                value={loginForm.username}
-                onChange={e => setLoginForm({ ...loginForm, username: e.target.value })}
-                required
-                disabled={isLoggingIn}
-              />
-            </div>
-            <div className="login-field">
-              <label>Пароль</label>
-              <input 
-                type="password"
-                placeholder="••••••••"
-                value={loginForm.password}
-                onChange={e => setLoginForm({ ...loginForm, password: e.target.value })}
-                disabled={isLoggingIn}
-                required
-              />
-              {loginMode !== 'staff' && (
-                <span style={{ fontSize: '0.78rem', color: '#666', marginTop: '6px', display: 'block', lineHeight: '1.3' }}>
-                  💡 <strong>Подсказка:</strong> Используется единый логин и пароль от аккаунта ЭИОС КГУ (eios.kosgos.ru).
-                </span>
-              )}
-            </div>
-
-            {!loginError && sessionExpired && <div className="login-error">Сессия истекла — войдите снова.</div>}
-            {loginError && <div className="login-error">{loginError}</div>}
-
-            <button type="submit" className="btn-auth login-submit" disabled={isLoggingIn} style={{ background: loginMode === 'staff' ? '#059669' : 'var(--primary)' }}>
-              {isLoggingIn ? (
-                <>Проверка авторизации...</>
-              ) : (
-                <>
-                  <Lock size={16} /> {loginMode === 'staff' ? 'Войти в админку' : 'Войти через ЭИОС'}
-                </>
-              )}
-            </button>
-          </form>
-        </motion.div>
+        </section>
       </div>
     );
   }
 
   // --- LOGGED IN: SHOW PROFILE ---
+  const roleLabel = user.role === 'admin' ? 'Администратор' : user.role === 'moderator' ? 'Модератор' : 'Студент ИВИТШ';
+  const roadmapDone = roadmapCompleted >= totalRoadmapSteps;
+  const roadmapRatio = Math.min(1, Math.max(0, roadmapCompleted / totalRoadmapSteps));
+
   return (
-    <div className="container">
-      <div className="page-header">
+    <div className="container profile-page">
+      <header className="page-header">
         <h1>Личный кабинет</h1>
-      </div>
+      </header>
 
-      <div className="profile-card-layout">
-        
-        {/* STUDENT CARD */}
-        <motion.section 
-          className="student-main-profile"
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          {/* Avatar Box with Stock Person Fallback */}
-          <div className="student-avatar-box" style={{ position: 'relative' }}>
-            {user.photoUrl && !avatarLoadError ? (
-              <img 
-                src={user.photoUrl} 
-                alt={user.fullName}
-                onError={() => setAvatarLoadError(true)}
-                style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }}
-              />
-            ) : (
-              <div style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '50%',
-                background: '#E0F2FE',
-                color: '#0369A1',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '2px solid white',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
-              }}>
-                <User size={40} />
-              </div>
-            )}
-            
-            {/* Upload Custom Photo Pill */}
-            <label title="Сменить фото профиля" style={{
-              position: 'absolute',
-              bottom: 0,
-              right: 0,
-              background: 'var(--primary)',
-              color: 'white',
-              borderRadius: '50%',
-              width: '26px',
-              height: '26px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
-            }}>
-              <Camera size={13} />
-              <input type="file" accept="image/*" onChange={handleAvatarUpload} style={{ display: 'none' }} />
-            </label>
-          </div>
+      <div className="profile-layout">
+        {/* IDENTITY */}
+        <section className="card profile-identity" aria-labelledby="profile-name">
+          <div className="profile-identity-main">
+            <div className="profile-avatar">
+              {user.photoUrl && !avatarLoadError ? (
+                <img src={user.photoUrl} alt="" onError={() => setAvatarLoadError(true)} />
+              ) : (
+                <User size={36} {...ICON} />
+              )}
+            </div>
 
-          <div className="student-info-meta">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <h2>{user.fullName}</h2>
+            <div className="profile-identity-text">
+              <h2 id="profile-name" className="profile-name">{user.fullName}</h2>
+              <p className="profile-meta">
+                {roleLabel}
+                {user.group && <> · <span className="tabular">{user.group}</span></>}
+              </p>
               {user.role !== 'admin' && (
-                <span style={{ background: '#E6F4EA', color: '#137333', fontSize: '0.75rem', padding: '3px 8px', borderRadius: '8px', fontWeight: '800' }}>
-                  ✓ ЭИОС KOSGOS
+                <span className="badge badge-success profile-verified" title="Аккаунт подтверждён через ЭИОС КГУ (eios.kosgos.ru)">
+                  <BadgeCheck size={14} {...ICON} />
+                  Подтверждено ЭИОС
                 </span>
               )}
             </div>
-            
-            {user.group && <span className="student-group-tag">{user.group}</span>}
+          </div>
 
-            <p>
-              {user.role === 'admin' ? 'Администратор' : user.role === 'moderator' ? 'Модератор' : 'Студент ИВИТШ'}
-            </p>
+          <div className="profile-identity-actions">
+            <div className="profile-photo">
+              <label className="btn btn-secondary profile-photo-btn">
+                <Camera size={16} {...ICON} />
+                Сменить фото
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  className="visually-hidden"
+                  aria-describedby="profile-photo-hint"
+                />
+              </label>
+              <p id="profile-photo-hint" className="profile-photo-hint">
+                PNG, JPEG или WebP до 2 МБ. Фото хранится только на этом устройстве.
+              </p>
+            </div>
 
-            <button onClick={handleLogout} className="profile-logout-btn">
-              <LogOut size={14} /> Выйти из аккаунта
+            <button type="button" onClick={handleLogout} className="btn btn-secondary profile-logout">
+              <LogOut size={16} {...ICON} />
+              Выйти из аккаунта
             </button>
           </div>
-        </motion.section>
+        </section>
 
-
-
-        {/* REAL STATISTICS */}
-        <motion.section 
-          className="profile-stats-grid"
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <div className="stat-box-profile">
-            <span><Compass size={18} style={{ verticalAlign: 'text-bottom', marginRight: '5px', color: 'var(--primary)' }} /> Путь адаптации</span>
-            <h2>{roadmapCompleted} / {totalRoadmapSteps}</h2>
-            <p style={{ fontSize: '0.8rem', color: '#888', margin: 0 }}>
-              {roadmapCompleted >= totalRoadmapSteps ? '✅ Все этапы пройдены!' : 'этапов пройдено'}
-            </p>
-            <div style={{ marginTop: '8px', height: '4px', background: '#E8F4FF', borderRadius: '2px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', background: 'var(--primary)', borderRadius: '2px', width: `${Math.round((roadmapCompleted / totalRoadmapSteps) * 100)}%`, transition: 'width 0.5s ease' }} />
+        <div className="profile-main">
+          {/* REAL STATISTICS */}
+          <section aria-labelledby="profile-activity-title">
+            <div className="section-header">
+              <h2 id="profile-activity-title">Активность</h2>
             </div>
-          </div>
 
-          <div className="stat-box-profile">
-            <span><MessageSquare size={18} style={{ verticalAlign: 'text-bottom', marginRight: '5px', color: 'var(--primary)' }} /> Темы на форуме</span>
-            <h2>{forumQuestionsCount}</h2>
-            <p style={{ fontSize: '0.8rem', color: '#888', margin: 0 }}>сообщений создано вами</p>
-          </div>
-        </motion.section>
+            <ul className="card list profile-stats">
+              <li className="list-row profile-stat">
+                <span className="profile-stat-icon"><Compass size={20} {...ICON} /></span>
+                <div className="profile-stat-body">
+                  <div className="profile-stat-head">
+                    <div className="profile-stat-text">
+                      <span className="profile-stat-label">Путь адаптации</span>
+                      <span className={`profile-stat-meta${roadmapDone ? ' is-done' : ''}`}>
+                        {roadmapDone ? (
+                          <><CheckCircle2 size={14} {...ICON} /> Все этапы пройдены</>
+                        ) : (
+                          'этапов пройдено'
+                        )}
+                      </span>
+                    </div>
+                    <span className="profile-stat-value tabular">
+                      {roadmapCompleted} <span className="profile-stat-unit">из {totalRoadmapSteps}</span>
+                    </span>
+                  </div>
+                  <div
+                    className="progress"
+                    role="progressbar"
+                    aria-label="Пройдено этапов пути адаптации"
+                    aria-valuemin={0}
+                    aria-valuemax={totalRoadmapSteps}
+                    aria-valuenow={Math.min(roadmapCompleted, totalRoadmapSteps)}
+                  >
+                    <div className="progress-value" style={{ transform: `scaleX(${roadmapRatio})` }} />
+                  </div>
+                </div>
+              </li>
 
-        {/* ADAPTATION MINI-GAMES */}
-        <MiniGamesSection />
+              <li className="list-row profile-stat">
+                <span className="profile-stat-icon"><MessageSquare size={20} {...ICON} /></span>
+                <div className="profile-stat-body">
+                  <div className="profile-stat-head">
+                    <div className="profile-stat-text">
+                      <span className="profile-stat-label">Темы на форуме</span>
+                      <span className="profile-stat-meta">созданы вами</span>
+                    </div>
+                    <span className="profile-stat-value tabular">{forumQuestionsCount}</span>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </section>
+
+          {/* ADAPTATION MINI-GAMES */}
+          <MiniGamesSection />
+        </div>
       </div>
     </div>
   );

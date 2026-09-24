@@ -21,7 +21,7 @@ export const ToastProvider = ({ children }) => {
 
   const getIcon = (type) => {
     switch (type) {
-      case 'success': return <CheckCircle2 size={18} />;
+      case 'success': return <CheckCircle2 size={18} strokeWidth={1.75} />;
       case 'warning': return <AlertTriangle size={18} />;
       case 'error': return <AlertTriangle size={18} />;
       case 'info': return <Info size={18} />;
@@ -38,14 +38,14 @@ export const ToastProvider = ({ children }) => {
             <motion.div
               key={toast.id}
               className={`toast-notification toast-${toast.type}`}
-              initial={{ opacity: 0, y: 50, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              transition={{ duration: 0.25 }}
+              role="status"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] } }}
+              exit={{ opacity: 0, transition: { duration: 0.12 } }}
             >
               <div className="toast-icon">{getIcon(toast.type)}</div>
               <span className="toast-message">{toast.message}</span>
-              <button className="toast-close" onClick={() => dismiss(toast.id)}>
+              <button className="toast-close" onClick={() => dismiss(toast.id)} aria-label="Закрыть уведомление">
                 <X size={14} />
               </button>
             </motion.div>

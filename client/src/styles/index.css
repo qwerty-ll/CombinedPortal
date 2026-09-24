@@ -1,0 +1,11 @@
+/* Order matters: tokens → base → shared components → app shell → page areas */
+@import '@fontsource-variable/golos-text/index.css';
+@import './tokens.css';
+@import './base.css';
+@import './shared.css';
+@import './shell.css';
+@import './dashboard.css';
+@import './guide.css';
+@import './community.css';
+@import './profile.css';
+@import './admin.css';

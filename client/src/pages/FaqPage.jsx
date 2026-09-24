@@ -1,31 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, Info, MessageCircle, HelpCircle } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronDown, HelpCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
 import DOMPurify from 'dompurify';
 import { contentApi } from '../services/api';
 
-const FAQItem = ({ question, answer, isOpen, onClick }) => (
-  <div className={`faq-accordion-item ${isOpen ? 'active' : ''}`}>
-    <button className="faq-accordion-trigger" onClick={onClick}>
-      <span>{question}</span>
-      <ChevronDown size={18} />
-    </button>
-    <AnimatePresence initial={false}>
-      {isOpen && (
-        <motion.div 
-          className="faq-accordion-content"
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          transition={{ duration: 0.25 }}
+const ICON = { strokeWidth: 1.75 };
+
+const FAQItem = ({ id, question, answer, isOpen, onClick }) => {
+  const buttonId = `faq-q-${id}`;
+  const panelId = `faq-a-${id}`;
+  return (
+    <li className={`faq-item ${isOpen ? 'is-open' : ''}`}>
+      <h2 className="faq-question">
+        <button
+          type="button"
+          id={buttonId}
+          className="faq-trigger"
+          onClick={onClick}
+          aria-expanded={isOpen}
+          aria-controls={panelId}
         >
-          <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(answer || '') }} />
+          <span>{question}</span>
+          <ChevronDown size={20} {...ICON} className="faq-chevron" aria-hidden="true" />
+        </button>
+      </h2>
+      {isOpen && (
+        <motion.div
+          id={panelId}
+          role="region"
+          aria-labelledby={buttonId}
+          className="faq-answer"
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <div className="faq-answer-body" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(answer || '') }} />
         </motion.div>
       )}
-    </AnimatePresence>
-  </div>
-);
+    </li>
+  );
+};
 
 const FaqPage = () => {
   const navigate = useNavigate();
@@ -42,60 +57,58 @@ const FaqPage = () => {
   }, []);
 
   return (
-    <div className="container">
-      <div className="page-header">
-        <h1>Частые вопросы (FAQ)</h1>
-      </div>
-
-      {/* ACCORDIONS */}
-      {loading ? (
-        <div className="empty-state-card" style={{ background: 'white', borderRadius: '24px', padding: '50px 20px', textAlign: 'center', border: '1px solid #e9ecef', marginBottom: '30px' }}>
-          <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '800' }}>Загрузка вопросов...</h4>
+    <div className="container cm-page faq-page">
+      <header className="page-header">
+        <div>
+          <h1>Частые вопросы</h1>
+          <p className="page-subtitle">Короткие ответы на то, что первокурсники спрашивают чаще всего.</p>
         </div>
+      </header>
+
+      {loading ? (
+        <ul className="faq-list" aria-busy="true" aria-label="Загрузка вопросов">
+          {[0, 1, 2].map(i => (
+            <li key={i} className="faq-item faq-item-skeleton" aria-hidden="true">
+              <span className="skeleton faq-skel" />
+            </li>
+          ))}
+        </ul>
       ) : faqItems.length > 0 ? (
-        <div className="faq-accordions-group">
+        <ul className="faq-list">
           {faqItems.map((item, idx) => (
-            <FAQItem 
+            <FAQItem
               key={item.id || idx}
+              id={item.id || idx}
               question={item.question}
               answer={item.answer}
               isOpen={openIndex === idx}
               onClick={() => setOpenIndex(openIndex === idx ? null : idx)}
             />
           ))}
-        </div>
+        </ul>
       ) : (
-        <div className="empty-state-card" style={{ background: 'white', borderRadius: '24px', padding: '50px 20px', textAlign: 'center', border: '1px solid #e9ecef', marginBottom: '30px' }}>
-          <HelpCircle size={48} strokeWidth={1.5} style={{ color: '#aaa', marginBottom: '12px' }} />
-          <h4 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: '800' }}>Список частых вопросов пуст</h4>
-          <p style={{ margin: 0, fontSize: '0.88rem', color: '#777' }}>Администратор может добавить вопросы через панель управления</p>
+        <div className="empty-state">
+          <HelpCircle size={32} {...ICON} aria-hidden="true" />
+          <h2 className="cm-empty-title">Список частых вопросов пока пуст</h2>
+          <p>Администратор добавляет вопросы через панель управления. А пока спросите на форуме — там отвечают студенты и кураторы.</p>
         </div>
       )}
 
-      {/* FOOTER HELPER */}
-      <div className="faq-help-box">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Info size={24} style={{ color: 'var(--primary)' }} />
-          <h3>Не нашли ответ на свой вопрос?</h3>
-        </div>
+      {/* NOT FOUND AN ANSWER */}
+      <section className="section faq-help" aria-labelledby="faq-help-heading">
+        <h2 id="faq-help-heading">Не нашли ответ на свой вопрос?</h2>
         <p>
-          Наши студенты и кураторы часто делятся ответами на форуме. Посмотрите обсуждения или задайте свой собственный вопрос!
+          Студенты и кураторы часто делятся ответами на форуме. Посмотрите обсуждения или задайте свой вопрос.
         </p>
-        <div className="faq-help-buttons">
-          <button 
-            className="btn-faq-redirect secondary"
-            onClick={() => navigate('/forum')}
-          >
-            Перейти на форум
-          </button>
-          <button 
-            className="btn-faq-redirect primary"
-            onClick={() => navigate('/forum')}
-          >
+        <div className="faq-help-actions">
+          <button type="button" className="btn btn-primary" onClick={() => navigate('/forum')}>
             Задать вопрос
           </button>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate('/forum')}>
+            Перейти на форум
+          </button>
         </div>
-      </div>
+      </section>
     </div>
   );
 };

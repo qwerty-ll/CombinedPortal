@@ -77,6 +77,35 @@ npm run dev                 # http://localhost:5173, /api проксируетс
 npm test
 ```
 
+### Демо-режим (без доступа к ЭИОС)
+
+Поддельный ЭИОС пускает студентом с любым логином и паролем `demo` и отдаёт расписание на неделю;
+второй скрипт заполняет портал объявлениями, FAQ и вопросами на форуме.
+
+```bash
+# в .env: COOKIE_SECURE=false и EIOS_BASE_URL=http://127.0.0.1:9000/api
+python3 scripts/demo/demo_eios.py                                  # отдельный терминал
+npm run server                                                     # backend
+python3 scripts/demo/seed_demo.py portal_admin <ADMIN_PASSWORD>    # один раз
+npm run dev                                                        # http://localhost:5173
+```
+
+Вход студентом: «Личный кабинет» → «Студент ЭИОС КГУ», логин `25-isbo-011`, пароль `demo`.
+Вход администратором: «Сотрудник ИВИТШ», `ADMIN_USERNAME` / `ADMIN_PASSWORD` из `.env`.
+
+---
+
+## 🎨 Дизайн
+
+Интерфейс следует правилам [impeccable](https://github.com/pbakaus/impeccable) (основа) и
+[taste-skill](https://github.com/Leonxlnx/taste-skill) (числовые ограничения). Решения описаны в
+[docs/DESIGN.md](docs/DESIGN.md), сравнение «до/после» — в [docs/redesign/](docs/redesign/).
+
+- Токены (цвет, типографика, отступы, радиусы, движение) — `client/src/styles/tokens.css`; новые hex-значения в коде не используются.
+- Общие компоненты — `client/src/styles/shared.css`; стили разделов — `client/src/styles/<раздел>.css`.
+- Шрифт Golos Text подключён локально (`@fontsource-variable/golos-text`), Google Fonts не нужен.
+- Проверка анти-паттернов: `npx -y impeccable detect http://localhost:5173/` (нужен Chrome).
+
 ---
 
 ## 📖 Развертывание

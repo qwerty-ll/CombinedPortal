@@ -1,136 +1,141 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Link2, Map as MapIcon, BookOpen, FileText, CheckSquare, 
-  ChevronRight, ChevronLeft, Zap, GraduationCap, Users, Heart, 
-  LifeBuoy, ChevronDown, Check, Send, Sparkles, Smile,
-  Lightbulb, Trophy, ThumbsUp, RefreshCw, X
+import { motion } from 'framer-motion';
+import {
+  Zap, GraduationCap, Users, Heart, LifeBuoy, ChevronDown, ExternalLink,
+  FileText, CalendarDays, LogIn, Globe, Laptop, Building2, Shield, Wallet,
+  BedDouble, HeartHandshake, Phone, Lightbulb, MessageSquareQuote, BookOpen
 } from 'lucide-react';
-import MascotMessage from '../components/MascotMessage';
 import RoadmapSection, { ROADMAP_STEPS } from '../components/RoadmapSection';
 import { StepFoundation, StepRoadmap, StepChatbot } from '../components/StepIntroCards';
 import QuizModal from '../components/QuizModal';
 import ChecklistModal from '../components/ChecklistModal';
 import FunLayerModal from '../components/FunLayerModal';
-import RewardsModal from '../components/RewardsModal';
+import RewardsModal, { GuideDialog } from '../components/RewardsModal';
 import { contentApi, adaptationApi } from '../services/api';
 
-const DisciplineCard = ({ subject }) => {
+const EASE = [0.16, 1, 0.3, 1];
+
+const LINK_GROUPS = [
+  {
+    id: 'access', label: 'Быстрый доступ', icon: Zap, links: [
+      { href: 'https://guide.kosgos.ru/', label: 'Справочник первокурсника', icon: FileText },
+      { href: 'https://eios.kosgos.ru/WebApp/#/Rasp/Group/8540', label: 'Расписание занятий', icon: CalendarDays },
+      { href: 'https://eios.kosgos.ru', label: 'Вход в СДО ЕИОС', icon: LogIn },
+      { href: 'https://kosgos.ru', label: 'Сайт Университета', icon: Globe },
+    ]
+  },
+  {
+    id: 'study', label: 'Учеба и расписание', icon: GraduationCap, links: [
+      { href: '/plans/is_2026.pdf', label: 'Учебный план ИСТ (1 курс)', icon: FileText },
+      { href: '/plans/ib_2026.pdf', label: 'Учебный план ИБ (1 курс)', icon: FileText },
+      { href: '/plans/pm_2026.pdf', label: 'Учебный план ПМ (1 курс)', icon: FileText },
+      { href: 'https://eios.kosgos.ru', label: 'Электронные курсы СДО', icon: Laptop },
+    ]
+  },
+  {
+    id: 'school', label: 'Высшая ИТ-школа', icon: Users, links: [
+      { href: 'https://kosgos.ru/svedeniya-ob-organizatsii/struktura-i-organy-upravleniya/instituty/institut-vysshaya-it-shkola.html', label: 'Дирекция ИВИТШ (Б-209)', icon: Building2 },
+      { href: 'https://vk.ru/vitshmedia', label: 'Группа VK ИВИТШ', icon: Users },
+    ]
+  },
+  {
+    id: 'life', label: 'Студенческая жизнь', icon: Heart, links: [
+      { href: 'https://vk.ru/osoksu', label: 'Студенческий совет КГУ', icon: Users },
+    ]
+  },
+  {
+    id: 'support', label: 'Поддержка студентов', icon: LifeBuoy, links: [
+      { href: 'https://kosgos.ru/svedeniya-ob-organizatsii/struktura-i-organy-upravleniya/voennoe-obuchenie/voennyj-uchebnyj-tsentr.html?ysclid=mte14ombvd622350198', label: 'ВУЦ КГУ (Военно-учебный центр)', icon: Shield },
+      { href: 'https://kosgos.ru/svedeniya-ob-organizatsii/dopolnitelnaya-informatsiya/stipendii-i-inye-vidy-sotsialnoj-podderzhki.html?ysclid=mth3qazqhx932846281', label: 'Стипендии и выплаты', icon: Wallet },
+      { href: 'https://vk.ru/ssokgu?ysclid=mth3rh6eq5543794961', label: 'Общежития и заселение', icon: BedDouble },
+      { href: 'https://kosgos.ru/studentam/psikhologicheskaya-pomoshch/', label: 'Психологическая помощь', icon: HeartHandshake },
+      { href: 'https://kosgos.ru/kontakty/', label: 'Приёмная комиссия', icon: Phone },
+    ]
+  },
+];
+
+const SEMESTERS = [1, 2];
+const FLOORS = [1, 2, 3, 4];
+
+const linkMeta = (href) => {
+  if (href.endsWith('.pdf')) return 'PDF';
+  try {
+    return new URL(href, window.location.origin).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+};
+
+// Arrow-key navigation for role="tablist" groups (roving tabindex).
+const handleTabsKeyDown = (e, ids, activeId, onSelect, idPrefix) => {
+  if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft' && e.key !== 'Home' && e.key !== 'End') return;
+  e.preventDefault();
+  const index = ids.indexOf(activeId);
+  let next = index;
+  if (e.key === 'ArrowRight') next = (index + 1) % ids.length;
+  if (e.key === 'ArrowLeft') next = (index - 1 + ids.length) % ids.length;
+  if (e.key === 'Home') next = 0;
+  if (e.key === 'End') next = ids.length - 1;
+  onSelect(ids[next]);
+  const el = document.getElementById(`${idPrefix}-${ids[next]}`);
+  if (el) {
+    el.focus();
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+};
+
+const SubjectItem = ({ subject }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const accentColor = subject.color || '#007AFF';
+  const panelId = `subject-panel-${subject.id}`;
+  const controlType = `${subject.type}${subject.extraType ? ` + ${subject.extraType}` : ''}`;
 
   return (
-    <motion.div 
-      whileHover={{ y: -2 }}
-      style={{ 
-        background: 'white', 
-        borderRadius: '16px', 
-        border: `1px solid ${isOpen ? accentColor : '#E9ECEF'}`,
-        boxShadow: isOpen ? `0 8px 24px ${accentColor}22` : '0 4px 12px rgba(0,0,0,0.03)',
-        overflow: 'hidden',
-        transition: 'all 0.25s ease',
-        borderLeft: `4px solid ${accentColor}`,
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between'
-      }}
-    >
-      <div 
-        onClick={() => setIsOpen(!isOpen)} 
-        style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          cursor: 'pointer', 
-          padding: '16px 18px',
-          background: isOpen ? `${accentColor}08` : 'white',
-          height: '100%',
-          boxSizing: 'border-box'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
-          <div style={{ 
-            width: '42px', 
-            height: '42px', 
-            borderRadius: '12px', 
-            background: `${accentColor}18`, 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            fontSize: '1.3rem',
-            flexShrink: 0 
-          }}>
-            {subject.emoji}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: '800', color: 'var(--text)', lineHeight: '1.3' }}>
-              {subject.name}
-            </h4>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '5px', flexWrap: 'wrap' }}>
-              <span style={{ 
-                fontSize: '0.72rem', 
-                fontWeight: '700', 
-                padding: '2px 8px', 
-                borderRadius: '6px', 
-                background: subject.type === 'Экзамен' ? '#FF3B3015' : '#34C75915',
-                color: subject.type === 'Экзамен' ? '#FF3B30' : '#34C759'
-              }}>
-                {subject.type}{subject.extraType ? ` + ${subject.extraType}` : ''}
-              </span>
-              <span style={{ fontSize: '0.75rem', color: '#888' }}>
-                • {subject.hours} ч. • {subject.credits} з.е.
-              </span>
+    <li className="subject" data-open={isOpen}>
+      <h3 className="subject-heading">
+        <button
+          type="button"
+          className="subject-toggle"
+          aria-expanded={isOpen}
+          aria-controls={panelId}
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          <span className="subject-name">{subject.name}</span>
+          <span className="subject-type">
+            <span className={`badge${subject.type === 'Экзамен' ? ' badge-accent' : ''}`}>{controlType}</span>
+          </span>
+          <span className="subject-hours tabular">
+            {subject.hours} ч · {subject.credits} з.е.
+          </span>
+          <ChevronDown className="subject-chevron" size={20} strokeWidth={1.75} aria-hidden="true" />
+        </button>
+      </h3>
+
+      {isOpen && (
+        <motion.div
+          id={panelId}
+          className="subject-details"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.2, ease: EASE }}
+        >
+          {subject.description && <p className="subject-desc">{subject.description}</p>}
+
+          {subject.mascotHack && (
+            <div className="subject-tip">
+              <Lightbulb size={18} strokeWidth={1.75} aria-hidden="true" />
+              <p><strong>Хак ВИТШика.</strong> {subject.mascotHack}</p>
             </div>
-          </div>
-        </div>
+          )}
 
-        <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.3 }} style={{ color: accentColor, flexShrink: 0, marginLeft: '12px' }}>
-          <ChevronDown size={18}/>
+          {subject.seniorAdvice && (
+            <div className="subject-tip">
+              <MessageSquareQuote size={18} strokeWidth={1.75} aria-hidden="true" />
+              <p><strong>Совет старшекурсника.</strong> {subject.seniorAdvice}</p>
+            </div>
+          )}
         </motion.div>
-      </div>
-
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            style={{ 
-              padding: '16px 18px', 
-              background: '#F8F9FA', 
-              borderTop: '1px solid #E9ECEF'
-            }}
-          >
-            <p style={{ margin: '0 0 12px 0', fontSize: '0.88rem', color: '#444', lineHeight: '1.5' }}>
-              {subject.description}
-            </p>
-            
-            {subject.mascotHack && (
-              <div style={{ 
-                background: `${accentColor}12`, 
-                border: `1px solid ${accentColor}30`, 
-                padding: '10px 14px', 
-                borderRadius: '12px', 
-                fontSize: '0.84rem', 
-                color: accentColor, 
-                fontWeight: '600', 
-                marginBottom: '8px' 
-              }}>
-                🐱 <strong>Хак ВИТШика:</strong> {subject.mascotHack}
-              </div>
-            )}
-            
-            {subject.seniorAdvice && (
-              <div style={{ fontSize: '0.82rem', color: '#666', fontStyle: 'italic', background: 'white', padding: '10px 14px', borderRadius: '12px', border: '1px solid #eee' }}>
-                💬 <strong>Совет старшекурсника:</strong> {subject.seniorAdvice}
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+      )}
+    </li>
   );
 };
 
@@ -148,6 +153,7 @@ const FreshmanGuide = () => {
   });
 
   const [subjectsList, setSubjectsList] = useState([]);
+  const [subjectsLoading, setSubjectsLoading] = useState(true);
 
   useEffect(() => {
     contentApi.getSubjects().then(res => {
@@ -156,8 +162,6 @@ const FreshmanGuide = () => {
           id: s.subject_code || `sub-${s.id}`,
           name: s.name,
           shortName: s.short_name,
-          emoji: s.emoji || '📚',
-          color: s.color || '#007AFF',
           difficulty: s.difficulty || 3,
           hours: s.hours || 108,
           credits: s.credits || 3,
@@ -169,7 +173,8 @@ const FreshmanGuide = () => {
           seniorAdvice: s.senior_advice
         })));
       }
-    }).catch(e => console.warn('Using static subjects fallback:', e));
+    }).catch(e => console.warn('Using static subjects fallback:', e))
+      .finally(() => setSubjectsLoading(false));
   }, []);
 
   const [activeStepModal, setActiveStepModal] = useState(null); // stepId 0..8 or null
@@ -227,161 +232,104 @@ const FreshmanGuide = () => {
     setActiveStepModal(null);
   };
 
-  const tabColors = {
-    access: '#007FFF',
-    study: '#673AB7',
-    school: '#00BCD4',
-    life: '#D32F2F',
-    support: '#009688'
-  };
+  const activeGroup = LINK_GROUPS.find(g => g.id === activeTab);
+  const semesterSubjects = subjectsList.filter(s => s.semester === selectedSemester);
+  const modalStep = activeStepModal !== null ? ROADMAP_STEPS[activeStepModal] : null;
 
   return (
-    <div className="freshman-guide-page">
-      
-      {/* Header Banner */}
-      <div className="freshman-hero-banner">
+    <div className="container guide-page">
+
+      <header className="page-header guide-header">
         <div>
-          <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1.2px', opacity: 0.85 }}>Высшая ИТ-Школа КГУ</span>
-          <h1 style={{ fontSize: '2.2rem', fontWeight: '800', margin: '4px 0 0 0' }}>Путь первокурсника</h1>
-          <p style={{ fontSize: '1rem', margin: '8px 0 0 0', opacity: 0.9, maxWidth: '540px' }}>
-            Пройди все 9 этапов адаптации вместе с ВИТШиком: изучи правила, проверь знания, найди кабинеты и открой дипломы!
+          <h1>Путь первокурсника</h1>
+          <p className="page-subtitle">
+            Пройди 9 этапов адаптации вместе с ВИТШиком: изучи правила, проверь знания, найди кабинеты и получи диплом.
           </p>
         </div>
-        <motion.img 
-          src="/img/mascot.png" 
-          alt="ВИТШик" 
-          style={{ width: '96px', height: '96px', objectFit: 'contain' }}
-          animate={{ y: [0, -8, 0] }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-        />
-      </div>
+        <img src="/img/mascot.png" alt="" className="guide-header-mascot" width="72" height="72" />
+      </header>
 
       {/* 9-Step Roadmap Engine */}
-      <div style={{ marginBottom: '40px' }}>
-        <RoadmapSection 
+      <section className="section" aria-labelledby="roadmap-title">
+        <RoadmapSection
           activeStep={activeStep}
           completedSteps={completedSteps}
           onStepClick={handleStepClick}
         />
-      </div>
+      </section>
 
       {/* Quick Links Section */}
-      <section id="level-links" style={{ marginBottom: '40px' }}>
-        <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: '0 0 16px 0', color: 'var(--text)' }}>База ссылок и полезностей</h3>
-        
-        <div style={{ background: 'white', borderRadius: '24px', padding: '24px', border: `1px solid ${tabColors[activeTab]}30`, boxShadow: `0 10px 30px ${tabColors[activeTab]}15`, position: 'relative', overflow: 'hidden', transition: 'all 0.3s' }}>
-          
-          {/* Animated Background Emojis */}
-          <div className="card-bg-icons">
-             {activeTab === 'access' && "⚡ 📋 📅 🔑".split(' ').map((e,i) => <span key={i} className="bg-emoji">{e}</span>)}
-             {activeTab === 'study' && "📚 🎓 📝 🔬".split(' ').map((e,i) => <span key={i} className="bg-emoji">{e}</span>)}
-             {activeTab === 'school' && "💻 👨‍💻 🤖 🚀".split(' ').map((e,i) => <span key={i} className="bg-emoji">{e}</span>)}
-             {activeTab === 'life' && "🍕 🎸 🏀 🎭".split(' ').map((e,i) => <span key={i} className="bg-emoji">{e}</span>)}
-             {activeTab === 'support' && "🆘 🛡️ 🚑 💬".split(' ').map((e,i) => <span key={i} className="bg-emoji">{e}</span>)}
-          </div>
+      <section id="level-links" className="section" aria-labelledby="links-title">
+        <div className="section-header">
+          <h2 id="links-title">База ссылок и полезностей</h2>
+        </div>
 
-          {/* Navigation Tabs */}
-          <div className="tabs-header-innovative" style={{ marginBottom: '20px' }}>
-            {[
-              { id: 'access', label: 'Быстрый доступ', icon: <Zap size={16}/>, color: '#007FFF' },
-              { id: 'study', label: 'Учеба и расписание', icon: <GraduationCap size={16}/>, color: '#673AB7' },
-              { id: 'school', label: 'Высшая ИТ-школа', icon: <Users size={16}/>, color: '#00BCD4' },
-              { id: 'life', label: 'Студенческая жизнь', icon: <Heart size={16}/>, color: '#D32F2F' },
-              { id: 'support', label: 'Поддержка студентов', icon: <LifeBuoy size={16}/>, color: '#009688' }
-            ].map((t) => (
-              <button 
-                key={t.id} 
-                className={`tab-btn-innovative ${activeTab === t.id ? 'active' : ''}`} 
-                onClick={() => setActiveTab(t.id)}
-                style={{ '--tab-color': t.color }}
-              >
-                <div className="tab-icon-wrapper">{t.icon}</div>
-                <span>{t.label}</span>
-              </button>
+        <div className="segmented guide-tabs" role="tablist" aria-label="Разделы ссылок">
+          {LINK_GROUPS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`links-tab-${id}`}
+              aria-selected={activeTab === id}
+              aria-controls="links-panel"
+              tabIndex={activeTab === id ? 0 : -1}
+              className="segmented-item"
+              onClick={(e) => {
+                setActiveTab(id);
+                e.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+              }}
+              onKeyDown={(e) => handleTabsKeyDown(e, LINK_GROUPS.map(g => g.id), activeTab, setActiveTab, 'links-tab')}
+            >
+              <Icon size={16} strokeWidth={1.75} aria-hidden="true" />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div id="links-panel" role="tabpanel" aria-labelledby={`links-tab-${activeTab}`} className="card guide-links-card">
+          <ul className="guide-links">
+            {activeGroup.links.map(({ href, label, icon: Icon }) => (
+              <li key={href + label}>
+                <a className="guide-link" href={href} target="_blank" rel="noopener noreferrer">
+                  <Icon className="guide-link-icon" size={18} strokeWidth={1.75} aria-hidden="true" />
+                  <span className="guide-link-text">
+                    <span className="guide-link-label">{label}</span>
+                    <span className="guide-link-meta">{linkMeta(href)}</span>
+                  </span>
+                  <ExternalLink className="guide-link-external" size={16} strokeWidth={1.75} aria-hidden="true" />
+                  <span className="visually-hidden"> (откроется в новой вкладке)</span>
+                </a>
+              </li>
             ))}
-          </div>
-
-          <div className="links-content-innovative">
-            <AnimatePresence mode="wait">
-              <motion.ul 
-                key={activeTab}
-                className="game-links-innovative"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.25 }}
-              >
-                {activeTab === 'access' && (
-                  <>
-                    <li><a href="https://guide.kosgos.ru/" target="_blank" rel="noopener noreferrer"><FileText size={16}/> Справочник первокурсника</a></li>
-                    <li><a href="https://eios.kosgos.ru/WebApp/#/Rasp/Group/8540" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Расписание занятий</a></li>
-                    <li><a href="https://eios.kosgos.ru" target="_blank" rel="noopener noreferrer"><Zap size={16}/> Вход в СДО ЕИОС</a></li>
-                    <li><a href="https://kosgos.ru" target="_blank" rel="noopener noreferrer"><Users size={16}/> Сайт Университета</a></li>
-                  </>
-                )}
-                {activeTab === 'study' && (
-                  <>
-                    <li><a href="/plans/is_2026.pdf" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Учебный план ИСТ (1 курс)</a></li>
-                    <li><a href="/plans/ib_2026.pdf" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Учебный план ИБ (1 курс)</a></li>
-                    <li><a href="/plans/pm_2026.pdf" target="_blank" rel="noopener noreferrer"><BookOpen size={16}/> Учебный план ПМ (1 курс)</a></li>
-                    <li><a href="https://eios.kosgos.ru" target="_blank" rel="noopener noreferrer"><Zap size={16}/> Электронные курсы СДО</a></li>
-                  </>
-                )}
-                {activeTab === 'school' && (
-                  <>
-                    <li><a href="https://kosgos.ru/svedeniya-ob-organizatsii/struktura-i-organy-upravleniya/instituty/institut-vysshaya-it-shkola.html" target="_blank" rel="noopener noreferrer"><Users size={16}/> Дирекция ИВИТШ (Б-209)</a></li>
-                    <li><a href="https://vk.ru/vitshmedia" target="_blank" rel="noopener noreferrer"><Heart size={16}/> Группа VK ИВИТШ</a></li>
-                  </>
-                )}
-                {activeTab === 'life' && (
-                  <>
-                    <li><a href="https://vk.ru/osoksu" target="_blank" rel="noopener noreferrer"><Users size={16} /> Студенческий совет КГУ</a></li>
-                  </>
-                )}
-                {activeTab === 'support' && (
-                  <>
-                    <li><a href="https://kosgos.ru/svedeniya-ob-organizatsii/struktura-i-organy-upravleniya/voennoe-obuchenie/voennyj-uchebnyj-tsentr.html?ysclid=mte14ombvd622350198" target="_blank" rel="noopener noreferrer"><GraduationCap size={16} /> ВУЦ КГУ (Военно-учебный центр)</a></li>
-                    <li><a href="https://kosgos.ru/svedeniya-ob-organizatsii/dopolnitelnaya-informatsiya/stipendii-i-inye-vidy-sotsialnoj-podderzhki.html?ysclid=mth3qazqhx932846281" target="_blank" rel="noopener noreferrer"><GraduationCap size={16} /> Стипендии и выплаты</a></li>
-                    <li><a href="https://vk.ru/ssokgu?ysclid=mth3rh6eq5543794961" target="_blank" rel="noopener noreferrer"><LifeBuoy size={16} /> Общежития и заселение</a></li>
-                    <li><a href="https://kosgos.ru/studentam/psikhologicheskaya-pomoshch/" target="_blank" rel="noopener noreferrer"><Heart size={16} /> Психологическая помощь</a></li>
-                    <li><a href="https://kosgos.ru/kontakty/" target="_blank" rel="noopener noreferrer"><Sparkles size={16} /> Приёмная комиссия</a></li>
-                  </>
-                )}
-              </motion.ul>
-            </AnimatePresence>
-          </div>
+          </ul>
         </div>
       </section>
 
-      {/* ALL 24 SUBJECTS CATALOG IN BEAUTIFUL 2-COLUMN GRID */}
-      <section id="level-disciplines">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
+      {/* Subjects catalog */}
+      <section id="level-disciplines" className="section" aria-labelledby="subjects-title">
+        <div className="section-header guide-subjects-header">
           <div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: 0, color: 'var(--text)' }}>
-              Дисциплины ИВИТШ КГУ ({subjectsList.filter(s => s.semester === selectedSemester).length})
-            </h3>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: '#777' }}>
-              Нажми на дисциплину, чтобы увидеть советы и хаки ВИТШика
-            </p>
+            <h2 id="subjects-title">
+              Дисциплины ИВИТШ КГУ{' '}
+              {!subjectsLoading && <span className="guide-count tabular">{semesterSubjects.length}</span>}
+            </h2>
+            <p>Открой дисциплину, чтобы увидеть описание и советы ВИТШика</p>
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', background: 'white', padding: '4px', borderRadius: '12px', border: '1px solid #e9ecef' }}>
-            {[1, 2].map(sem => (
-              <button 
-                key={sem} 
+          <div className="segmented" role="tablist" aria-label="Семестр">
+            {SEMESTERS.map(sem => (
+              <button
+                key={sem}
+                type="button"
+                role="tab"
+                id={`semester-tab-${sem}`}
+                aria-selected={selectedSemester === sem}
+                aria-controls="subjects-panel"
+                tabIndex={selectedSemester === sem ? 0 : -1}
+                className="segmented-item"
                 onClick={() => setSelectedSemester(sem)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: selectedSemester === sem ? 'var(--primary)' : 'transparent',
-                  color: selectedSemester === sem ? 'white' : '#666',
-                  fontWeight: '700',
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  boxShadow: selectedSemester === sem ? '0 4px 12px rgba(0,127,255,0.25)' : 'none'
-                }}
+                onKeyDown={(e) => handleTabsKeyDown(e, SEMESTERS, selectedSemester, setSelectedSemester, 'semester-tab')}
               >
                 {sem}-й семестр
               </button>
@@ -389,109 +337,106 @@ const FreshmanGuide = () => {
           </div>
         </div>
 
-        {/* 2-Column Responsive Grid */}
-        <div className="disciplines-grid-container">
-          {subjectsList.filter(s => s.semester === selectedSemester).map(subject => (
-            <DisciplineCard key={subject.id} subject={subject} />
-          ))}
+        <div id="subjects-panel" role="tabpanel" aria-labelledby={`semester-tab-${selectedSemester}`}>
+          {subjectsLoading ? (
+            <ul className="card subject-list" aria-busy="true" aria-label="Загрузка дисциплин">
+              {[0, 1, 2, 3].map(i => (
+                <li key={i} className="subject subject-skeleton">
+                  <span className="skeleton subject-skeleton-title" />
+                  <span className="skeleton subject-skeleton-meta" />
+                </li>
+              ))}
+            </ul>
+          ) : semesterSubjects.length > 0 ? (
+            <ul className="card subject-list">
+              {semesterSubjects.map(subject => (
+                <SubjectItem key={subject.id} subject={subject} />
+              ))}
+            </ul>
+          ) : (
+            <div className="empty-state">
+              <BookOpen size={24} strokeWidth={1.75} aria-hidden="true" />
+              <h3>Список дисциплин пока пуст</h3>
+              <p>Не удалось загрузить дисциплины этого семестра. Обнови страницу чуть позже.</p>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* UNIFIED MODAL OVERLAY FOR ALL ROADMAP STEPS */}
-      <AnimatePresence>
-        {activeStepModal !== null && (
-          <div 
-            className="modal-overlay" 
-            onClick={closeStepModal} 
-            style={{ 
-              position: 'fixed', 
-              inset: 0, 
-              zIndex: 9999, 
-              background: 'rgba(0,0,0,0.6)', 
-              backdropFilter: 'blur(8px)', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justify: 'center', 
-              padding: '20px' 
-            }}
-          >
-            <motion.div 
-              className="auth-modal" 
-              onClick={(e) => e.stopPropagation()} 
-              style={{ width: '100%', maxWidth: '540px', background: 'white', borderRadius: '24px', padding: '28px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            >
-              <button 
-                className="close-modal" 
-                onClick={closeStepModal}
-                style={{ position: 'absolute', top: '18px', right: '18px', background: '#f1f3f5', border: 'none', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}
-              >
-                ✕
-              </button>
+      {/* UNIFIED MODAL FOR ALL ROADMAP STEPS */}
+      <GuideDialog open={activeStepModal !== null} onClose={closeStepModal} labelledBy="step-modal-title" wide={activeStepModal === 5}>
+        {modalStep && (
+          <>
+            <div className="step-modal-header">
+              <h2 id="step-modal-title">{modalStep.title}</h2>
+              <p className="step-modal-meta tabular">Этап {modalStep.id + 1} из {ROADMAP_STEPS.length}</p>
+            </div>
 
-              <div style={{ marginBottom: '20px' }}>
-                <span style={{ fontSize: '0.78rem', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                  {ROADMAP_STEPS[activeStepModal]?.label}
-                </span>
-                <h3 style={{ margin: '2px 0 0 0', fontSize: '1.3rem', fontWeight: '800', color: 'var(--text)' }}>
-                  {ROADMAP_STEPS[activeStepModal]?.title}
-                </h3>
+            {/* Step 1 */}
+            {activeStepModal === 0 && <StepFoundation onComplete={() => { completeStep(0); closeStepModal(); }} />}
+
+            {/* Step 2 */}
+            {activeStepModal === 1 && <StepRoadmap onComplete={() => { completeStep(1); closeStepModal(); }} />}
+
+            {/* Step 3 */}
+            {activeStepModal === 2 && <StepChatbot onComplete={() => { completeStep(2); closeStepModal(); }} />}
+
+            {/* Step 4 */}
+            {activeStepModal === 3 && <QuizModal onComplete={() => { completeStep(3); }} onClose={closeStepModal} />}
+
+            {/* Step 5 */}
+            {activeStepModal === 4 && <ChecklistModal onComplete={() => { completeStep(4); }} />}
+
+            {/* Step 6: Floor Plans Map */}
+            {activeStepModal === 5 && (
+              <div className="step-body">
+                <div className="segmented segmented-fill" role="tablist" aria-label="Этаж корпуса Б">
+                  {FLOORS.map(f => (
+                    <button
+                      key={f}
+                      type="button"
+                      role="tab"
+                      id={`floor-tab-${f}`}
+                      aria-selected={selectedFloor === f}
+                      aria-controls="floor-panel"
+                      tabIndex={selectedFloor === f ? 0 : -1}
+                      className="segmented-item"
+                      onClick={() => setSelectedFloor(f)}
+                      onKeyDown={(e) => handleTabsKeyDown(e, FLOORS, selectedFloor, setSelectedFloor, 'floor-tab')}
+                    >
+                      <span className="tabular">{f} этаж</span>
+                    </button>
+                  ))}
+                </div>
+                <div id="floor-panel" role="tabpanel" aria-labelledby={`floor-tab-${selectedFloor}`}>
+                  <img src={`/floor${selectedFloor}.png`} alt={`Схема ${selectedFloor} этажа`} className="floor-plan" />
+                  <a className="floor-plan-link" href={`/floor${selectedFloor}.png`} target="_blank" rel="noopener noreferrer">
+                    Открыть схему {selectedFloor} этажа в полном размере
+                    <ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />
+                    <span className="visually-hidden"> (откроется в новой вкладке)</span>
+                  </a>
+                </div>
+                <button type="button" onClick={() => { completeStep(5); closeStepModal(); }} className="btn btn-primary btn-block step-complete">
+                  Завершить этап 6
+                </button>
               </div>
+            )}
 
-              {/* Step 1 */}
-              {activeStepModal === 0 && <StepFoundation onComplete={() => { completeStep(0); closeStepModal(); }} />}
-              
-              {/* Step 2 */}
-              {activeStepModal === 1 && <StepRoadmap onComplete={() => { completeStep(1); closeStepModal(); }} />}
-              
-              {/* Step 3 */}
-              {activeStepModal === 2 && <StepChatbot onComplete={() => { completeStep(2); closeStepModal(); }} />}
-              
-              {/* Step 4 */}
-              {activeStepModal === 3 && <QuizModal onComplete={() => { completeStep(3); }} />}
-              
-              {/* Step 5 */}
-              {activeStepModal === 4 && <ChecklistModal onComplete={() => { completeStep(4); }} />}
-              
-              {/* Step 6: Floor Plans Map */}
-              {activeStepModal === 5 && (
-                <div>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                    {[1, 2, 3, 4].map(f => (
-                      <button 
-                        key={f} 
-                        onClick={() => setSelectedFloor(f)} 
-                        style={{ flex: 1, padding: '8px', borderRadius: '10px', border: '1px solid #ddd', background: selectedFloor === f ? 'var(--primary)' : 'white', color: selectedFloor === f ? 'white' : '#333', fontWeight: '700' }}
-                      >
-                        {f} этаж
-                      </button>
-                    ))}
-                  </div>
-                  <img src={`/floor${selectedFloor}.png`} alt={`Схема ${selectedFloor} этажа`} style={{ width: '100%', borderRadius: '12px', border: '1px solid #eee', marginBottom: '16px' }} />
-                  <button onClick={() => { completeStep(5); closeStepModal(); }} className="btn-auth" style={{ width: '100%' }}>
-                    Завершить этап 6 →
-                  </button>
-                </div>
-              )}
-              
-              {/* Step 7: Subjects */}
-              {activeStepModal === 6 && (
-                <div>
-                  <p style={{ fontSize: '0.88rem', color: '#666', marginBottom: '14px' }}>Все 24 дисциплины ИВИТШ КГУ доступны в каталоге ниже на главной странице.</p>
-                  <button onClick={() => { completeStep(6); closeStepModal(); }} className="btn-auth" style={{ width: '100%' }}>
-                    Завершить этап 7 →
-                  </button>
-                </div>
-              )}
-              
-              {/* Step 8: Student Life */}
-              {activeStepModal === 7 && <FunLayerModal onComplete={() => { completeStep(7); closeStepModal(); }} />}
-            </motion.div>
-          </div>
+            {/* Step 7: Subjects */}
+            {activeStepModal === 6 && (
+              <div className="step-body">
+                <p className="step-lead">Все 24 дисциплины ИВИТШ КГУ собраны в каталоге ниже на этой странице.</p>
+                <button type="button" onClick={() => { completeStep(6); closeStepModal(); }} className="btn btn-primary btn-block step-complete">
+                  Завершить этап 7
+                </button>
+              </div>
+            )}
+
+            {/* Step 8: Student Life */}
+            {activeStepModal === 7 && <FunLayerModal onComplete={() => { completeStep(7); closeStepModal(); }} />}
+          </>
         )}
-      </AnimatePresence>
+      </GuideDialog>
 
       {/* REWARDS MODAL */}
       <RewardsModal isOpen={isRewardsOpen} onClose={() => setIsRewardsOpen(false)} />

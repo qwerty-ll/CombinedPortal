@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { 
-  ArrowLeft, MessageSquare, ThumbsUp, ThumbsDown, Send, CheckCircle2, LogIn, User, Trash2
+import {
+  ArrowLeft, MessageSquare, ThumbsUp, ThumbsDown, Send, CheckCircle2, LogIn, Trash2, SearchX
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { forumApi } from '../services/api';
+
+const ICON = { strokeWidth: 1.75 };
 
 const QuestionDetail = () => {
   const { id } = useParams();
@@ -44,9 +45,9 @@ const QuestionDetail = () => {
 
   // Role badge helper
   const getRoleBadge = (role) => {
-    if (role === 'admin') return <span className="role-badge admin">Админ</span>;
-    if (role === 'moderator') return <span className="role-badge moderator">Модератор</span>;
-    if (role === 'curator') return <span className="role-badge curator">Куратор</span>;
+    if (role === 'admin') return <span className="badge badge-accent">Админ</span>;
+    if (role === 'moderator') return <span className="badge badge-warning">Модератор</span>;
+    if (role === 'curator') return <span className="badge badge-success">Куратор</span>;
     return null;
   };
 
@@ -133,7 +134,7 @@ const QuestionDetail = () => {
       setAnswers(prev => [...prev, createdAns]);
       setQuestion(prev => prev ? { ...prev, answers_count: (prev.answers_count || 0) + 1 } : prev);
       setReplyText('');
-      toast.show('Ответ опубликован!', 'success');
+      toast.show('Ответ опубликован', 'success');
     } catch (err) {
       toast.show(err.message || 'Ошибка отправки ответа', 'warning');
     } finally {
@@ -141,185 +142,211 @@ const QuestionDetail = () => {
     }
   };
 
+  // Ctrl/Cmd + Enter sends the reply from the textarea
+  const handleReplyKeyDown = (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && e.currentTarget.form) {
+      e.preventDefault();
+      e.currentTarget.form.requestSubmit();
+    }
+  };
+
+  const backButton = (
+    <button type="button" onClick={() => navigate('/forum')} className="btn btn-ghost btn-sm qd-back">
+      <ArrowLeft size={18} {...ICON} /> Все вопросы
+    </button>
+  );
+
   if (loading) {
     return (
-      <div className="container" style={{ textAlign: 'center', padding: '100px 0' }}>
-        <MessageSquare size={48} strokeWidth={1.5} style={{ marginBottom: '15px', color: 'var(--primary)' }} />
-        <h2>Загрузка вопроса...</h2>
+      <div className="container cm-page" aria-busy="true">
+        {backButton}
+        <div className="card qd-question">
+          <span className="skeleton qd-skel-meta" />
+          <span className="skeleton qd-skel-title" />
+          <span className="skeleton qd-skel-line" />
+          <span className="skeleton qd-skel-line qd-skel-short" />
+        </div>
+        <div className="section">
+          <span className="skeleton qd-skel-heading" />
+          <div className="qd-answers">
+            <div className="qd-answer" aria-hidden="true">
+              <span className="skeleton qd-skel-meta" />
+              <span className="skeleton qd-skel-line" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!question) {
     return (
-      <div className="container" style={{ textAlign: 'center', padding: '100px 0' }}>
-        <h2>Вопрос не найден</h2>
-        <button onClick={() => navigate('/forum')} className="btn-auth" style={{ marginTop: '20px', width: '200px' }}>
-          Вернуться на форум
-        </button>
+      <div className="container cm-page">
+        {backButton}
+        <div className="empty-state qd-missing">
+          <SearchX size={32} {...ICON} aria-hidden="true" />
+          <h1 className="cm-empty-title">Вопрос не найден</h1>
+          <p>Возможно, его удалили или ссылка неточная. Вернитесь к списку и найдите вопрос через поиск.</p>
+          <button type="button" onClick={() => navigate('/forum')} className="btn btn-primary">
+            Вернуться на форум
+          </button>
+        </div>
       </div>
     );
   }
 
   const isQuestionCreator = user && question.author_id === user.id;
+  const rating = question.votes_count || 0;
 
   return (
-    <div className="container">
-      {/* BACK BUTTON */}
-      <div className="details-back-row">
-        <button onClick={() => navigate('/forum')} className="btn-back-link">
-          <ArrowLeft size={18} /> Вернуться к списку вопросов
-        </button>
-      </div>
+    <div className="container cm-page">
+      {backButton}
 
-      {/* QUESTION BLOCK */}
-      <motion.section 
-        className="question-block"
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <div className="post-top-row">
-          <div className="post-author-badge">
-            <div className="post-author-avatar" style={{ background: '#E0F2FE', color: '#0369A1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', overflow: 'hidden', flexShrink: 0 }}>
-              <User size={18} />
-            </div>
-            <div className="post-author-meta">
-              <h5>
-                {formatAuthorName(question.author_name, question.author_username)}
-              </h5>
-              <span>{question.category}</span>
-            </div>
-          </div>
-          <span className="post-time-ago">{formatDate(question.created_at)}</span>
-        </div>
+      {/* QUESTION */}
+      <article className="card qd-question" aria-labelledby="qd-title">
+        <p className="qd-meta">
+          <span className="badge">{question.category}</span>
+          <span className="qd-author">{formatAuthorName(question.author_name, question.author_username)}</span>
+          <time className="tabular cm-dot" dateTime={question.created_at}>{formatDate(question.created_at)}</time>
+        </p>
+        <h1 id="qd-title" className="qd-title">{question.title}</h1>
+        <p className="qd-content">{question.content}</p>
 
-        <span className="post-tag-badge" style={{ alignSelf: 'flex-start' }}>{question.category}</span>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--text)' }}>{question.title}</h2>
-        <p style={{ fontSize: '1.05rem', lineHeight: '1.6', color: '#444', margin: 0 }}>{question.content}</p>
-
-        <div className="post-bottom-row" style={{ padding: 0, border: 'none' }}>
-          <div className="post-voting-buttons">
-            <button 
-              className={`vote-action-btn like ${question.user_vote === 1 ? 'active' : ''}`}
+        <div className="qd-question-foot">
+          <div className="cm-vote cm-vote-row" role="group" aria-label="Оценка вопроса">
+            <button
+              type="button"
+              className="cm-vote-btn"
+              data-kind="like"
+              aria-pressed={question.user_vote === 1}
               onClick={() => handleVoteQuestion('like')}
-              title="Нравится"
+              aria-label="Полезный вопрос"
+              title="Полезный вопрос"
             >
-              <ThumbsUp size={16} />
+              <ThumbsUp size={18} {...ICON} />
             </button>
-            <span className="vote-count-number" style={{ fontSize: '1rem' }}>{question.votes_count || 0}</span>
-            <button 
-              className={`vote-action-btn dislike ${question.user_vote === -1 ? 'active' : ''}`}
+            <span className="cm-vote-count tabular" aria-label={`Рейтинг ${rating}`}>{rating}</span>
+            <button
+              type="button"
+              className="cm-vote-btn"
+              data-kind="dislike"
+              aria-pressed={question.user_vote === -1}
               onClick={() => handleVoteQuestion('dislike')}
-              title="Не нравится"
+              aria-label="Бесполезный вопрос"
+              title="Бесполезный вопрос"
             >
-              <ThumbsDown size={16} />
+              <ThumbsDown size={18} {...ICON} />
             </button>
           </div>
         </div>
-      </motion.section>
+      </article>
 
-      {/* ANSWERS HEADER */}
-      <div className="answers-header-row">
-        <h3>Ответы ({answers.length})</h3>
-      </div>
+      {/* ANSWERS */}
+      <section className="section" aria-labelledby="qd-answers-heading">
+        <div className="section-header">
+          <h2 id="qd-answers-heading">
+            Ответы <span className="qd-heading-count tabular">{answers.length}</span>
+          </h2>
+        </div>
 
-      {/* ANSWERS FEED */}
-      <div className="answers-feed-list">
         {answers.length > 0 ? (
-          answers.map((reply) => {
-            const isReplyAuthor = user && reply.author_id === user.id;
-            const canDeleteReply = isReplyAuthor || canModerate;
-            const canMarkSolution = isQuestionCreator || canModerate;
-            return (
-              <motion.div 
-                key={reply.id} 
-                className={`answer-card-box ${reply.is_solution ? 'best' : ''}`}
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-              >
-                {reply.is_solution && (
-                  <span className="best-answer-ribbon">
-                    <CheckCircle2 size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} />
-                    Решение
-                  </span>
-                )}
-                
-                <div className="post-top-row">
-                  <div className="post-author-badge">
-                    <div className="post-author-avatar" style={{ width: '28px', height: '28px', background: '#E0F2FE', color: '#0369A1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                      <User size={14} />
-                    </div>
-                    <div className="post-author-meta">
-                      <h5 style={{ fontSize: '0.85rem' }}>
-                        {formatAuthorName(reply.author_name)}
-                      </h5>
-                    </div>
-                  </div>
-                  <span className="post-time-ago">{formatDate(reply.created_at)}</span>
-                </div>
-
-                <p style={{ fontSize: '1rem', color: '#333', lineHeight: '1.5', margin: 0 }}>{reply.content}</p>
-
-                {(canMarkSolution || canDeleteReply) && (
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
-                    {canMarkSolution && (
-                      <button
-                        className="vote-action-btn like"
-                        style={{ padding: '4px 10px', height: 'auto', width: 'auto', borderRadius: '6px', fontSize: '0.8rem', gap: '4px' }}
-                        onClick={() => handleToggleSolution(reply.id)}
-                        title={reply.is_solution ? 'Снять отметку решения' : 'Отметить как решение'}
-                      >
-                        <CheckCircle2 size={14} /> {reply.is_solution ? 'Снять отметку' : 'Это решение'}
-                      </button>
+          <ul className="qd-answers">
+            {answers.map((reply) => {
+              const isReplyAuthor = user && reply.author_id === user.id;
+              const canDeleteReply = isReplyAuthor || canModerate;
+              const canMarkSolution = isQuestionCreator || canModerate;
+              return (
+                <li key={reply.id} className={`qd-answer ${reply.is_solution ? 'is-solution' : ''}`}>
+                  <p className="qd-meta">
+                    <span className="qd-author">{formatAuthorName(reply.author_name)}</span>
+                    <time className="tabular cm-dot" dateTime={reply.created_at}>{formatDate(reply.created_at)}</time>
+                    {reply.is_solution && (
+                      <span className="badge badge-success qd-solution-badge">
+                        <CheckCircle2 size={14} {...ICON} aria-hidden="true" /> Решение
+                      </span>
                     )}
-                    {canDeleteReply && (
-                      <button
-                        className="vote-action-btn dislike"
-                        style={{ padding: '4px', height: 'auto', width: 'auto', borderRadius: '4px' }}
-                        onClick={() => handleDeleteAnswer(reply.id)}
-                        title="Удалить ответ"
-                      >
-                        <Trash2 size={16} style={{ color: '#E74C3C' }} />
-                      </button>
-                    )}
-                  </div>
-                )}
-              </motion.div>
-            );
-          })
+                  </p>
+
+                  <p className="qd-answer-content">{reply.content}</p>
+
+                  {(canMarkSolution || canDeleteReply) && (
+                    <div className="qd-answer-actions">
+                      {canMarkSolution && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          aria-pressed={!!reply.is_solution}
+                          onClick={() => handleToggleSolution(reply.id)}
+                        >
+                          <CheckCircle2 size={16} {...ICON} />
+                          {reply.is_solution ? 'Снять отметку решения' : 'Отметить как решение'}
+                        </button>
+                      )}
+                      {canDeleteReply && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm btn-icon cm-delete-btn"
+                          onClick={() => handleDeleteAnswer(reply.id)}
+                          aria-label="Удалить ответ"
+                          title="Удалить ответ"
+                        >
+                          <Trash2 size={16} {...ICON} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         ) : (
-          <div style={{ textAlign: 'center', padding: '30px 0', color: '#999', background: 'rgba(255,255,255,0.4)', borderRadius: '16px', border: '1px dashed #DDD' }}>
-            Пока никто не ответил на этот вопрос. Помоги сокурснику — напиши ответ!
+          <div className="empty-state">
+            <MessageSquare size={32} {...ICON} aria-hidden="true" />
+            <h3 className="cm-empty-title">Ответов пока нет</h3>
+            <p>
+              {isLoggedIn
+                ? 'Если знаете ответ, напишите его ниже — это поможет сокурснику.'
+                : 'Войдите через ЭИОС, чтобы первым ответить на вопрос.'}
+            </p>
           </div>
         )}
-      </div>
+      </section>
 
-      {/* INPUT FORM FOR NEW REPLY */}
+      {/* REPLY */}
       {isLoggedIn ? (
-        <form onSubmit={handleSendReply} className="reply-input-box" style={{ marginBottom: '50px' }}>
-          <input 
-            type="text" 
-            placeholder="Напишите ответ..." 
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            disabled={submittingReply}
-            required
-          />
-          <button type="submit" className="btn-send-reply" disabled={submittingReply}>
-            <Send size={16} />
-          </button>
-        </form>
-      ) : (
-        <div className="auth-gate-banner" style={{ marginBottom: '50px' }}>
-          <div className="auth-gate-content">
-            <LogIn size={20} />
-            <div>
-              <strong>Войдите через ЭИОС, чтобы ответить на вопрос</strong>
+        <section className="section" aria-labelledby="qd-reply-heading">
+          <form onSubmit={handleSendReply} className="card qd-reply">
+            <h2 id="qd-reply-heading" className="qd-reply-title">Ваш ответ</h2>
+            <div className="field">
+              <label htmlFor="qd-reply-text" className="visually-hidden">Текст ответа</label>
+              <textarea
+                id="qd-reply-text"
+                className="textarea"
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                onKeyDown={handleReplyKeyDown}
+                disabled={submittingReply}
+                required
+                aria-describedby="qd-reply-hint"
+              />
+              <span className="field-hint" id="qd-reply-hint">Ctrl + Enter — отправить</span>
             </div>
+            <div className="cm-form-actions">
+              <button type="submit" className="btn btn-primary" disabled={submittingReply}>
+                <Send size={16} {...ICON} /> {submittingReply ? 'Отправляем…' : 'Отправить ответ'}
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : (
+        <div className="cm-notice qd-gate">
+          <LogIn size={20} {...ICON} className="cm-notice-icon" aria-hidden="true" />
+          <div className="cm-notice-text">
+            <p className="cm-notice-title">Войдите через ЭИОС, чтобы ответить на вопрос</p>
+            <p>Читать ответы можно без входа.</p>
           </div>
-          <button className="btn-auth-gate" onClick={() => navigate('/profile')}>
-            Войти
+          <button type="button" className="btn btn-primary" onClick={() => navigate('/profile')}>
+            Войти через ЭИОС
           </button>
         </div>
       )}
