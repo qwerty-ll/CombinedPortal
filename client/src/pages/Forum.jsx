@@ -8,7 +8,6 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { forumApi } from '../services/api';
 import SectionIcon from '../components/SectionIcon';
-import { categoryBadgeClass } from '../data/forumCategories';
 
 const ICON = { strokeWidth: 1.75 };
 const EASE = [0.16, 1, 0.3, 1];
@@ -379,8 +378,8 @@ const Forum = () => {
                           <Pin size={12} {...ICON} aria-hidden="true" /> Закреплён
                         </span>
                       )}
-                      <span className={categoryBadgeClass(q.category)}>{q.category}</span>
-                      {q.answersCount === 0 && <span className="badge badge-hue hue-amber">Ждёт ответа</span>}
+                      <span className="badge">{q.category}</span>
+                      {q.answersCount === 0 && <span className="badge badge-warning">Ждёт ответа</span>}
                     </div>
                     <h3 className="forum-row-title">
                       <Link to={`/forum/question/${q.id}`}>{highlightText(q.title, searchQuery)}</Link>

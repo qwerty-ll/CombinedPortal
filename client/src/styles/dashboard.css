@@ -89,6 +89,7 @@
 .dash-shortcut:active { transform: translateY(1px); }
 @media (hover: hover) {
   .dash-shortcut:hover { border-color: var(--border-strong); color: var(--text); transform: translateY(-1px); }
+  .dash-shortcut:hover .tile-quiet { background: var(--tile-soft); color: var(--tile); }
 }
 .dash-shortcut-text { display: flex; flex-direction: column; min-width: 0; }
 .dash-shortcut-label { font-size: var(--text-sm); font-weight: var(--weight-semibold); line-height: 1.3; }

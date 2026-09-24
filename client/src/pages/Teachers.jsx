@@ -3,7 +3,7 @@ import { Search, Mail, MapPin, Phone, ChevronRight, SearchX, Users as UsersIcon,
 import { motion, AnimatePresence } from 'framer-motion';
 import { contentApi } from '../services/api';
 import SectionIcon from '../components/SectionIcon';
-import { hueFor, initialsOf } from '../utils/avatar';
+import { initialsOf } from '../utils/avatar';
 
 const ICON = { strokeWidth: 1.75 };
 const EASE = [0.16, 1, 0.3, 1];
@@ -23,7 +23,7 @@ const TeacherPhoto = ({ photo, name, size = 'md' }) => {
   const [failed, setFailed] = useState(false);
   const hasPhoto = photo && !photo.includes('nophoto') && !failed;
   return (
-    <span className={`cm-avatar cm-avatar-${size} ${hasPhoto ? '' : `hue-${hueFor(name)} cm-avatar-hue`}`} aria-hidden="true">
+    <span className={`cm-avatar cm-avatar-${size}`} aria-hidden="true">
       {hasPhoto ? (
         <img src={photo} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
       ) : (

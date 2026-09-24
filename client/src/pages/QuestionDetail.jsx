@@ -6,7 +6,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { forumApi } from '../services/api';
-import { categoryBadgeClass } from '../data/forumCategories';
 
 const ICON = { strokeWidth: 1.75 };
 
@@ -206,7 +205,7 @@ const QuestionDetail = () => {
       {/* QUESTION */}
       <article className="card qd-question" aria-labelledby="qd-title">
         <p className="qd-meta">
-          <span className={categoryBadgeClass(question.category)}>{question.category}</span>
+          <span className="badge">{question.category}</span>
           <span className="qd-author">{formatAuthorName(question.author_name, question.author_username)}</span>
           <time className="tabular cm-dot" dateTime={question.created_at}>{formatDate(question.created_at)}</time>
         </p>

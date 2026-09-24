@@ -35,9 +35,9 @@ const cleanDisciplineTitle = (rawTitle) => {
 // Helper for lesson type badge (label + badge tone)
 const getLessonTypeBadge = (disciplineName) => {
   const lower = (disciplineName || '').toLowerCase();
-  if (lower.startsWith('лек') || lower.includes(' лек ')) return { label: 'Лекция', tone: 'badge-hue hue-blue' };
-  if (lower.startsWith('лаб') || lower.includes(' лаб ')) return { label: 'Лабораторная', tone: 'badge-hue hue-violet' };
-  if (lower.startsWith('пр') || lower.includes(' пр ')) return { label: 'Практика', tone: 'badge-hue hue-green' };
+  if (lower.startsWith('лек') || lower.includes(' лек ')) return { label: 'Лекция', tone: '' };
+  if (lower.startsWith('лаб') || lower.includes(' лаб ')) return { label: 'Лабораторная', tone: '' };
+  if (lower.startsWith('пр') || lower.includes(' пр ')) return { label: 'Практика', tone: '' };
   if (lower.includes('экз') || lower.includes('зач')) return { label: 'Аттестация', tone: 'badge-warning' };
   return { label: 'Занятие', tone: '' };
 };
@@ -440,7 +440,7 @@ const ScheduleWidget = ({ onGroupLessons }) => {
           )}
           {iIdx === 0 && slot.lessonNum ? <span className="sched-lesson-num tabular">{slot.lessonNum} пара</span> : null}
           {iIdx === 0 && marker === 'now' && <span className="badge badge-accent sched-marker">Идёт сейчас</span>}
-          {iIdx === 0 && marker === 'next' && <span className="badge badge-hue hue-orange sched-marker">Следующая</span>}
+          {iIdx === 0 && marker === 'next' && <span className="badge sched-marker">Следующая</span>}
         </p>
         <h4 className="sched-lesson-title">{cleanedTitle}</h4>
         <p className="sched-lesson-meta">

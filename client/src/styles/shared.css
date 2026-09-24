@@ -49,14 +49,14 @@
 }
 
 /* ---------- Section hues & icon tiles ---------- */
-.hue-blue   { --tile: var(--hue-blue);   --tile-soft: var(--hue-blue-soft); }
-.hue-orange { --tile: var(--hue-orange); --tile-soft: var(--hue-orange-soft); }
-.hue-violet { --tile: var(--hue-violet); --tile-soft: var(--hue-violet-soft); }
-.hue-green  { --tile: var(--hue-green);  --tile-soft: var(--hue-green-soft); }
-.hue-pink   { --tile: var(--hue-pink);   --tile-soft: var(--hue-pink-soft); }
-.hue-amber  { --tile: var(--hue-amber);  --tile-soft: var(--hue-amber-soft); }
-.hue-cyan   { --tile: var(--hue-cyan);   --tile-soft: var(--hue-cyan-soft); }
-.hue-slate  { --tile: var(--hue-slate);  --tile-soft: var(--hue-slate-soft); }
+.hue-blue   { --tile: var(--hue-blue);   --tile-soft: var(--hue-blue-soft); --tile-tint: var(--hue-blue-tint); --tile-edge: var(--hue-blue-edge); }
+.hue-orange { --tile: var(--hue-orange); --tile-soft: var(--hue-orange-soft); --tile-tint: var(--hue-orange-tint); --tile-edge: var(--hue-orange-edge); }
+.hue-violet { --tile: var(--hue-violet); --tile-soft: var(--hue-violet-soft); --tile-tint: var(--hue-violet-tint); --tile-edge: var(--hue-violet-edge); }
+.hue-green  { --tile: var(--hue-green);  --tile-soft: var(--hue-green-soft); --tile-tint: var(--hue-green-tint); --tile-edge: var(--hue-green-edge); }
+.hue-pink   { --tile: var(--hue-pink);   --tile-soft: var(--hue-pink-soft); --tile-tint: var(--hue-pink-tint); --tile-edge: var(--hue-pink-edge); }
+.hue-amber  { --tile: var(--hue-amber);  --tile-soft: var(--hue-amber-soft); --tile-tint: var(--hue-amber-tint); --tile-edge: var(--hue-amber-edge); }
+.hue-cyan   { --tile: var(--hue-cyan);   --tile-soft: var(--hue-cyan-soft); --tile-tint: var(--hue-cyan-tint); --tile-edge: var(--hue-cyan-edge); }
+.hue-slate  { --tile: var(--hue-slate);  --tile-soft: var(--hue-slate-soft); --tile-tint: var(--hue-slate-tint); --tile-edge: var(--hue-slate-edge); }
 
 .tile {
   display: inline-flex;
@@ -70,6 +70,12 @@
   color: var(--tile, var(--text-2));
 }
 .tile-sm { width: 2rem; height: 2rem; border-radius: var(--radius-sm); }
+/* Neutral tile for a section you are not in; links reveal the hue on hover */
+.tile.tile-quiet {
+  background: var(--surface-2);
+  color: var(--text-2);
+  transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
 .tile-lg { width: 3rem; height: 3rem; border-radius: var(--radius-lg); }
 .card-compact { padding: var(--space-4); }
 
@@ -199,7 +205,7 @@
 .badge-success { background: var(--success-soft); color: var(--success); }
 .badge-warning { background: var(--warning-soft); color: var(--warning); }
 .badge-danger { background: var(--danger-soft); color: var(--danger); }
-.badge-hue { background: var(--tile-soft); color: var(--tile); }
+.badge-warm { background: var(--warm-soft); color: var(--warm-strong); }
 
 /* Filter chips (single-select) */
 .chip {

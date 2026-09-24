@@ -29,9 +29,12 @@ const PageLoader = () => (
 );
 
 import { scheduleDailyActivityReminder } from './utils/notifications';
+import { markStep, ROUTE_STEPS } from './utils/onboarding';
+import { useAuth } from './context/AuthContext';
 
 function App() {
   const location = useLocation();
+  const { user } = useAuth();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -40,6 +43,12 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'instant' });
     scheduleDailyActivityReminder();
   }, [location.pathname]);
+
+  // Opening a section counts towards the dashboard checklist, however the user got there
+  useEffect(() => {
+    markStep(user?.id, ROUTE_STEPS[location.pathname]);
+    if (user) markStep(user.id, 'profile-curator');
+  }, [location.pathname, user?.id]);
 
   // Close the mobile drawer on navigation and with Escape
   useEffect(() => { setIsMobileMenuOpen(false); }, [location.pathname]);

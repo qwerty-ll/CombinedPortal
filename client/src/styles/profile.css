@@ -50,7 +50,7 @@
   font-weight: var(--weight-medium);
   color: var(--text);
 }
-.login-perks .tile { background: var(--surface); }
+.login-perks .tile { background: var(--surface); color: var(--warm-strong); }
 
 .login-card { padding: var(--space-8); }
 

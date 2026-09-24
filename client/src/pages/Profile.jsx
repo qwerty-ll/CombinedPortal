@@ -8,7 +8,7 @@ import { useToast } from '../context/ToastContext';
 import { adaptationApi, forumApi } from '../services/api';
 import MiniGamesSection from '../components/MiniGamesSection';
 import SectionIcon from '../components/SectionIcon';
-import { hueFor, initialsOf, shrinkAvatar } from '../utils/avatar';
+import { initialsOf, shrinkAvatar } from '../utils/avatar';
 
 const ICON = { strokeWidth: 1.75, 'aria-hidden': true };
 
@@ -179,15 +179,15 @@ const Profile = () => {
             </p>
             <ul className="login-perks">
               <li>
-                <SectionIcon section="guide" size="sm" />
+                <SectionIcon section="guide" size="sm" quiet />
                 <span>Путь первокурсника сохраняется на любом устройстве</span>
               </li>
               <li>
-                <SectionIcon section="forum" size="sm" />
+                <SectionIcon section="forum" size="sm" quiet />
                 <span>Вопросы и ответы на форуме от вашего имени</span>
               </li>
               <li>
-                <span className="tile tile-sm hue-blue" aria-hidden="true"><CalendarDays size={16} strokeWidth={1.75} /></span>
+                <span className="tile tile-sm tile-quiet" aria-hidden="true"><CalendarDays size={16} strokeWidth={1.75} /></span>
                 <span>Расписание вашей группы на главной</span>
               </li>
             </ul>
@@ -341,7 +341,7 @@ const Profile = () => {
         {/* IDENTITY */}
         <section className="card profile-identity" aria-labelledby="profile-name">
           <div className="profile-identity-main">
-            <div className={`profile-avatar hue-${hueFor(user.fullName || user.username)}`}>
+            <div className="profile-avatar hue-cyan">
               {user.photoUrl && !avatarLoadError ? (
                 <img src={user.photoUrl} alt="" onError={() => setAvatarLoadError(true)} />
               ) : (
@@ -403,7 +403,7 @@ const Profile = () => {
 
             <ul className="card list profile-stats">
               <li className="list-row profile-stat">
-                <SectionIcon section="guide" />
+                <SectionIcon section="guide" quiet />
                 <div className="profile-stat-body">
                   <div className="profile-stat-head">
                     <div className="profile-stat-text">
@@ -434,7 +434,7 @@ const Profile = () => {
               </li>
 
               <li className="list-row profile-stat">
-                <SectionIcon section="forum" />
+                <SectionIcon section="forum" quiet />
                 <div className="profile-stat-body">
                   <div className="profile-stat-head">
                     <div className="profile-stat-text">

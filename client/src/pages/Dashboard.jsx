@@ -9,6 +9,7 @@ import SectionIcon from '../components/SectionIcon';
 import { SECTIONS } from '../data/sections';
 import { contentApi, adaptationApi } from '../services/api';
 import { openChat } from '../utils/chat';
+import { markStep, readSteps, ONBOARDING_EVENT } from '../utils/onboarding';
 
 const ICON = { strokeWidth: 1.75, 'aria-hidden': true };
 
@@ -108,27 +109,17 @@ const Dashboard = () => {
     { id: 'ads', text: 'Прочитать объявления', isAdTrigger: true },
   ];
 
-  const [completedTaskIds, setCompletedTaskIds] = useState(() => {
-    try {
-      const saved = localStorage.getItem('onboarding_completed_tasks');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+  const [completedTaskIds, setCompletedTaskIds] = useState(() => readSteps(user?.id));
 
+  // Steps are also completed elsewhere (App marks visited sections); keep the card in sync
   useEffect(() => {
-    localStorage.setItem('onboarding_completed_tasks', JSON.stringify(completedTaskIds));
-  }, [completedTaskIds]);
+    const sync = () => setCompletedTaskIds(readSteps(user?.id));
+    sync();
+    window.addEventListener(ONBOARDING_EVENT, sync);
+    return () => window.removeEventListener(ONBOARDING_EVENT, sync);
+  }, [user?.id]);
 
-  const markTaskDone = (taskId) => {
-    setCompletedTaskIds(prev => (prev.includes(taskId) ? prev : [...prev, taskId]));
-  };
-
-  // Signing in is the first onboarding step
-  useEffect(() => {
-    if (isLoggedIn) markTaskDone('profile-curator');
-  }, [isLoggedIn]);
+  const markTaskDone = (taskId) => markStep(user?.id, taskId);
 
   const handleTaskClick = (task) => {
     markTaskDone(task.id);
@@ -210,7 +201,7 @@ const Dashboard = () => {
             return (
               <li key={id}>
                 <Link to={path} className="dash-shortcut" onClick={() => markTaskDone(id)}>
-                  <SectionIcon section={id} />
+                  <SectionIcon section={id} quiet />
                   <span className="dash-shortcut-text">
                     <span className="dash-shortcut-label">{label}</span>
                     <span className="dash-shortcut-hint">{hint}</span>
@@ -224,7 +215,14 @@ const Dashboard = () => {
 
       <div className="dash-grid">
         {/* SCHEDULE */}
-        <section id="schedule-section" className="dash-main" aria-labelledby="schedule-title">
+        {/* Choosing a group, a date or a view counts as having looked at the schedule */}
+        <section
+          id="schedule-section"
+          className="dash-main"
+          aria-labelledby="schedule-title"
+          onClickCapture={() => markTaskDone('schedule')}
+          onChangeCapture={() => markTaskDone('schedule')}
+        >
           <ScheduleWidget onGroupLessons={setGroupLessons} />
         </section>
 
@@ -254,7 +252,7 @@ const Dashboard = () => {
                           <span className="dash-ann-text">
                             <span className="dash-ann-title">{ad.title}</span>
                             <span className="dash-ann-meta">
-                              {ad.important && <span className="badge badge-hue hue-orange">Важно</span>}
+                              {ad.important && <span className="badge badge-warm">Важно</span>}
                               <span className="tabular">{ad.time}</span>
                             </span>
                           </span>
