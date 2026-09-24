@@ -1,5 +1,5 @@
-# Everything in one container: the SPA behind nginx, the backend on SQLite and, with DEMO=1,
-# a fake EIOS plus demo content. Built and started by the docker-compose.yml in the repository root.
+# Everything in one container: the SPA behind nginx and the backend on SQLite.
+# Built and started by the docker-compose.yml in the repository root.
 # Production (PostgreSQL, HTTPS) uses infrastructure/docker-compose.yml instead.
 
 # --- Stage 1: build the React SPA ---
@@ -28,7 +28,6 @@ WORKDIR /app/server
 COPY server/requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
 COPY server ./
-COPY scripts/demo /app/demo
 COPY --from=client /app/dist /usr/share/nginx/html
 
 COPY infrastructure/nginx/snippets /etc/nginx/snippets

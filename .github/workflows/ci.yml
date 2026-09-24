@@ -71,7 +71,7 @@ jobs:
         run: |
           curl -fsS http://127.0.0.1:8080/api/v1/health
           curl -fsS http://127.0.0.1:8080/forum | grep -q '<div id="root">'
-          curl -fsS http://127.0.0.1:8080/api/v1/announcements | grep -q 'Посвящение в студенты'
+          curl -fsS http://127.0.0.1:8080/api/v1/announcements | grep -q '^\['
       - name: Container log
         if: always()
         run: docker compose logs
