@@ -107,7 +107,7 @@ def test_logged_in_chat_does_not_duplicate_current_message(app, fake_eios, monke
 
     async def capture(message, history, user, db, group_hint=None, use_llm=True):
         sent["history"] = history
-        return "ok", []
+        return "ok", [], None
     monkeypatch.setattr("app.routers.chat.assistant.answer", capture)
     c = login_student(app, fake_eios)
     c.post("/api/v1/chat", json={"message": "где 209", "history": [{"role": "user", "content": "привет"}]}, headers={"X-Requested-With": "XMLHttpRequest"})

@@ -29,10 +29,11 @@ async def chat_with_mascot(
 
     history = [turn.model_dump() for turn in (req.history or [])]
     # Anonymous visitors get answers from portal data only, so the paid API cannot be burned without logging in.
-    reply, actions = await assistant.answer(
+    reply, actions, document = await assistant.answer(
         req.message, history, current_user, db, group_hint=req.group, use_llm=current_user is not None,
     )
     return schemas.ChatResponse(
         reply=reply,
         actions=[schemas.ChatAction(label=a.label, to=a.to) for a in actions if a.to.startswith("/") and not a.to.startswith("//")],
+        document=document,
     )

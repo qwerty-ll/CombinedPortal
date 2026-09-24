@@ -15,7 +15,7 @@ from urllib.parse import quote
 from sqlalchemy.orm import Session, selectinload
 
 import app.models as models
-from app.services import rag_service, timetable
+from app.services import document_drafts, documents, rag_service, timetable
 
 logger = logging.getLogger("ivitsh_portal.assistant")
 
@@ -465,6 +465,56 @@ def _system_prompt(facts: List[Finding], now: datetime) -> str:
     )
 
 
+# --- Documents ---------------------------------------------------------------------------------
+
+_EXPLANATORY = re.compile(r"объяснительн")
+_RETAKE = re.compile(r"пере[сз]да")
+
+
+def _pairs_word(n: int) -> str:
+    if n % 10 == 1 and n % 100 != 11:
+        return "пара"
+    if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14:
+        return "пары"
+    return "пар"
+
+
+async def _document_reply(q: str, user: Optional[models.User], now: datetime) -> Optional[tuple]:
+    """"Напиши объяснительную, вчера болел" → a filled-in draft to check and download as Word or PDF."""
+    kind = "explanatory" if _EXPLANATORY.search(q) else "retake" if _RETAKE.search(q) else None
+    if not kind:
+        return None
+    if user is None:
+        return (
+            "Войди через ЭИОС в «Личном кабинете», и я подставлю в документ твоё ФИО и группу.",
+            [Action("Войти через ЭИОС", "/profile")],
+            None,
+        )
+    today = now.date()
+    if kind == "explanatory":
+        draft = await document_drafts.explanatory_draft(user, q, now)
+        fields = draft["fields"]
+        day = date.fromisoformat(fields["date_from"])
+        label = _day_label(day, today) if day >= today else (
+            "вчера" if day == today - timedelta(days=1) else f"{day.day} {documents.MONTHS_GENITIVE[day.month - 1]}"
+        )
+        n = len(fields["pairs"])
+        parts = [f"Собрал объяснительную за {label}" + (f": {n} {_pairs_word(n)} из расписания." if n else ".")]
+        if not n:
+            parts.append("Пар в расписании на этот день не нашёл — проверь дату.")
+        parts.append(f"Причина — {fields['reason']}. Проверь и скачай." if fields["reason"] else "Укажи причину — и можно скачивать.")
+    else:
+        draft = await document_drafts.retake_draft(user, q, now, _matching_disciplines)
+        fields = draft["fields"]
+        if fields["discipline"]:
+            teacher = f" (преподаватель — {fields['teacher']})" if fields["teacher"] else ""
+            parts = [f"Собрал заявление на пересдачу {documents.CONTROL_GENITIVE[fields['control']]} "
+                     f"по дисциплине «{fields['discipline']}»{teacher}. Проверь и скачай."]
+        else:
+            parts = ["Собрал заявление на пересдачу. Выбери дисциплину — и можно скачивать."]
+    return " ".join(parts), [], draft
+
+
 async def answer(
     message: str,
     history: list,
@@ -472,10 +522,15 @@ async def answer(
     db: Session,
     group_hint: Optional[str] = None,
     use_llm: bool = True,
-) -> Tuple[str, List[Action]]:
+) -> Tuple[str, List[Action], Optional[dict]]:
+    """The reply, buttons to go on with, and a document draft when one was asked for."""
     q = _norm(message).strip()
     previous_q = next((_norm(t.get("content", "")) for t in reversed(history or []) if t.get("role") == "user"), "")
     now = timetable.msk_now()
+
+    document = await _document_reply(q, user, now)
+    if document:
+        return document
 
     exact = [f for f in (
         await _schedule_finding(q, previous_q, user, group_hint, now),
@@ -484,14 +539,14 @@ async def answer(
     ) if f]
     if exact:
         shown = sorted(exact, key=lambda f: -f.weight)[:2]
-        return "\n\n".join(f.text for f in shown), _merge_actions(shown)
+        return "\n\n".join(f.text for f in shown), _merge_actions(shown), None
 
     found = _faq_findings(q, db) + _forum_findings(q, db)
     knowledge = _knowledge_finding(q)
     if knowledge:
         found.append(knowledge)
     if not found:
-        return NOT_FOUND_REPLY, [Action("Спросить на форуме", "/forum")]
+        return NOT_FOUND_REPLY, [Action("Спросить на форуме", "/forum")], None
     found.sort(key=lambda f: -f.weight)
     best = found[0]
 
@@ -502,7 +557,7 @@ async def answer(
             if image and image.group(0) not in reply:
                 reply = f"{reply}\n\n{image.group(0)}"
             if reply:
-                return reply, _merge_actions(found)
+                return reply, _merge_actions(found), None
         except Exception as e:
             logger.warning("GigaChat unavailable, answering from portal data: %s", e)
-    return best.text, _merge_actions(found)
+    return best.text, _merge_actions(found), None

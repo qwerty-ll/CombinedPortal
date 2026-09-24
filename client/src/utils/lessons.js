@@ -12,6 +12,6 @@ export const subgroupOf = (lesson) => {
 
 /** "лек Философия, п/г 1" → "Философия" */
 export const cleanLessonTitle = (raw = '') => String(raw)
-  .replace(/^(лек|лаб|пр)\.?\s+/i, '')
+  .replace(/^(лек|лаб|пр|экз|зач|конс)\.?\s+/i, '')
   .replace(SUBGROUP_SUFFIX, '')
   .trim();

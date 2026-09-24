@@ -76,8 +76,9 @@ login_failures_by_user = RateLimiter(max_events=5, window_seconds=15 * 60)
 login_failures_by_ip = RateLimiter(max_events=100, window_seconds=15 * 60)
 admin_login_failures_by_ip = RateLimiter(max_events=10, window_seconds=15 * 60)
 chat_requests = RateLimiter(max_events=20, window_seconds=60)
+document_requests = RateLimiter(max_events=30, window_seconds=60)
 
 
 def reset_all() -> None:
-    for limiter in (login_failures_by_user, login_failures_by_ip, admin_login_failures_by_ip, chat_requests):
+    for limiter in (login_failures_by_user, login_failures_by_ip, admin_login_failures_by_ip, chat_requests, document_requests):
         limiter.clear()

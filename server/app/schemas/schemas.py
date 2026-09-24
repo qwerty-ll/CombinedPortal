@@ -1,5 +1,5 @@
-from datetime import datetime
-from typing import Optional, List, Literal
+from datetime import date, datetime
+from typing import Any, Dict, Optional, List, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # --- User & Auth Schemas ---
@@ -164,6 +164,48 @@ class ChatAction(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     actions: List[ChatAction] = Field(default_factory=list)
+    # A document ВИТШик prepared: {"kind", "fields", "options"}, shown as a card to check and download
+    document: Optional[Dict[str, Any]] = None
+
+
+# --- Documents (explanatory note, retake request) ---
+_PERSON_NAME = r"^[А-Яа-яЁёA-Za-z][А-Яа-яЁёA-Za-z' .-]*$"
+
+
+class DocumentPerson(BaseModel):
+    full_name: str = Field(..., min_length=3, max_length=120, pattern=_PERSON_NAME)
+    group: str = Field(..., min_length=1, max_length=50)
+    course: Optional[int] = Field(None, ge=1, le=6)
+
+    @field_validator("full_name")
+    @classmethod
+    def _two_words(cls, value: str) -> str:
+        if len(value.split()) < 2:
+            raise ValueError("Укажите фамилию и имя")
+        return value
+
+
+class MissedPairIn(BaseModel):
+    start: str = Field(..., pattern=r"^\d{1,2}:\d{2}$")
+    end: str = Field(..., pattern=r"^\d{1,2}:\d{2}$")
+    discipline: str = Field(..., min_length=1, max_length=200)
+    kind: str = Field("", max_length=40)
+    teacher: str = Field("", max_length=100)
+
+
+class ExplanatoryIn(DocumentPerson):
+    date_from: date
+    date_to: Optional[date] = None
+    reason: str = Field(..., min_length=2, max_length=300)
+    pairs: List[MissedPairIn] = Field(default_factory=list, max_length=12)
+    attachment: str = Field("", max_length=200)
+
+
+class RetakeIn(DocumentPerson):
+    discipline: str = Field(..., min_length=2, max_length=200)
+    control: Literal["экзамен", "зачёт", "дифференцированный зачёт"]
+    teacher: str = Field("", max_length=100)
+    reason: str = Field(..., min_length=3, max_length=300)
 
 
 ADAPTATION_TOTAL_STEPS = 9

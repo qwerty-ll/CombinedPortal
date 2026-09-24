@@ -670,6 +670,63 @@
 }
 .chat-link span { overflow-wrap: anywhere; }
 
+/* A document ВИТШик prepared: summary, fields to correct, Word / PDF */
+.doc-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.doc-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--accent);
+}
+.doc-card-title {
+  flex: 1;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+  overflow-wrap: normal;
+}
+.doc-card-edit { margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2)) calc(-1 * var(--space-1)) 0; color: var(--text-2); }
+.doc-card-summary { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-sm); }
+.doc-card-row { display: grid; grid-template-columns: 4.75rem minmax(0, 1fr); gap: var(--space-2); }
+.doc-card .nowrap { white-space: nowrap; }
+.doc-card-row dt { color: var(--text-3); }
+.doc-card-row dd { color: var(--text); overflow-wrap: anywhere; }
+.doc-card-form { display: flex; flex-direction: column; gap: var(--space-3); }
+.doc-field { gap: var(--space-1); min-width: 0; }
+.doc-field .input,
+.doc-field .select { min-height: 2.5rem; font-size: var(--text-sm); }
+.doc-field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: var(--space-3); }
+.doc-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-1); }
+.doc-chips .chip { max-width: 100%; font-size: var(--text-xs); white-space: normal; text-align: left; }
+.doc-pairs { display: flex; flex-direction: column; gap: var(--space-1); border: 0; padding: 0; margin: 0; }
+.doc-pairs legend { margin-bottom: var(--space-1); }
+.doc-pair {
+  display: grid;
+  grid-template-columns: auto 3rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.doc-pair input { align-self: center; width: 1rem; height: 1rem; accent-color: var(--accent); }
+.doc-hint { display: flex; align-items: center; gap: var(--space-1); font-size: var(--text-sm); color: var(--text-3); }
+.doc-missing { color: var(--text-2); }
+.doc-card-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.doc-status { display: flex; align-items: flex-start; gap: var(--space-1); font-size: var(--text-sm); color: var(--text-2); }
+.doc-status:empty { display: none; }
+.doc-status.is-ok { color: var(--success); }
+.doc-status.is-error { color: var(--danger); }
+.doc-status svg { flex-shrink: 0; margin-top: 0.15em; }
+
 /* Where to go next: links to the map, the schedule, a forum thread */
 .chat-actions {
   display: flex;

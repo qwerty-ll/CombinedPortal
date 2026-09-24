@@ -139,3 +139,10 @@ def test_subgroup_comes_from_the_name_when_the_field_is_empty():
     assert parsed == [
         ("Python для ИИ (ТЭК, АПК)", 1), ("Базы данных", 2), ("ОС", 2), ("Философия", 0), ("Физика", 1),
     ]
+
+
+def test_session_prefixes_are_stripped():
+    rows = [lesson("2026-12-24", "10:10", "11:40", "экз Философия"), lesson("2026-12-20", "10:10", "11:40", "конс Философия")]
+    assert [(l.discipline, l.kind) for l in timetable.parse_lessons(ok({"rasp": rows}))] == [
+        ("Философия", "консультация"), ("Философия", "экзамен"),
+    ]

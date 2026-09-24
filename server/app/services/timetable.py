@@ -63,7 +63,8 @@ async def cached(endpoint: str, params: dict, ttl: int) -> dict:
 
 # --- Lessons -----------------------------------------------------------------------------------
 
-_KIND_PREFIX = re.compile(r"^(лек|лаб|пр)\.?\s+", re.IGNORECASE)
+# "лек", "лаб", "пр", and for the session "экз", "зач", "конс"
+_KIND_PREFIX = re.compile(r"^(лек|лаб|пр|экз|зач|конс)\.?\s+", re.IGNORECASE)
 # EIOS writes the subgroup into the name ("пр Python, п/г 1", "(п/г 2)", "подгруппа 1") and only
 # sometimes into номерПодгруппы
 _SUBGROUP_IN_TITLE = re.compile(r"(?:п/г|подгр[а-яё]*)\.?\s*(\d)|(\d)\s*п/г", re.IGNORECASE)

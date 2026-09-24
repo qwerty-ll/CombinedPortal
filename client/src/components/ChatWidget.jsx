@@ -5,6 +5,7 @@ import { X, Send, CircleStop, ExternalLink, Maximize2, ArrowRight } from 'lucide
 import { chatApi } from '../services/api';
 import { mapImageNameToPath } from '../utils/chatImages';
 import { OPEN_CHAT_EVENT } from '../utils/chat';
+import DocumentCard from './DocumentCard';
 
 const ICON = { strokeWidth: 1.75, 'aria-hidden': true };
 const EASE = [0.16, 1, 0.3, 1];
@@ -43,7 +44,7 @@ const pickedGroupName = () => {
   } catch { return null; }
 };
 
-const GREETING = 'Привет! Я ВИТШик. Спроси, где у тебя следующая пара, что завтра, как найти аудиторию или где сейчас преподаватель.';
+const GREETING = 'Привет! Я ВИТШик. Спроси, где у тебя следующая пара, как найти аудиторию или где сейчас преподаватель. А ещё я пишу объяснительные и заявления на пересдачу.';
 
 // Floating mascot button and the chat panel with the ВИТШик assistant.
 const ChatWidget = () => {
@@ -78,9 +79,10 @@ const ChatWidget = () => {
   const suggestions = [
     'Где у меня следующая пара?',
     'Какие пары завтра?',
+    'Объяснительная за вчера',
+    'Заявление на пересдачу',
     'Как найти Б-407?',
-    'Стипендии и ПГАС',
-    'Где поесть рядом?'
+    'Стипендии и ПГАС'
   ];
 
   const handleSendMessage = async (text = inputValue) => {
@@ -105,7 +107,8 @@ const ChatWidget = () => {
       const actions = Array.isArray(data?.actions)
         ? data.actions.filter(a => typeof a?.to === 'string' && a.to.startsWith('/') && !a.to.startsWith('//'))
         : [];
-      setChatMessages(prev => [...prev, { text: data?.reply || 'Не удалось получить ответ. Попробуй спросить иначе.', sender: 'bot', actions }]);
+      const draft = data?.document && ['explanatory', 'retake'].includes(data.document.kind) ? data.document : null;
+      setChatMessages(prev => [...prev, { text: data?.reply || 'Не удалось получить ответ. Попробуй спросить иначе.', sender: 'bot', actions, document: draft }]);
     } catch (e) {
       const text = e.status === 429
         ? e.message
@@ -265,6 +268,8 @@ const ChatWidget = () => {
               </span>
             </button>
           )}
+
+          {msg.document && <DocumentCard draft={msg.document} />}
 
           {msg.actions?.length > 0 && (
             <div className="chat-actions">
