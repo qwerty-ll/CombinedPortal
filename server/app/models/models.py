@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, UniqueConstraint, false
 from sqlalchemy.orm import relationship
 from app.db.database import Base
 
@@ -19,12 +19,17 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, default="student")  # "student" | "curator" | "moderator" | "admin"
     group_number = Column(String, nullable=True)
+    # Stable user ID returned by EIOS; binds the local account to one EIOS identity.
     sdo_id = Column(String, nullable=True)
+    # "eios" for accounts created by EIOS SSO, "local" for the env-configured administrator.
+    auth_source = Column(String, nullable=False, default="eios", server_default="eios")
+    is_blocked = Column(Boolean, nullable=False, default=False, server_default=false())
     created_at = Column(DateTime(timezone=True), default=_utcnow)
 
     questions = relationship("ForumQuestion", back_populates="author", cascade="all, delete-orphan")
     answers = relationship("ForumAnswer", back_populates="author", cascade="all, delete-orphan")
     votes = relationship("Vote", back_populates="user", cascade="all, delete-orphan")
+    adaptation = relationship("UserAdaptation", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 
 class ForumQuestion(Base):
@@ -109,15 +114,6 @@ class FaqItem(Base):
     order_index = Column(Integer, default=0)
 
 
-class AnalyticsQuestion(Base):
-    __tablename__ = "analytics_questions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    question_text = Column(String, unique=True, index=True, nullable=False)
-    ask_count = Column(Integer, default=1)
-    last_asked = Column(DateTime(timezone=True), default=_utcnow)
-
-
 class Subject(Base):
     __tablename__ = "subjects"
 
@@ -154,6 +150,4 @@ class UserAdaptation(Base):
     completed_steps = Column(String, default="[0]")
     last_updated = Column(DateTime(timezone=True), default=_utcnow)
 
-    user = relationship("User")
-
-
+    user = relationship("User", back_populates="adaptation")

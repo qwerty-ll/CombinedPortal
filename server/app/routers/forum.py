@@ -1,6 +1,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.database import get_db
@@ -18,6 +19,7 @@ _MAX_SEARCH_LEN = 200
 def get_forum_questions(
     category: Optional[str] = Query(None),
     search: Optional[str] = Query(None, max_length=_MAX_SEARCH_LEN),
+    author_id: Optional[int] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     current_user: Optional[models.User] = Depends(security.get_current_user),
@@ -27,11 +29,13 @@ def get_forum_questions(
     query = db.query(models.ForumQuestion).options(joinedload(models.ForumQuestion.author))
     if category and category != "Все":
         query = query.filter(models.ForumQuestion.category == category)
+    if author_id is not None:
+        query = query.filter(models.ForumQuestion.author_id == author_id)
     if search:
-        safe_search = search.replace("%", "\\%").replace("_", "\\_")
+        safe_search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         query = query.filter(
-            (models.ForumQuestion.title.ilike(f"%{safe_search}%")) |
-            (models.ForumQuestion.content.ilike(f"%{safe_search}%"))
+            (models.ForumQuestion.title.ilike(f"%{safe_search}%", escape="\\")) |
+            (models.ForumQuestion.content.ilike(f"%{safe_search}%", escape="\\"))
         )
 
     questions = (
@@ -259,7 +263,6 @@ def vote_question(
     else:
         new_vote = models.Vote(user_id=current_user.id, question_id=question_id, vote_type=req.vote_type)
         db.add(new_vote)
-    from sqlalchemy.exc import IntegrityError
     try:
         db.commit()
     except IntegrityError:
@@ -277,10 +280,70 @@ def delete_question(
     if not q:
         raise HTTPException(status_code=404, detail="Вопрос не найден")
     
-    if q.author_id != current_user.id and current_user.role not in ("admin", "moderator"):
+    if q.author_id != current_user.id and not security.is_moderator(current_user):
         raise HTTPException(status_code=403, detail="Недостаточно прав для удаления этого вопроса")
     
     db.delete(q)
     db.commit()
     return {"status": "deleted"}
 
+
+@router.post("/questions/{question_id}/pin")
+def toggle_pin(
+    question_id: int,
+    current_user: models.User = Depends(security.require_moderator),
+    db: Session = Depends(get_db)
+):
+    q = db.query(models.ForumQuestion).filter(models.ForumQuestion.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Вопрос не найден")
+    q.is_pinned = not q.is_pinned
+    db.commit()
+    return {"id": q.id, "is_pinned": q.is_pinned}
+
+
+def _get_answer_or_404(db: Session, answer_id: int) -> models.ForumAnswer:
+    answer = (
+        db.query(models.ForumAnswer)
+        .options(joinedload(models.ForumAnswer.question))
+        .filter(models.ForumAnswer.id == answer_id)
+        .first()
+    )
+    if not answer:
+        raise HTTPException(status_code=404, detail="Ответ не найден")
+    return answer
+
+
+@router.delete("/answers/{answer_id}", status_code=200)
+def delete_answer(
+    answer_id: int,
+    current_user: models.User = Depends(security.require_current_user),
+    db: Session = Depends(get_db)
+):
+    answer = _get_answer_or_404(db, answer_id)
+    if answer.author_id != current_user.id and not security.is_moderator(current_user):
+        raise HTTPException(status_code=403, detail="Недостаточно прав для удаления этого ответа")
+    db.delete(answer)
+    db.commit()
+    return {"status": "deleted"}
+
+
+@router.post("/answers/{answer_id}/solution")
+def toggle_solution(
+    answer_id: int,
+    current_user: models.User = Depends(security.require_current_user),
+    db: Session = Depends(get_db)
+):
+    """The question author or a moderator marks (or unmarks) the answer that solved the question."""
+    answer = _get_answer_or_404(db, answer_id)
+    if answer.question.author_id != current_user.id and not security.is_moderator(current_user):
+        raise HTTPException(status_code=403, detail="Отметить решение может только автор вопроса или модератор")
+    mark = not answer.is_solution
+    if mark:
+        db.query(models.ForumAnswer).filter(
+            models.ForumAnswer.question_id == answer.question_id,
+            models.ForumAnswer.id != answer.id,
+        ).update({models.ForumAnswer.is_solution: False}, synchronize_session=False)
+    answer.is_solution = mark
+    db.commit()
+    return {"id": answer.id, "question_id": answer.question_id, "is_solution": answer.is_solution}

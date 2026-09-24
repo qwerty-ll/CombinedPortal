@@ -1,111 +1,125 @@
-import os
 import uuid
-import hashlib
-import secrets
 from datetime import datetime, timezone, timedelta
-from typing import Optional, Set
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status, Request
+from typing import Optional
+
+import bcrypt
+import jwt
+from fastapi import Depends, HTTPException, status, Request, Response
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from dotenv import load_dotenv
 
+from app.core.config import settings
 from app.db.database import get_db
 import app.models as models
 
-load_dotenv()
+AUTH_COOKIE_NAME = "portal_token"
+# Header the SPA sends on every request; cross-site pages cannot set it without a CORS preflight.
+CSRF_HEADER_NAME = "X-Requested-With"
+CSRF_HEADER_VALUE = "XMLHttpRequest"
 
-raw_secret = os.getenv("SECRET_KEY")
-if not raw_secret:
-    # SECURITY: Refusing to start without a proper SECRET_KEY.
-    # A hardcoded fallback would compromise all JWT tokens.
-    raise RuntimeError(
-        "CRITICAL SECURITY ERROR: SECRET_KEY environment variable is not set. "
-        "Server startup aborted. Please set SECRET_KEY in your .env file."
-    )
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/admin-login", auto_error=False)
 
-SECRET_KEY = raw_secret
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
-VERIFY_SSL = os.getenv("VERIFY_SSL", "true").lower() == "true"
-# Use secure cookies in production (HTTPS). Set COOKIE_SECURE=false only for local dev.
-COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").lower() == "true"
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-# FIX (B-02): tokenUrl updated to the actual login endpoint used by this app.
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/eios-login", auto_error=False)
+def _bcrypt_input(password: str) -> bytes:
+    # bcrypt only uses the first 72 bytes and bcrypt>=5 rejects longer input.
+    return (password or "").encode("utf-8")[:72]
 
-# FIX (C-03): Multi-worker & DB-backed JWT revocation list.
-# Stores revoked JTIs (JWT IDs) both in-memory (L1 cache) and SQLite DB (persistent across workers/restarts).
-_revoked_jtis: Set[str] = set()
-
-def revoke_token(jti: str, db: Optional[Session] = None) -> None:
-    """Add a JTI to the revocation list (memory + DB)."""
-    _revoked_jtis.add(jti)
-    if db is not None:
-        try:
-            from sqlalchemy.exc import IntegrityError
-            rev_item = models.RevokedToken(jti=jti)
-            db.add(rev_item)
-            db.commit()
-        except Exception:
-            db.rollback()
-
-def is_token_revoked(jti: str, db: Optional[Session] = None) -> bool:
-    """Return True if the JTI has been revoked via logout."""
-    if jti in _revoked_jtis:
-        return True
-    if db is not None:
-        rev_db = db.query(models.RevokedToken).filter(models.RevokedToken.jti == jti).first()
-        if rev_db:
-            _revoked_jtis.add(jti)
-            return True
-    return False
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    if not plain_password or not hashed_password:
+    if not plain_password or not hashed_password or not hashed_password.startswith("$2"):
         return False
-    if hashed_password.startswith("$2"):
-        try:
-            return pwd_context.verify(plain_password, hashed_password)
-        except Exception:
-            return False
-    sha256_hash = hashlib.sha256((plain_password or "").encode("utf-8")).hexdigest()
-    return secrets.compare_digest(sha256_hash, hashed_password)
+    try:
+        return bcrypt.checkpw(_bcrypt_input(plain_password), hashed_password.encode("utf-8"))
+    except ValueError:
+        return False
+
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password or "")
+    return bcrypt.hashpw(_bcrypt_input(password), bcrypt.gensalt()).decode("utf-8")
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    # FIX (C-03): Add jti (JWT ID) to every token to support revocation on logout.
-    to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def create_access_token(subject: str) -> str:
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": subject,
+        "iat": now,
+        "exp": now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        "jti": str(uuid.uuid4()),
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def decode_access_token(token: str) -> Optional[dict]:
+    try:
+        return jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+            options={"require": ["exp", "sub", "jti"]},
+        )
+    except jwt.PyJWTError:
+        return None
+
+
+def set_auth_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=settings.COOKIE_SECURE,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+
+
+def clear_auth_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=AUTH_COOKIE_NAME,
+        httponly=True,
+        samesite="lax",
+        secure=settings.COOKIE_SECURE,
+        path="/",
+    )
+
+
+def revoke_token(jti: str, db: Session) -> None:
+    """Store the JTI so the token is rejected until it expires, and drop entries that already expired."""
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    try:
+        db.query(models.RevokedToken).filter(models.RevokedToken.revoked_at < cutoff).delete(synchronize_session=False)
+        if not db.query(models.RevokedToken).filter(models.RevokedToken.jti == jti).first():
+            db.add(models.RevokedToken(jti=jti))
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def is_token_revoked(jti: str, db: Session) -> bool:
+    return db.query(models.RevokedToken.id).filter(models.RevokedToken.jti == jti).first() is not None
+
+
+def extract_token(request: Request, bearer_token: Optional[str]) -> Optional[str]:
+    return bearer_token or request.cookies.get(AUTH_COOKIE_NAME)
+
 
 def get_current_user(
     request: Request,
     token: Optional[str] = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> Optional[models.User]:
-    auth_token = token or request.cookies.get("portal_token")
+    auth_token = extract_token(request, token)
     if not auth_token:
         return None
-    try:
-        payload = jwt.decode(auth_token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        jti: str = payload.get("jti")
-        if username is None:
-            return None
-        # FIX (C-03): Check JWT revocation list (memory + DB)
-        if jti and is_token_revoked(jti, db):
-            return None
-    except JWTError:
+    payload = decode_access_token(auth_token)
+    if not payload or is_token_revoked(payload["jti"], db):
         return None
-
-    user = db.query(models.User).filter(models.User.username == username).first()
+    user = db.query(models.User).filter(models.User.username == payload["sub"]).first()
+    if not user or user.is_blocked:
+        return None
     return user
+
 
 def require_current_user(user: Optional[models.User] = Depends(get_current_user)) -> models.User:
     if not user:
@@ -116,18 +130,25 @@ def require_current_user(user: Optional[models.User] = Depends(get_current_user)
         )
     return user
 
+
 def require_admin(user: models.User = Depends(require_current_user)) -> models.User:
     if user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Необходимы права Администратора",
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Необходимы права Администратора")
     return user
+
 
 def require_moderator(user: models.User = Depends(require_current_user)) -> models.User:
     if user.role not in ("admin", "moderator"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Необходимы права Модератора или Администратора",
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Необходимы права Модератора или Администратора")
     return user
+
+
+def is_moderator(user: Optional[models.User]) -> bool:
+    return bool(user) and user.role in ("admin", "moderator")
+
+
+def is_protected_admin(user: models.User) -> bool:
+    """The env-configured administrator cannot be demoted, blocked or deleted from the admin panel."""
+    return user.auth_source == "local" or (
+        bool(settings.ADMIN_USERNAME) and user.username.lower() == settings.admin_username_normalized
+    )

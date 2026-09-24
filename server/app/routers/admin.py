@@ -10,6 +10,17 @@ import app.core.security as security
 router = APIRouter(prefix="/api/v1", tags=["Admin"])
 
 
+def _get_manageable_user(db: Session, user_id: int, current_user: models.User) -> models.User:
+    target_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if target_user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Это действие недоступно для собственной учётной записи")
+    if security.is_protected_admin(target_user):
+        raise HTTPException(status_code=400, detail="Это действие недоступно для Главного Администратора ИВИТШ")
+    return target_user
+
+
 @router.get("/admin/users", response_model=List[schemas.UserResponse])
 def get_all_users(
     limit: int = Query(100, ge=1, le=500),
@@ -33,18 +44,7 @@ def update_user_role(
     current_user: models.User = Depends(security.require_admin),
     db: Session = Depends(get_db)
 ):
-    if req.role not in ("student", "curator", "moderator", "admin"):
-        raise HTTPException(status_code=400, detail="Недопустимая роль. Используйте: student, curator, moderator, admin")
-    target_user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not target_user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
-
-    if target_user.id == current_user.id or target_user.username.lower() == current_user.username.lower():
-        raise HTTPException(status_code=400, detail="Нельзя изменить собственную роль администратора")
-
-    if target_user.username.lower() in ("ivitsh_admin", "admin"):
-        raise HTTPException(status_code=400, detail="Нельзя изменять роль Главного Администратора ИВИТШ")
-
+    target_user = _get_manageable_user(db, user_id, current_user)
     target_user.role = req.role
     db.commit()
     db.refresh(target_user)
@@ -57,119 +57,25 @@ def delete_user(
     current_user: models.User = Depends(security.require_admin),
     db: Session = Depends(get_db)
 ):
-    target_user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not target_user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
-
-    if target_user.id == current_user.id or target_user.username.lower() == current_user.username.lower():
-        raise HTTPException(status_code=400, detail="Нельзя удалить собственного администратора")
-
-    if target_user.username.lower() in ("ivitsh_admin", "admin"):
-        raise HTTPException(status_code=400, detail="Нельзя удалять Главного Администратора ИВИТШ")
-
+    target_user = _get_manageable_user(db, user_id, current_user)
     db.delete(target_user)
     db.commit()
     return {"status": "deleted", "id": user_id}
 
 
-@router.post("/adaptation", response_model=schemas.UserAdaptationResponse)
-def save_user_adaptation(
-    req: schemas.UserAdaptationUpdate,
-    current_user: models.User = Depends(security.require_current_user),
+@router.patch("/admin/users/{user_id}/block", response_model=schemas.UserResponse)
+def set_user_blocked(
+    user_id: int,
+    req: schemas.BlockUpdateSchema,
+    current_user: models.User = Depends(security.require_admin),
     db: Session = Depends(get_db)
 ):
-    import json
-    from datetime import datetime
-
-    adaptation = db.query(models.UserAdaptation).filter(models.UserAdaptation.user_id == current_user.id).first()
-    steps_json = json.dumps(req.completed_steps)
-
-    if not adaptation:
-        adaptation = models.UserAdaptation(
-            user_id=current_user.id,
-            completed_steps=steps_json,
-            last_updated=datetime.utcnow()
-        )
-        db.add(adaptation)
-    else:
-        adaptation.completed_steps = steps_json
-        adaptation.last_updated = datetime.utcnow()
-
+    """Blocking (unlike deleting) survives the next EIOS login and invalidates existing sessions at once."""
+    target_user = _get_manageable_user(db, user_id, current_user)
+    target_user.is_blocked = req.blocked
     db.commit()
-    db.refresh(adaptation)
-
-    progress = round((len(req.completed_steps) / 9.0) * 100.0, 1)
-    return schemas.UserAdaptationResponse(
-        user_id=current_user.id,
-        username=current_user.username,
-        full_name=current_user.full_name,
-        group_number=current_user.group_number,
-        completed_steps=req.completed_steps,
-        progress_percent=progress,
-        last_updated=adaptation.last_updated
-    )
-
-
-@router.get("/adaptation/me", response_model=schemas.UserAdaptationResponse)
-def get_my_adaptation(
-    current_user: models.User = Depends(security.require_current_user),
-    db: Session = Depends(get_db)
-):
-    import json
-    adaptation = db.query(models.UserAdaptation).filter(models.UserAdaptation.user_id == current_user.id).first()
-    steps = [0]
-    last_upd = current_user.created_at
-    if adaptation and adaptation.completed_steps:
-        try:
-            steps = json.loads(adaptation.completed_steps)
-        except Exception:
-            steps = [0]
-        if adaptation.last_updated:
-            last_upd = adaptation.last_updated
-
-    progress = round((len(steps) / 9.0) * 100.0, 1)
-    return schemas.UserAdaptationResponse(
-        user_id=current_user.id,
-        username=current_user.username,
-        full_name=current_user.full_name,
-        group_number=current_user.group_number,
-        completed_steps=steps,
-        progress_percent=progress,
-        last_updated=last_upd
-    )
-
-
-@router.get("/admin/adaptations", response_model=List[schemas.UserAdaptationResponse])
-def get_student_adaptations(
-    current_user: models.User = Depends(security.require_moderator),
-    db: Session = Depends(get_db)
-):
-    import json
-    users = db.query(models.User).order_by(models.User.created_at.desc()).all()
-    res = []
-    for u in users:
-        adaptation = db.query(models.UserAdaptation).filter(models.UserAdaptation.user_id == u.id).first()
-        steps = [0]
-        last_upd = u.created_at
-        if adaptation and adaptation.completed_steps:
-            try:
-                steps = json.loads(adaptation.completed_steps)
-            except Exception:
-                steps = [0]
-            if adaptation.last_updated:
-                last_upd = adaptation.last_updated
-
-        progress = round((len(steps) / 9.0) * 100.0, 1)
-        res.append(schemas.UserAdaptationResponse(
-            user_id=u.id,
-            username=u.username,
-            full_name=u.full_name,
-            group_number=u.group_number,
-            completed_steps=steps,
-            progress_percent=progress,
-            last_updated=last_upd
-        ))
-    return res
+    db.refresh(target_user)
+    return target_user
 
 
 # --- Teachers ---
@@ -188,7 +94,7 @@ def create_teacher(
     current_user: models.User = Depends(security.require_admin),
     db: Session = Depends(get_db)
 ):
-    new_t = models.Teacher(**t_in.dict())
+    new_t = models.Teacher(**t_in.model_dump())
     db.add(new_t)
     db.commit()
     db.refresh(new_t)
@@ -231,7 +137,7 @@ def create_announcement(
     current_user: models.User = Depends(security.require_admin),
     db: Session = Depends(get_db)
 ):
-    new_a = models.Announcement(**a_in.dict())
+    new_a = models.Announcement(**a_in.model_dump())
     db.add(new_a)
     db.commit()
     db.refresh(new_a)
@@ -263,7 +169,7 @@ def update_announcement(
     a = db.query(models.Announcement).filter(models.Announcement.id == announcement_id).first()
     if not a:
         raise HTTPException(status_code=404, detail="Объявление не найдено")
-    for key, value in a_in.dict().items():
+    for key, value in a_in.model_dump().items():
         setattr(a, key, value)
     db.commit()
     db.refresh(a)
@@ -292,7 +198,7 @@ def create_faq_item(
     current_user: models.User = Depends(security.require_admin),
     db: Session = Depends(get_db)
 ):
-    new_f = models.FaqItem(**f_in.dict())
+    new_f = models.FaqItem(**f_in.model_dump())
     db.add(new_f)
     db.commit()
     db.refresh(new_f)
@@ -324,7 +230,7 @@ def update_faq_item(
     f = db.query(models.FaqItem).filter(models.FaqItem.id == faq_id).first()
     if not f:
         raise HTTPException(status_code=404, detail="FAQ элемент не найден")
-    for key, value in f_in.dict().items():
+    for key, value in f_in.model_dump().items():
         setattr(f, key, value)
     db.commit()
     db.refresh(f)
@@ -360,7 +266,7 @@ def create_subject(
             status_code=409,
             detail=f"Предмет с кодом '{s_in.subject_code}' уже существует. Используйте PUT для обновления."
         )
-    new_s = models.Subject(**s_in.dict())
+    new_s = models.Subject(**s_in.model_dump())
     db.add(new_s)
     db.commit()
     db.refresh(new_s)
@@ -377,7 +283,7 @@ def update_subject(
     s = db.query(models.Subject).filter(models.Subject.id == subject_id).first()
     if not s:
         raise HTTPException(status_code=404, detail="Предмет не найден")
-    for key, value in s_in.dict().items():
+    for key, value in s_in.model_dump().items():
         setattr(s, key, value)
     db.commit()
     db.refresh(s)

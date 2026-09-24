@@ -1,77 +1,24 @@
 import re
-from typing import Optional
-from fastapi import APIRouter, Query, HTTPException, status
-import httpx
-import logging
+import time
+from typing import Any, Dict, Optional, Tuple
 
-import app.core.security as security
+from fastapi import APIRouter, Query, HTTPException
 
-logger = logging.getLogger("ivitsh_portal.schedule")
+from app.services import eios
+
 router = APIRouter(prefix="/api/v1/schedule", tags=["Schedule"])
 
-EIOS_BASE_URL = "https://eios.kosgos.ru/api"
-
-# Validation patterns
 _YEAR_RE = re.compile(r'^\d{4}-\d{4}$')
 _DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 
-FALLBACK_GROUPS = [
-    {"id": 8540, "name": "24-ИСбо-1"},
-    {"id": 8541, "name": "24-ИСбо-2"},
-    {"id": 8542, "name": "25-ИВТбо-1"},
-    {"id": 8543, "name": "25-ИВТбо-2"},
-    {"id": 8544, "name": "23-ИВТбо-1"},
-    {"id": 8545, "name": "22-ИВТбо-1"}
-]
+# Reference lists change rarely; the timetable itself can change during the day.
+_LIST_TTL = 6 * 60 * 60
+_RASP_TTL = 10 * 60
+# When EIOS is down we keep serving the last real answer for up to a day, marked as stale.
+_STALE_TTL = 24 * 60 * 60
+_MAX_CACHE_ENTRIES = 2000
 
-FALLBACK_TEACHERS = [
-    {"id": 101, "name": "Киприна Людмила Юрьевна"},
-    {"id": 102, "name": "Барило Илья Иванович"},
-    {"id": 103, "name": "Лустгартен Юрий Леонидович"},
-    {"id": 104, "name": "Красавина Мария Сергеевна"},
-    {"id": 105, "name": "Прядкина Нина Олеговна"},
-    {"id": 106, "name": "Демчинова Екатерина Игоревна"}
-]
-
-FALLBACK_AUDITORIES = [
-    {"id": 209, "name": "Б-209 (Дирекция)"},
-    {"id": 301, "name": "Б-301 (Лаборатория)"},
-    {"id": 305, "name": "Б-305 (Компьютерный класс)"},
-    {"id": 401, "name": "Б-401 (Коворкинг)"}
-]
-
-FALLBACK_RASP = [
-    {
-        "dis": "лек Алгоритмы и структуры данных",
-        "disciplina": "Алгоритмы и структуры данных",
-        "prep": "Барило Илья Иванович",
-        "aud": "Б-305",
-        "type": "Лекция",
-        "time": "08:30-10:00",
-        "day": "Понедельник",
-        "date": "2026-08-17"
-    },
-    {
-        "dis": "лаб Разработка веб-приложений",
-        "disciplina": "Разработка веб-приложений",
-        "prep": "Лустгартен Юрий Леонидович",
-        "aud": "Б-301",
-        "type": "Лабораторная",
-        "time": "10:10-11:40",
-        "day": "Понедельник",
-        "date": "2026-08-17"
-    },
-    {
-        "dis": "пр Высшая математика",
-        "disciplina": "Высшая математика",
-        "prep": "Красавина Мария Сергеевна",
-        "aud": "Б-214",
-        "type": "Практическое",
-        "time": "12:10-13:40",
-        "day": "Вторник",
-        "date": "2026-08-18"
-    }
-]
+_cache: Dict[Tuple, Tuple[float, Any]] = {}
 
 
 def _validate_year(year: str) -> None:
@@ -84,68 +31,67 @@ def _validate_sdate(sdate: str) -> None:
         raise HTTPException(status_code=400, detail="Неверный формат даты. Ожидается: YYYY-MM-DD")
 
 
-async def _fetch_eios(endpoint: str, params: dict, timeout: float = 2.5):
-    url = f"{EIOS_BASE_URL}/{endpoint}"
-    try:
-        async with httpx.AsyncClient(verify=security.VERIFY_SSL, timeout=timeout) as client:
-            resp = await client.get(url, params=params)
-            if resp.status_code == 451 or "отключите vpn" in resp.text.lower():
-                logger.warning(f"[EIOS BLOCK] 451 access denied on {url}")
-                return None
-            if resp.status_code == 200:
-                return resp.json()
-            return None
-    except Exception as e:
-        logger.warning(f"[EIOS FETCH FAST FALLBACK] Connection to {url} timed out or failed: {e}")
-        return None
+def clear_cache() -> None:
+    _cache.clear()
+
+
+async def _cached_eios(endpoint: str, params: dict, ttl: int) -> dict:
+    key = (endpoint, tuple(sorted(params.items())))
+    now = time.time()
+    cached = _cache.get(key)
+    if cached and now - cached[0] < ttl:
+        return cached[1]
+
+    data = await eios.fetch_json(endpoint, params)
+    # An empty timetable (holidays) is a valid answer; only a missing payload or failed state is an error.
+    if isinstance(data, dict) and data.get("data") is not None and data.get("state", 1) == 1:
+        if len(_cache) >= _MAX_CACHE_ENTRIES:
+            _cache.pop(min(_cache, key=lambda k: _cache[k][0]))
+        _cache[key] = (now, data)
+        return data
+
+    if cached and now - cached[0] < _STALE_TTL:
+        return {**cached[1], "stale": True, "cached_at": int(cached[0])}
+    # Never invent a timetable: tell the client EIOS is unavailable instead.
+    raise HTTPException(status_code=503, detail="Расписание ЭИОС КГУ сейчас недоступно. Попробуйте позже или откройте eios.kosgos.ru.")
 
 
 @router.get("/years")
 async def get_eios_years():
-    data = await _fetch_eios("Rasp/ListYears", {})
-    if data:
-        return data
-    return {"data": {"years": ["2025-2026", "2024-2025", "2026-2027"]}, "state": 1}
+    return await _cached_eios("Rasp/ListYears", {}, _LIST_TTL)
 
 
 @router.get("/groups")
 async def get_eios_groups(year: str = Query("2025-2026")):
     _validate_year(year)
-    data = await _fetch_eios("raspGrouplist", {"year": year})
-    if data and "data" in data and data["data"]:
-        return data
-    return {"data": FALLBACK_GROUPS, "state": 1}
+    return await _cached_eios("raspGrouplist", {"year": year}, _LIST_TTL)
 
 
 @router.get("/teachers")
 async def get_eios_teachers(year: str = Query("2025-2026")):
     _validate_year(year)
-    data = await _fetch_eios("raspTeacherlist", {"year": year})
-    if data and "data" in data and data["data"]:
-        return data
-    return {"data": FALLBACK_TEACHERS, "state": 1}
+    return await _cached_eios("raspTeacherlist", {"year": year}, _LIST_TTL)
 
 
 @router.get("/auditories")
 async def get_eios_auditories(year: str = Query("2025-2026")):
     _validate_year(year)
-    data = await _fetch_eios("raspAudlist", {"year": year})
-    if data and "data" in data and data["data"]:
-        return data
-    return {"data": FALLBACK_AUDITORIES, "state": 1}
+    return await _cached_eios("raspAudlist", {"year": year}, _LIST_TTL)
 
 
 @router.get("/rasp")
 async def get_eios_rasp(
-    idGroup: Optional[int] = Query(None),
-    idTeacher: Optional[int] = Query(None),
-    idAud: Optional[int] = Query(None),
+    idGroup: Optional[int] = Query(None, ge=1),
+    idTeacher: Optional[int] = Query(None, ge=1),
+    idAud: Optional[int] = Query(None, ge=1),
     year: str = Query("2025-2026"),
     sdate: Optional[str] = Query(None)
 ):
     _validate_year(year)
     if sdate:
         _validate_sdate(sdate)
+    if not (idGroup or idTeacher or idAud):
+        raise HTTPException(status_code=400, detail="Укажите группу, преподавателя или аудиторию")
 
     params = {"year": year}
     if idGroup:
@@ -156,9 +102,4 @@ async def get_eios_rasp(
         params["idAud"] = idAud
     if sdate:
         params["sdate"] = sdate
-
-    data = await _fetch_eios("Rasp", params, timeout=3.0)
-    if data and "data" in data and data["data"]:
-        return data
-    return {"data": FALLBACK_RASP, "state": 1}
-
+    return await _cached_eios("Rasp", params, _RASP_TTL)

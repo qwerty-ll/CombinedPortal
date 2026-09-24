@@ -1,30 +1,8 @@
 from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from typing import Optional, List, Literal
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # --- User & Auth Schemas ---
-class UserCreate(BaseModel):
-    username: str = Field(..., min_length=3, max_length=80)
-    password: str = Field(..., min_length=6, max_length=128)
-    full_name: str = Field(..., min_length=1, max_length=200)
-    email: Optional[EmailStr] = None
-    group_number: Optional[str] = Field(None, max_length=50)
-
-    @field_validator("password")
-    @classmethod
-    def validate_password_quality(cls, v: str) -> str:
-        if not v or len(v.strip()) < 6:
-            raise ValueError("Пароль должен иметь длину не менее 6 символов")
-        return v
-
-    @field_validator("username")
-    @classmethod
-    def validate_username_chars(cls, v: str) -> str:
-        cleaned = v.strip()
-        if len(cleaned) < 3:
-            raise ValueError("Имя пользователя должно содержать не менее 3 символов")
-        return cleaned
-
 class UserLogin(BaseModel):
     username: str = Field(..., min_length=1, max_length=80)
     password: str = Field(..., min_length=1, max_length=128)
@@ -34,14 +12,12 @@ class EiosLoginRequest(BaseModel):
     password: str = Field(..., min_length=1, max_length=128)
     group_number: Optional[str] = Field(None, max_length=50)
 
-class SdoLoginRequest(EiosLoginRequest):
-    pass
-
 class UserUpdateProfile(BaseModel):
-    full_name: Optional[str] = Field(None, min_length=2, max_length=200)
     group_number: Optional[str] = Field(None, max_length=50)
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     username: str
     full_name: str
@@ -49,19 +25,19 @@ class UserResponse(BaseModel):
     group_number: Optional[str] = None
     email: Optional[str] = None
     userpictureurl: Optional[str] = None
-    courses: Optional[List[dict]] = None
+    auth_source: str = "eios"
+    is_blocked: bool = False
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
+class LoginResponse(BaseModel):
+    # The JWT is only delivered as an httpOnly cookie so page scripts can never read it.
     user: UserResponse
 
 class RoleUpdateSchema(BaseModel):
-    role: str
+    role: Literal["student", "curator", "moderator", "admin"]
+
+class BlockUpdateSchema(BaseModel):
+    blocked: bool
 
 # --- Forum Schemas ---
 class ForumAnswerCreate(BaseModel):
@@ -76,8 +52,7 @@ class ForumAnswerResponse(BaseModel):
     is_solution: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ForumQuestionCreate(BaseModel):
     title: str = Field(..., min_length=3, max_length=300)
@@ -98,8 +73,7 @@ class ForumQuestionResponse(BaseModel):
     is_pinned: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class VoteRequest(BaseModel):
     vote_type: int
@@ -126,8 +100,7 @@ class TeacherCreate(BaseModel):
 class TeacherResponse(TeacherCreate):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AnnouncementCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=300)
@@ -138,8 +111,7 @@ class AnnouncementResponse(AnnouncementCreate):
     id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class FaqItemCreate(BaseModel):
     question: str = Field(..., min_length=1, max_length=500)
@@ -150,8 +122,7 @@ class FaqItemCreate(BaseModel):
 class FaqItemResponse(FaqItemCreate):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SubjectCreate(BaseModel):
     subject_code: str = Field(..., min_length=1, max_length=50)
@@ -172,8 +143,7 @@ class SubjectCreate(BaseModel):
 class SubjectResponse(SubjectCreate):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Chatbot Schemas ---
 class ChatMessageTurn(BaseModel):
@@ -188,11 +158,23 @@ class ChatResponse(BaseModel):
     reply: str
 
 
+ADAPTATION_TOTAL_STEPS = 9
+
+
 class UserAdaptationUpdate(BaseModel):
-    completed_steps: List[int] = Field(..., max_length=20)
+    completed_steps: List[int] = Field(..., max_length=ADAPTATION_TOTAL_STEPS * 2)
+
+    @field_validator("completed_steps")
+    @classmethod
+    def validate_steps(cls, v: List[int]) -> List[int]:
+        if any(step < 0 or step >= ADAPTATION_TOTAL_STEPS for step in v):
+            raise ValueError(f"Номер шага должен быть от 0 до {ADAPTATION_TOTAL_STEPS - 1}")
+        return sorted(set(v))
 
 
 class UserAdaptationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     user_id: int
     username: str
     full_name: str
@@ -200,7 +182,3 @@ class UserAdaptationResponse(BaseModel):
     completed_steps: List[int]
     progress_percent: float
     last_updated: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
-
