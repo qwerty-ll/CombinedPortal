@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 import app.models as models
 from app.core import security
+from app.routers import auth
 from app.services import eios
 from conftest import CSRF, add_eios_account, login_admin, login_student
 
@@ -61,8 +62,8 @@ def test_eios_login_is_case_insensitive_for_existing_accounts(app, fake_eios, db
 def test_eios_login_rejects_wrong_password_and_rate_limits(client, fake_eios):
     add_eios_account(fake_eios, "24-isbo-002", password="right")
     for _ in range(5):
-        assert client.post("/api/v1/auth/eios-login", json={"username": "24-isbo-002", "password": "bad"}).status_code == 401
-    r = client.post("/api/v1/auth/eios-login", json={"username": "24-isbo-002", "password": "right"})
+        assert client.post("/api/v1/auth/eios-login", json={"consent": True, "username": "24-isbo-002", "password": "bad"}).status_code == 401
+    r = client.post("/api/v1/auth/eios-login", json={"consent": True, "username": "24-isbo-002", "password": "right"})
     assert r.status_code == 429
 
 
@@ -70,7 +71,7 @@ def test_eios_login_cannot_reach_local_admin(app, client, fake_eios):
     login_admin(app)
     accounts, calls = fake_eios
     add_eios_account(fake_eios, "portal_admin")
-    r = client.post("/api/v1/auth/eios-login", json={"username": "portal_admin", "password": "pw"})
+    r = client.post("/api/v1/auth/eios-login", json={"consent": True, "username": "portal_admin", "password": "pw"})
     assert r.status_code == 401
     assert calls == []
 
@@ -78,7 +79,7 @@ def test_eios_login_cannot_reach_local_admin(app, client, fake_eios):
 def test_eios_login_rejects_different_eios_identity(app, client, fake_eios):
     login_student(app, fake_eios, "24-isbo-003", eios_id="1")
     add_eios_account(fake_eios, "24-isbo-003", eios_id="2")
-    r = client.post("/api/v1/auth/eios-login", json={"username": "24-isbo-003", "password": "pw"})
+    r = client.post("/api/v1/auth/eios-login", json={"consent": True, "username": "24-isbo-003", "password": "pw"})
     assert r.status_code == 409
 
 
@@ -86,7 +87,7 @@ def test_eios_unavailable_returns_503(client, monkeypatch):
     async def down(username, password):
         raise eios.EiosUnavailable()
     monkeypatch.setattr(eios, "authenticate", down)
-    r = client.post("/api/v1/auth/eios-login", json={"username": "x", "password": "y"})
+    r = client.post("/api/v1/auth/eios-login", json={"consent": True, "username": "x", "password": "y"})
     assert r.status_code == 503
 
 
@@ -222,3 +223,15 @@ def test_jwt_claims_tolerate_garbage():
     assert eios.jwt_claims(TOKEN)[_CLAIMS + "sid"] == "-12345"
     for bad in (None, "", "no-dots", "a.!!!.c", "a.bm90IGpzb24.c"):
         assert eios.jwt_claims(bad) == {}
+
+
+def test_eios_login_needs_consent_and_records_it(client, fake_eios, db):
+    _, calls = fake_eios
+    add_eios_account(fake_eios, "24-isbo-050")
+    r = client.post("/api/v1/auth/eios-login", json={"username": "24-isbo-050", "password": "pw"})
+    assert r.status_code == 400 and "согласие" in r.json()["detail"]
+    assert calls == []  # nothing is sent to EIOS without consent
+    r = client.post("/api/v1/auth/eios-login", json={"username": "24-isbo-050", "password": "pw", "consent": True})
+    assert r.status_code == 200
+    user = db.query(models.User).filter(models.User.username == "24-isbo-050").one()
+    assert user.pd_consent_at is not None and user.pd_consent_version == auth.PD_CONSENT_VERSION

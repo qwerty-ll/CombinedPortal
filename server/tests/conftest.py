@@ -85,7 +85,7 @@ def add_eios_account(fake_eios, username, password="pw", eios_id="100", full_nam
 def login_student(app, fake_eios, username="24-isbo-001", **kwargs):
     add_eios_account(fake_eios, username, **kwargs)
     c = TestClient(app)
-    r = c.post("/api/v1/auth/eios-login", json={"username": username, "password": kwargs.get("password", "pw")})
+    r = c.post("/api/v1/auth/eios-login", json={"consent": True, "username": username, "password": kwargs.get("password", "pw")})
     assert r.status_code == 200, r.text
     return c
 

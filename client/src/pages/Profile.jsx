@@ -4,6 +4,7 @@ import {
   LogIn, LogOut, Camera, AlertCircle, Clock, Loader2, Eye, EyeOff, CalendarDays,
   Smartphone, Share
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { adaptationApi, forumApi } from '../services/api';
@@ -44,6 +45,8 @@ const Profile = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [capsLockOn, setCapsLockOn] = useState(false);
+  // 152-ФЗ: a separate, unticked consent box; signing in through EIOS needs it
+  const [consent, setConsent] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
   const app = useInstallApp();
 
@@ -91,13 +94,18 @@ const Profile = () => {
       setIsLoggingIn(false);
       return;
     }
+    if (loginMode !== 'staff' && !consent) {
+      setLoginError('Отметьте согласие на обработку персональных данных');
+      setIsLoggingIn(false);
+      return;
+    }
 
     try {
       let res;
       if (loginMode === 'staff') {
         res = await adminLogin(loginForm.username, loginForm.password);
       } else {
-        res = await login(loginForm.username, '', loginForm.password);
+        res = await login(loginForm.username, '', loginForm.password, consent);
       }
 
       if (res && res.error) {
@@ -286,6 +294,22 @@ const Profile = () => {
                   </p>
                 )}
               </div>
+
+              {!isStaff && (
+                <label className="login-consent">
+                  <input
+                    type="checkbox"
+                    checked={consent}
+                    onChange={e => { setConsent(e.target.checked); if (e.target.checked) setLoginError(''); }}
+                    disabled={isLoggingIn}
+                    aria-describedby={loginError ? 'login-error' : undefined}
+                  />
+                  <span>
+                    Даю согласие на обработку персональных данных{' '}
+                    (<Link to="/privacy#consent">текст согласия</Link>). Портал использует cookie для входа.
+                  </span>
+                </label>
+              )}
 
               {!loginError && sessionExpired && (
                 <p className="login-alert login-alert-warning" role="status">

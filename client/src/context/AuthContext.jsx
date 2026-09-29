@@ -130,9 +130,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Student login through EIOS KSU (credentials are checked by the backend)
-  const login = async (loginInput, groupInput = '', passwordInput = '') => {
+  const login = async (loginInput, groupInput = '', passwordInput = '', consent = false) => {
     try {
-      return completeLogin(await authApi.eiosLogin(loginInput.trim(), passwordInput, groupInput.trim()));
+      return completeLogin(await authApi.eiosLogin(loginInput.trim(), passwordInput, groupInput.trim(), consent));
     } catch (err) {
       return { error: err.message || 'Ошибка входа через ЭИОС КГУ. Проверьте логин и пароль' };
     }

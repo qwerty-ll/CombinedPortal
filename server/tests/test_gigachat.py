@@ -196,3 +196,17 @@ async def test_self_check_reports_every_step(gigachat):
     assert lines[4].startswith("Ответ на «Ответь одним словом: работает?»: Ответ:")
     # Neither the key nor the token is printed
     assert "configured" not in "\n".join(lines) and "token" not in lines[2].split(":", 1)[1]
+
+
+def test_russian_cas_ship_with_the_portal(monkeypatch):
+    import hashlib
+
+    monkeypatch.setattr(rag_service.settings, "GIGACHAT_CA_BUNDLE", "")
+    context = rag_service._build_ssl_context()
+    fingerprints = {hashlib.sha256(der).hexdigest().upper() for der in context.get_ca_certs(binary_form=True)}
+    # Russian Trusted Root CA and the Sub CAs of 2022 and 2024
+    assert {
+        "D26D2D0231B7C39F92CC738512BA54103519E4405D68B5BD703E9788CA8ECF31",
+        "BBBDE2103E790B999EC62BD03CF625A5A2E7C316E10AFE6A490EEDEAD8B3FD9B",
+        "2155785036C900DBB5F1BB2A1569C80C55595BD6BF94867A29BBDDBC7D88A3F2",
+    } <= fingerprints

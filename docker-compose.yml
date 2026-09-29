@@ -33,8 +33,6 @@ services:
       DOCUMENT_ADDRESSEE_NAME: ${DOCUMENT_ADDRESSEE_NAME:-}
     volumes:
       - portal_data:/app/data
-      # The Russian Trusted Root CA for GigaChat: infrastructure/gigachat-ca/russian_trusted_root_ca.pem
-      - ./infrastructure/gigachat-ca:/app/certs:ro
 
 volumes:
   portal_data:

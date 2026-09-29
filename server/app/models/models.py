@@ -28,6 +28,9 @@ class User(Base):
     is_blocked = Column(Boolean, nullable=False, default=False, server_default=false())
     # Profile picture URL reported by EIOS, refreshed on every login.
     avatar_url = Column(String, nullable=True)
+    # When the student last agreed to personal data processing at sign-in, and to which text version
+    pd_consent_at = Column(DateTime(timezone=True), nullable=True)
+    pd_consent_version = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), default=_utcnow)
 
     questions = relationship("ForumQuestion", back_populates="author", cascade="all, delete-orphan")

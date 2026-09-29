@@ -22,7 +22,7 @@ def test_block_user_ends_session_and_prevents_login(app, fake_eios, db):
     r = admin.patch(f"/api/v1/admin/users/{_user_id(db, '24-isbo-001')}/block", json={"blocked": True}, headers=CSRF)
     assert r.status_code == 200 and r.json()["is_blocked"] is True
     assert student.get("/api/v1/auth/me").status_code == 401
-    r = student.post("/api/v1/auth/eios-login", json={"username": "24-isbo-001", "password": "pw"})
+    r = student.post("/api/v1/auth/eios-login", json={"consent": True, "username": "24-isbo-001", "password": "pw"})
     assert r.status_code == 403
 
 
