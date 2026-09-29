@@ -221,6 +221,30 @@ def test_grounded(reply, ok):
     assert assistant.grounded(reply, facts) is ok
 
 
+def test_small_talk_and_what_the_cat_can_do(student, monkeypatch):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("small talk needs no search and no GigaChat")
+
+    monkeypatch.setattr(rag_service, "ask_gigachat", forbidden)
+    monkeypatch.setattr(rag_service.settings, "GIGACHAT_AUTH_KEY", "configured")
+    for question in ("что ты умеешь делать?", "Кто ты?", "чем можешь помочь", "что можно у тебя спросить", "помощь"):
+        reply, actions = ask(student, question)
+        assert reply == assistant.CAPABILITIES_REPLY, question
+        assert ("Частые вопросы", "/faq") in actions
+    assert ask(student, "Привет!")[0].startswith("Привет, Иван!")
+    assert ask(student, "спасибо большое")[0] == "Пожалуйста! Если что, я здесь."
+    assert ask(student, "как дела?")[0].startswith("Отлично")
+    # A greeting with a question is a question
+    assert ask(student, "привет, где следующая пара?")[0].startswith("Сейчас идёт")
+
+
+def test_questions_about_the_portal_get_its_sections(client, fake_timetable):
+    reply, actions = ask(client, "как задать вопрос на форуме")
+    assert reply.startswith("Что есть на портале ИВИТШ") and actions == [("Форум", "/forum")]
+    assert ask(client, "как установить портал на телефон")[1] == [("Личный кабинет", "/profile")]
+    assert "с 9:00 до 17:00" in ask(client, "часы работы деканата")[0]
+
+
 def test_who_is_the_director(client, fake_timetable):
     for question in ("как зовут директора ивитш?", "кто руководит ИВИТШ", "где кабинет директора"):
         reply, _ = ask(client, question)
