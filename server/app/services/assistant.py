@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session, selectinload
 
 import app.models as models
 from app.services import agent, document_drafts, documents, rag_service, timetable
+from app.services import rooms as rooms_base
 
 logger = logging.getLogger("ivitsh_portal.assistant")
 
@@ -25,7 +26,7 @@ MAX_ACTIONS = 3
 # The newest threads are searched; older ones are still on the forum itself
 FORUM_SEARCH_LIMIT = 300
 WEEKDAY_AT = ["в понедельник", "во вторник", "в среду", "в четверг", "в пятницу", "в субботу", "в воскресенье"]
-# Rooms that have their own highlighted floor plan in /public
+# Rooms drawn on the floor plans (client/src/data/floorPlans.js): [IMG:301.png] shows the plan with the room picked
 ROOM_IMAGES = {
     "101", "102", "104", "107", "108", "201", "202", "203", "204", "206", "207", "208", "209",
     "301", "302", "303", "304", "306", "307", "308", "309", "310", "312", "313",
@@ -457,9 +458,12 @@ def room_in(q: str) -> Optional[str]:
 
 def room_finding(q: str) -> Optional[Finding]:
     if "коворкинг" in q:
+        others = [s for s in rooms_base.spaces() if s["name"] != "Коворкинг ВИТШ"]
+        more = "; ".join(s["name"] + (f" ({rooms_base.where(s)})" if rooms_base.where(s) else "") for s in others)
         return Finding(
-            "Коворкинг ВИТШ — на 4 этаже корпуса Б (ул. Ивановская, 24а). Там можно заниматься между парами.\n\n[IMG:coworking.png]",
-            [Action("4 этаж на карте", _link("/map", room="Б-401"))], exact=True, weight=90,
+            "Коворкинг ВИТШ — на 4 этаже корпуса Б (ул. Ивановская, 24а), 50 мест, есть переносная доска и телевизор. "
+            f"Там можно заниматься между парами.\nЕщё коворкинги и переговорные: {more}.\n\n[IMG:coworking.png]",
+            [Action("Коворкинг на карте", _link("/map", room="коворкинг"))], exact=True, weight=90,
         )
     m = _ROOM_RE.search(q)
     if m:
@@ -468,13 +472,170 @@ def room_finding(q: str) -> Optional[Finding]:
         floor, number = "2", "209"
     else:
         return None
-    note = " (дирекция ИВИТШ)" if number == "209" else ""
+    note = " (дирекция ИВИТШ)" if number == "209" else " (коворкинг «8 бит»)" if number == "108" else ""
     hours = " Дирекция работает с понедельника по пятницу с 9:00 до 17:00, перерыв с 12:00 до 13:00." if number == "209" else ""
+    room = rooms_base.get(number)
+    about = f" Это {rooms_base.summary(room)}." if room else ""
     if number in ROOM_IMAGES:
-        text = f"Аудитория Б-{number}{note} — на {floor} этаже корпуса Б (ул. Ивановская, 24а).{hours} На схеме этажа она выделена.\n\n[IMG:{number}.png]"
+        text = f"Аудитория Б-{number}{note} — на {floor} этаже корпуса Б (ул. Ивановская, 24а).{hours}{about} На схеме этажа она выделена.\n\n[IMG:{number}.png]"
     else:
         text = f"Аудитория Б-{number} — на {floor} этаже корпуса Б (ул. Ивановская, 24а). Вот схема этажа.\n\n[IMG:floor{floor}.png]"
     return Finding(text, [Action("Открыть на карте", _link("/map", room=f"Б-{number}"))], exact=True, weight=90)
+
+
+# --- What is in the rooms: computers, OS, equipment, software (app/assets/rooms.json) ------------
+
+_ROOM_FACTS = re.compile(
+    r"комп|\bпк\b|ноут|\bос\b|операционк|линукс|linux|убунт|ubuntu|виндо|windows|винд[аеуы]\b|оборудован|техник|"
+    r"программ|софт|установлен|\bстоит\b|мест[аоу]?\b|вмеща|вмест|человек|что за|что есть|есть ли|какая это|"
+    r"тип аудитори|какой класс|" + "|".join(rooms_base.EQUIPMENT_WORDS.values())
+)
+# "Где", "в каких", "есть ли": a question about where something is, not how to install or learn it
+_WHERE_IS = re.compile(r"\bгде\b|в как[а-я]*\b|на как[а-я]*\b|какие аудитори|установлен|\bстоит\b|есть ли|\bесть\b|список|покажи|\bвсе\b")
+_BIGGEST = re.compile(r"сам[а-я]* (больш|вместительн|крупн)|больш[а-я]* всего мест")
+_FOR_PEOPLE = re.compile(r"(?:на|для|вмест[а-я]*|помест[а-я]*)\s+(\d{2,3})\s*(?:человек|чел|мест|студент)")
+_MOST_COMPUTERS = re.compile(r"больше всего (компьютер|компов|пк|ноут|машин)")
+_TOTAL = re.compile(r"(сколько|всего).*(компьютер|компов|пк|ноут).*(всего|в корпусе|во всем|по корпусу)|всего (компьютер|компов|пк|ноут)")
+# A question about pairs, even when it names Linux or a program: «где пара по Linux»
+_SCHEDULE_ONLY = re.compile(r"\bпар(а|ы|у|е|ой|ами|ах|ам)?\b|заняти|расписани|экзамен|зачет|консультац|семинар")
+_GENITIVE = {
+    "проектор": "проектора", "телевизор": "телевизора", "сенсорный стол": "сенсорного стола", "веб-камера": "веб-камеры",
+    "видеокамеры": "видеокамер", "микрофоны": "микрофонов", "колонки": "колонок", "кликер": "кликера",
+    "наушники": "наушников", "маркерная доска": "маркерной доски", "меловая доска": "меловой доски",
+    "переносная доска": "переносной доски",
+}
+
+
+def _in_rooms(n: int) -> str:
+    return f"в {n} аудитории" if n % 10 == 1 and n % 100 != 11 else f"в {n} аудиториях"
+
+
+def _rooms_by_floor(found: List[dict], line) -> str:
+    return "\n".join(
+        f"• {floor} этаж: " + ", ".join(line(r) for r in found if r["floor"] == floor)
+        for floor in sorted({r["floor"] for r in found})
+    )
+
+
+def _room_card(room: dict, lead: str = "") -> Finding:
+    number = room["number"]
+    text = (f"{lead}\n\n" if lead else "") + rooms_base.details(room)
+    return Finding(text, [Action(f"Б-{number} на карте", _link("/map", room=f"Б-{number}"))], exact=True, weight=100)
+
+
+def _about_room(room: dict, q: str) -> Finding:
+    """"сколько компов в 301", "есть ли проектор в 204", "какая ОС в 302", "есть ли pycharm в 308"."""
+    name = f"Б-{room['number']}"
+    programs = rooms_base.software_in(q)
+    if programs:
+        have = [p for p in programs if p in room["software"]]
+        if have:
+            return _room_card(room, f"Да, в {name} есть {', '.join(have)}.")
+        elsewhere = sorted({r["number"] for r in rooms_base.rooms() if set(programs) & set(r["software"])})
+        other = f" {programs[0]} есть в " + ", ".join(f"Б-{n}" for n in elsewhere) + "." if elsewhere else ""
+        return _room_card(room, f"В {name} {' и '.join(programs[:2])} нет.{other}")
+    equipment = rooms_base.equipment_in(q)
+    if equipment:
+        if equipment in room["equipment"]:
+            return _room_card(room, f"Да, в {name} есть {equipment}.")
+        return _room_card(room, f"В {name} {_GENITIVE.get(equipment, equipment)} нет.")
+    if rooms_base.os_in(q) or re.search(r"\bос\b|операционк|операционн", q):
+        if room["pcs"] or room["laptops"]:
+            return _room_card(room, f"В {name} компьютеры на {room['os']}.")
+        if room["os"]:
+            return _room_card(room, f"В {name} компьютеров для студентов нет, ПК преподавателя на {room['os']}.")
+    if re.search(r"комп|\bпк\b|ноут|машин", q) and not (room["pcs"] or room["laptops"]):
+        return _room_card(room, f"В {name} компьютеров для студентов нет.")
+    if re.search(r"комп|\bпк\b|ноут|машин", q):
+        return _room_card(room, f"В {name} {rooms_base.computers(room)} на {room['os']}.")
+    if re.search(r"мест|вмест|вмеща|человек", q):
+        return _room_card(room, f"В {name} {rooms_base.places(room['seats'])}.")
+    return _room_card(room)
+
+
+def room_facts_finding(q: str, number: Optional[str]) -> Optional[Finding]:
+    """Places, computers, OS, equipment and software of one room or of the whole building."""
+    if number:
+        if not _ROOM_FACTS.search(q) or _ASKS_ROOM_PAIRS.search(q):
+            return None
+        room = rooms_base.get(number)
+        if room:
+            return _about_room(room, q)
+        space = next((s for s in rooms_base.spaces() if s.get("room") == number), None)
+        return _space_card(space) if space else None
+
+    named = rooms_base.spaces_in(q)
+    if len(named) == 1:
+        return _space_card(named[0])
+    if named:
+        cards = [_space_card(s) for s in named]
+        return Finding("\n".join(f"• {c.text}" for c in cards), _merge_actions(cards), exact=True, weight=100)
+    every = rooms_base.rooms()
+    if _MOST_COMPUTERS.search(q):
+        top = sorted(every, key=lambda r: -(r["pcs"] + r["laptops"]))[:3]
+        lines = "\n".join(f"• Б-{r['number']} — {rooms_base.computers(r)}, {r['os']}, {r['floor']} этаж" for r in top)
+        return Finding(f"Больше всего компьютеров:\n{lines}", [Action(f"Б-{top[0]['number']} на карте", _link("/map", room=f"Б-{top[0]['number']}"))],
+                       exact=True, weight=100)
+    if _TOTAL.search(q):
+        pcs, laptops = sum(r["pcs"] for r in every), sum(r["laptops"] for r in every)
+        with_computers = [r for r in every if r["pcs"] or r["laptops"]]
+        return Finding(f"В корпусе Б {pcs} ПК и {laptops} ноутбуков для студентов {_in_rooms(len(with_computers))}.\n\n"
+                       + _rooms_by_floor(with_computers, lambda r: f"Б-{r['number']} ({rooms_base.computers(r)})"),
+                       [Action("Аудитории на карте", _link("/map", filter="computers"))], exact=True, weight=100)
+    people = _FOR_PEOPLE.search(q)
+    if _BIGGEST.search(q) or (people and re.search(r"аудитори|кабинет|класс|помест|вмест|\bгде\b", q)):
+        need = int(people.group(1)) if people else 0
+        fit = sorted((r for r in every if r["seats"] >= need), key=lambda r: -r["seats"])
+        if not need:
+            best = fit[0]
+            return _room_card(best, f"Самая вместительная — Б-{best['number']}: {rooms_base.places(best['seats'])}.")
+        if not fit:
+            return Finding(f"Аудиторий на {need} мест в корпусе Б нет: самая большая — Б-407, 180 мест.",
+                           [Action("Б-407 на карте", _link("/map", room="Б-407"))], exact=True, weight=100)
+        fit = sorted(fit, key=lambda r: r["seats"])
+        lines = "\n".join(f"• Б-{r['number']} — {rooms_base.places(r['seats'])}, {r['type']}, {r['floor']} этаж" for r in fit[:6])
+        more = f"\nи ещё {len(fit) - 6}" if len(fit) > 6 else ""
+        return Finding(f"На {need} человек и больше:\n{lines}{more}", [Action(f"Б-{fit[0]['number']} на карте", _link("/map", room=f"Б-{fit[0]['number']}"))],
+                       exact=True, weight=100)
+
+    if not _WHERE_IS.search(q):
+        return None
+    programs = sorted(rooms_base.software_in(q), key=lambda p: -sum(p in r["software"] for r in every))
+    if len(programs) == 1:
+        found = [r for r in every if programs[0] in r["software"]]
+        return Finding(f"{programs[0]} есть {_in_rooms(len(found))}:\n" + _rooms_by_floor(found, lambda r: f"Б-{r['number']}"),
+                       [Action("Показать на карте", _link("/map", soft=programs[0]))], exact=True, weight=100)
+    if programs:
+        lines = [f"• {p}: " + ", ".join(f"Б-{r['number']}" for r in every if p in r["software"]) for p in programs]
+        return Finding("Где установлено:\n" + "\n".join(lines), [Action("Показать на карте", _link("/map", soft=programs[0]))], exact=True, weight=100)
+    os = rooms_base.os_in(q)
+    if os:
+        found = [r for r in every if r["os"] == os and (r["pcs"] or r["laptops"])]
+        return Finding(f"Компьютеры на {os} — {_in_rooms(len(found))}:\n"
+                       + _rooms_by_floor(found, lambda r: f"Б-{r['number']} ({rooms_base.computers(r)})"),
+                       [Action("Показать на карте", _link("/map", os=os))], exact=True, weight=100)
+    equipment = rooms_base.equipment_in(q)
+    if equipment:
+        found = [r for r in every if equipment in r["equipment"]]
+        return Finding(f"{equipment[0].upper() + equipment[1:]} — {_in_rooms(len(found))}:\n"
+                       + _rooms_by_floor(found, lambda r: f"Б-{r['number']}"),
+                       [Action("Показать на карте", _link("/map", eq=equipment))], exact=True, weight=100)
+    kind = rooms_base.type_in(q)
+    if kind:
+        found = [r for r in every if r["type"] == kind]
+        lines = "\n".join(f"• Б-{r['number']} — {rooms_base.summary(r).split(': ', 1)[1]}" for r in found)
+        return Finding(f"{rooms_base.TYPE_PLURAL[kind]} корпуса Б:\n{lines}", [Action("Показать на карте", _link("/map", type=kind))],
+                       exact=True, weight=100)
+    return None
+
+
+def _space_card(space: dict) -> Finding:
+    where = rooms_base.where(space)
+    place = f", {where}" if where else ""
+    equipment = f" Есть: {', '.join(space['equipment'])}." if space["equipment"] else ""
+    unknown = "" if where else " Где это в корпусе, в базе портала пока не указано: уточни в дирекции (Б-209)."
+    actions = [Action(f"{space['name']} на карте", _link("/map", room=f"Б-{space['room']}" if space["room"].isdigit() else space["room"]))] if space.get("room") else []
+    return Finding(f"{space['name']} — {space['type']} на {rooms_base.places(space['seats'])}{place}.{equipment}{unknown}", actions, exact=True, weight=100)
 
 
 # --- Teachers ----------------------------------------------------------------------------------
@@ -813,7 +974,7 @@ def _knowledge_finding(q: str) -> Optional[Finding]:
 CAPABILITIES_REPLY = (
     "Я ВИТШик, помощник портала ИВИТШ. Вот что я умею:\n"
     "• Пары: «где следующая пара?», «что завтра?», «когда философия?»\n"
-    "• Аудитории: «как найти Б-407?» — покажу этаж и схему\n"
+    "• Аудитории: «как найти Б-407?», «свободна ли 305?», «сколько компов в 301?», «где есть PyCharm?», «где Linux?»\n"
     "• Преподаватели: «где сейчас Киприна?» — кабинет, почта и где он по расписанию\n"
     "• Документы: «объяснительная за вчера», «заявление на пересдачу» — соберу Word или PDF\n"
     "• Справка ИВИТШ: стипендии, дирекция, клубы, где поесть, частые вопросы и форум\n\n"
@@ -1001,6 +1162,10 @@ async def answer(
         finding = await teacher_answer(teachers, q, user, now)
         return finding.text, finding.actions, None
     number = room_in(q)
+    # Computers, OS, programs, equipment, places: of the room named, else where in the building
+    facts = room_facts_finding(q, number) if number or not _SCHEDULE_ONLY.search(q) else None
+    if facts:
+        return facts.text, facts.actions, None
     if number and _ASKS_ROOM_PAIRS.search(q):
         finding = await room_answer(number, q, now)
         if finding:

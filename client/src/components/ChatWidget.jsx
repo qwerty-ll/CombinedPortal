@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { X, Send, CircleStop, ExternalLink, Maximize2, ArrowRight } from 'lucide-react';
 import { chatApi } from '../services/api';
-import { mapImageNameToPath } from '../utils/chatImages';
+import { mapImageNameToPath, planOf } from '../utils/chatImages';
+import FloorPlan from './FloorPlan';
 import { OPEN_CHAT_EVENT } from '../utils/chat';
 import DocumentCard from './DocumentCard';
 
@@ -44,7 +45,7 @@ const pickedGroupName = () => {
   } catch { return null; }
 };
 
-const GREETING = 'Привет! Я ВИТШик. Спроси, где у тебя следующая пара, как найти аудиторию или где сейчас преподаватель. А ещё я пишу объяснительные и заявления на пересдачу.';
+const GREETING = 'Привет! Я ВИТШик. Спроси, где у тебя следующая пара, как найти аудиторию и что в ней за компьютеры или где сейчас преподаватель. А ещё я пишу объяснительные и заявления на пересдачу.';
 
 // Floating mascot button and the chat panel with the ВИТШик assistant.
 const ChatWidget = () => {
@@ -205,7 +206,8 @@ const ChatWidget = () => {
       .replace(/\[EMOJI_.*?\]/gi, '')
       .replace(/\[TAG_.*?\]/gi, '')
       .trim();
-    const imgPath = imgMatch ? mapImageNameToPath(imgMatch[1]) : '';
+    const plan = imgMatch ? planOf(imgMatch[1]) : null;
+    const imgPath = imgMatch && !plan ? mapImageNameToPath(imgMatch[1]) : '';
 
     // Rich Markdown & Link Formatter
     const formattedLines = cleanText.split('\n').map((line, lIdx) => {
@@ -265,6 +267,18 @@ const ChatWidget = () => {
         </button>
         <div className="message bot">
           <div className="chat-text">{formattedLines}</div>
+
+          {plan && (
+            <Link
+              to={plan.room ? `/map?room=${encodeURIComponent(/^\d{3}$/.test(plan.room) ? `Б-${plan.room}` : plan.room)}` : '/map'}
+              state={plan.room ? undefined : { selectedFloor: plan.floor }}
+              className="chat-plan"
+              aria-label={plan.room ? 'Открыть эту схему на карте кампуса' : `Открыть схему ${plan.floor} этажа на карте кампуса`}
+              onClick={() => { if (isMobile) setIsChatOpen(false); }}
+            >
+              <FloorPlan floor={plan.floor} selected={plan.room} compact />
+            </Link>
+          )}
 
           {imgPath && (
             <button

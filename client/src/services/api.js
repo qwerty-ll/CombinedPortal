@@ -12,6 +12,7 @@ const CACHEABLE_PREFIXES = [
   '/api/v1/announcements',
   '/api/v1/faq',
   '/api/v1/schedule/',
+  '/api/v1/rooms',
 ];
 
 const isCacheable = (endpoint) => CACHEABLE_PREFIXES.some((prefix) => endpoint.startsWith(prefix));
@@ -261,6 +262,12 @@ export const scheduleApi = {
   // Today's lessons of the portal's teachers: { date, teachers: { [teacherId]: lessons[] } }
   getTeachersToday: () =>
     apiFetch('/api/v1/schedule/teachers/today', { retries: 0, timeout: 20000 }),
+};
+
+// Rooms of корпус Б: places, computers, OS, equipment, software; today's pairs in one of them
+export const roomsApi = {
+  getRooms: () => apiFetch('/api/v1/rooms'),
+  getToday: (number) => apiFetch(`/api/v1/rooms/${encodeURIComponent(number)}/today`, { retries: 0, useCache: false }),
 };
 
 // Documents ВИТШик prepares (explanatory note, retake request), downloaded as Word or PDF

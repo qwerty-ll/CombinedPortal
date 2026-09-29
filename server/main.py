@@ -13,7 +13,7 @@ from app.core import security
 from app.db.database import SessionLocal
 from app.db.migrate import run_migrations
 import app.models as models
-from app.routers import auth, forum, chat, schedule, documents, admin, adaptation
+from app.routers import auth, forum, chat, schedule, documents, admin, adaptation, rooms
 
 logging.basicConfig(
     level=logging.INFO,
@@ -108,6 +108,7 @@ app.include_router(schedule.router)
 app.include_router(documents.router)
 app.include_router(admin.router)
 app.include_router(adaptation.router)
+app.include_router(rooms.router)
 
 
 @app.get("/api/v1/health")
