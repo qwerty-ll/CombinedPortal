@@ -79,11 +79,17 @@ def admin_login(user_in: schemas.UserLogin, request: Request, response: Response
                 auth_source="local",
             )
             db.add(db_user)
-        elif db_user.auth_source != "local":
-            # Never hand admin rights to an existing EIOS student who happens to share the admin login.
+        elif db_user.auth_source != "local" and db_user.sdo_id:
+            # Never hand admin rights to an EIOS student (an account bound to an EIOS identity) who shares the admin login.
             logger.error("ADMIN_USERNAME %r collides with an EIOS account; choose another admin login", username)
             raise HTTPException(status_code=409, detail="Логин администратора совпадает с учётной записью ЭИОС. Смените ADMIN_USERNAME.")
         else:
+            if db_user.auth_source != "local":
+                # An account of earlier portal versions (demo data, the old registration) that EIOS never
+                # confirmed: migration 0002 marked it "eios" by default. The env administrator takes it over.
+                logger.warning("Admin login %r takes over an account never bound to EIOS", username)
+                db_user.auth_source = "local"
+                db_user.hashed_password = security.get_password_hash(secrets.token_urlsafe(32))
             db_user.role = "admin"
             db_user.is_blocked = False
         db.commit()
