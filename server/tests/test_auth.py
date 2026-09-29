@@ -76,6 +76,31 @@ def test_eios_login_cannot_reach_local_admin(app, client, fake_eios):
     assert calls == []
 
 
+def test_admin_login_takes_over_an_old_account_never_bound_to_eios(app, client, db):
+    # Earlier portal versions left such rows; migration 0002 marked them "eios"
+    db.add(models.User(username="Portal_Admin", full_name="Администратор", hashed_password=security.get_password_hash("old"),
+                       role="student", auth_source="eios"))
+    db.commit()
+    r = client.post("/api/v1/auth/admin-login", json={"username": "portal_admin", "password": "Adm1n-Test-Password!"})
+    assert r.status_code == 200, r.text
+    db.expire_all()
+    admin = db.query(models.User).filter(models.User.username == "Portal_Admin").one()
+    assert (admin.role, admin.auth_source) == ("admin", "local")
+    # Its old password no longer opens the admin panel
+    assert TestClient(app).post("/api/v1/auth/admin-login", json={"username": "portal_admin", "password": "old"}).status_code == 401
+
+
+def test_admin_login_never_takes_over_an_eios_student(app, client, fake_eios, db):
+    login_student(app, fake_eios, "portal_admin_x", eios_id="77")
+    student = db.query(models.User).filter(models.User.username == "portal_admin_x").one()
+    student.username = "portal_admin"
+    db.commit()
+    r = client.post("/api/v1/auth/admin-login", json={"username": "portal_admin", "password": "Adm1n-Test-Password!"})
+    assert r.status_code == 409
+    db.expire_all()
+    assert db.query(models.User).filter(models.User.username == "portal_admin").one().role == "student"
+
+
 def test_eios_login_rejects_different_eios_identity(app, client, fake_eios):
     login_student(app, fake_eios, "24-isbo-003", eios_id="1")
     add_eios_account(fake_eios, "24-isbo-003", eios_id="2")
