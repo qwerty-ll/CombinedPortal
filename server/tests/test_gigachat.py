@@ -194,6 +194,7 @@ async def test_self_check_reports_every_step(gigachat):
     assert lines[2].startswith("OAuth: токен получен")
     assert lines[3] == "Доступные модели: GigaChat-2, GigaChat-2-Pro"
     assert lines[4].startswith("Ответ на «Ответь одним словом: работает?»: Ответ:")
+    assert lines[5].startswith("Функции: модель ответила без вызова функции")
     # Neither the key nor the token is printed
     assert "configured" not in "\n".join(lines) and "token" not in lines[2].split(":", 1)[1]
 
@@ -210,3 +211,50 @@ def test_russian_cas_ship_with_the_portal(monkeypatch):
         "BBBDE2103E790B999EC62BD03CF625A5A2E7C316E10AFE6A490EEDEAD8B3FD9B",
         "2155785036C900DBB5F1BB2A1569C80C55595BD6BF94867A29BBDDBC7D88A3F2",
     } <= fingerprints
+
+
+@pytest.mark.anyio
+async def test_functions_go_out_and_come_back(gigachat):
+    spec = [{"name": "schedule", "description": "Пары", "parameters": {"type": "object", "properties": {}}}]
+    gigachat.reply = lambda payload: _Response(200, {"choices": [{"message": {
+        "role": "assistant", "content": "", "function_call": {"name": "schedule", "arguments": {"date_from": "2026-09-25"}},
+        "functions_state_id": "abc"}, "finish_reason": "function_call"}]})
+    choice = await rag_service.chat([{"role": "user", "content": "пары завтра"}], functions=spec)
+    sent = gigachat.chats[-1]["json"]
+    assert sent["functions"] == spec and sent["function_call"] == "auto" and sent["model"] == "GigaChat-2"
+    assert choice["finish_reason"] == "function_call"
+    assert choice["message"]["function_call"] == {"name": "schedule", "arguments": {"date_from": "2026-09-25"}}
+    assert choice["message"]["functions_state_id"] == "abc"
+    # A plain request carries no functions
+    gigachat.reply = lambda payload: answer("ok")
+    await rag_service.chat([{"role": "user", "content": "привет"}])
+    assert "functions" not in gigachat.chats[-1]["json"]
+
+
+@pytest.mark.anyio
+async def test_a_refusal_of_functions_is_told_apart(gigachat):
+    spec = [{"name": "schedule", "description": "Пары", "parameters": {"type": "object", "properties": {}}}]
+    gigachat.reply = lambda payload: _Response(422, {"message": "functions are not supported"})
+    with pytest.raises(rag_service.FunctionsRejected):
+        await rag_service.chat([{"role": "user", "content": "пары"}], functions=spec)
+    # The same status without functions is an ordinary failure
+    with pytest.raises(rag_service.GigaChatUnavailable) as failure:
+        await rag_service.chat([{"role": "user", "content": "пары"}])
+    assert not isinstance(failure.value, rag_service.FunctionsRejected)
+
+
+@pytest.mark.anyio
+async def test_self_check_runs_a_whole_function_round(gigachat):
+    replies = iter([
+        answer("Работает."),
+        _Response(200, {"choices": [{"message": {"role": "assistant", "content": "", "function_call": {
+            "name": "server_time", "arguments": {}}, "functions_state_id": "s1"}, "finish_reason": "function_call"}]}),
+        answer("На сервере 12:34."),
+    ])
+    gigachat.reply = lambda payload: next(replies)
+    lines = []
+    await rag_service.self_check(lines.append)
+    assert lines[-1] == "Функции: работают — вызов, результат и ответ «На сервере 12:34.». ВИТШик понимает вопросы своими словами."
+    last = gigachat.chats[-1]["json"]
+    assert [m["role"] for m in last["messages"]] == ["user", "assistant", "function"]
+    assert last["messages"][1]["functions_state_id"] == "s1" and last["function_call"] == "none"

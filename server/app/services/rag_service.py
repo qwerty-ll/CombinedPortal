@@ -8,13 +8,14 @@ Every call sends only the messages of the chat it answers. No X-Session-ID is se
 no context between calls and one student's chat can never leak into another's.
 """
 import asyncio
+import json
 import logging
 import os
 import re
 import ssl
 import time
 import uuid
-from typing import List
+from typing import List, Optional
 
 import certifi
 import httpx
@@ -31,10 +32,11 @@ CHAT_URL = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
 MODELS_URL = "https://gigachat.devices.sberbank.ru/api/v1/models"
 
 # How long a question may wait for a free stream before the student gets the portal's text right away
-QUEUE_WAIT = 6.0
-# Token, completion and one retry together; nginx gives up on the request after 25 s
-CALL_DEADLINE = 15.0
-REQUEST_TIMEOUT = httpx.Timeout(12.0, connect=5.0)
+QUEUE_WAIT = 5.0
+# One completion: token, request and one retry together. A whole answer (agent.ANSWER_DEADLINE) stays
+# under the chat client's 24 s and nginx's 25 s.
+CALL_DEADLINE = 12.0
+REQUEST_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 # After a 429 or a server error GigaChat is left alone for a while instead of being asked again at once
 COOLDOWN = 30.0
 HISTORY_TURNS = 4
@@ -303,8 +305,11 @@ def _cool_down(reason: str) -> None:
     logger.warning("GigaChat %s; answering without it for %.0f s", reason, COOLDOWN)
 
 
-async def _complete(messages: List[dict], max_tokens: int) -> str:
-    payload = {"model": settings.GIGACHAT_MODEL, "messages": messages, "temperature": 0.1, "max_tokens": max_tokens}
+class FunctionsRejected(GigaChatUnavailable):
+    """GigaChat refused a request with functions (the model or the account does not support them)."""
+
+
+async def _post(payload: dict) -> dict:
     token = await get_access_token()
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json"}
     started = time.monotonic()
@@ -320,12 +325,16 @@ async def _complete(messages: List[dict], max_tokens: int) -> str:
 
     if resp.status_code == 429 or resp.status_code >= 500:
         _cool_down(f"answered HTTP {resp.status_code}")
+    if resp.status_code in (400, 404, 422) and payload.get("functions"):
+        raise FunctionsRejected(f"HTTP {resp.status_code} for a request with functions")
     if resp.status_code != 200:
         raise GigaChatUnavailable(f"HTTP {resp.status_code}")
     try:
         body = resp.json()
         choice = body["choices"][0]
-        content = str(choice["message"]["content"] or "")
+        message = choice["message"]
+        if not isinstance(message, dict):
+            raise TypeError("message")
     except (ValueError, KeyError, IndexError, TypeError) as e:
         raise GigaChatUnavailable("unexpected answer format") from e
 
@@ -335,30 +344,46 @@ async def _complete(messages: List[dict], max_tokens: int) -> str:
     # "blacklist": GigaChat's own filter swapped the answer for a canned phrase unrelated to the question
     if reason in ("blacklist", "error"):
         raise GigaChatUnavailable(f"finish_reason={reason}")
-    reply = clean_reply(content)
-    if reason == "length":
-        reply = _whole_sentences(reply)
-    if not reply:
-        raise GigaChatUnavailable("empty answer")
-    return reply
+    return {"message": message, "finish_reason": reason}
 
 
-async def ask_gigachat(system_prompt: str, history: list, user_message: str, max_tokens: int = 350) -> str:
-    """One GigaChat completion; raises GigaChatUnavailable so the caller can answer from its own data."""
+async def chat(messages: List[dict], functions: Optional[List[dict]] = None, function_call: str = "auto",
+               max_tokens: int = 350) -> dict:
+    """One completion: {"message": {...}, "finish_reason": ...}. Waits for a free stream, never longer than
+    QUEUE_WAIT, and raises GigaChatUnavailable on anything that is not an answer."""
     if time.monotonic() < _state["cooldown_until"]:
         raise GigaChatUnavailable("cooling down after a refusal")
-    messages = build_messages(system_prompt, history, user_message)
+    payload = {"model": settings.GIGACHAT_MODEL, "messages": messages, "temperature": 0.1, "max_tokens": max_tokens}
+    if functions:
+        payload["functions"] = functions
+        payload["function_call"] = function_call
     streams = _streams()
     try:
         await asyncio.wait_for(streams.acquire(), QUEUE_WAIT)
     except asyncio.TimeoutError:
         raise GigaChatUnavailable("all streams are busy") from None
     try:
-        return await asyncio.wait_for(_complete(messages, max_tokens), CALL_DEADLINE)
+        return await asyncio.wait_for(_post(payload), CALL_DEADLINE)
     except asyncio.TimeoutError:
         raise GigaChatUnavailable(f"no answer in {CALL_DEADLINE:.0f} s") from None
     finally:
         streams.release()
+
+
+def text_of(choice: dict) -> str:
+    """The reply text of a completion, cleaned; cut at a whole sentence when max_tokens stopped it."""
+    reply = clean_reply(str(choice["message"].get("content") or ""))
+    if choice.get("finish_reason") == "length":
+        reply = _whole_sentences(reply)
+    return reply
+
+
+async def ask_gigachat(system_prompt: str, history: list, user_message: str, max_tokens: int = 350) -> str:
+    """One GigaChat completion; raises GigaChatUnavailable so the caller can answer from its own data."""
+    reply = text_of(await chat(build_messages(system_prompt, history, user_message), max_tokens=max_tokens))
+    if not reply:
+        raise GigaChatUnavailable("empty answer")
+    return reply
 
 
 async def self_check(say=print, question: str = "Ответь одним словом: работает?") -> None:
@@ -380,3 +405,29 @@ async def self_check(say=print, question: str = "Ответь одним сло�
     if settings.GIGACHAT_MODEL not in names:
         say(f"ВНИМАНИЕ: модели {settings.GIGACHAT_MODEL} нет в списке, укажите GIGACHAT_MODEL из него.")
     say(f"Ответ на «{question}»: {await ask_gigachat('Отвечай кратко.', [], question, max_tokens=20)}")
+    probe = [{"name": "server_time", "description": "Текущее время на сервере портала.",
+              "parameters": {"type": "object", "properties": {}}}]
+    try:
+        choice = await chat([{"role": "user", "content": "Который час на сервере? Узнай через функцию."}], functions=probe, max_tokens=50)
+    except FunctionsRejected:
+        say(f"Функции: модель {settings.GIGACHAT_MODEL} их не принимает — ВИТШик будет только пересказывать найденное "
+            "в базе. Попробуйте GIGACHAT_MODEL=GigaChat-2-Pro.")
+        return
+    call = choice["message"].get("function_call")
+    if call:
+        # The whole round: the call, its result back, the answer. The agent sends messages in exactly this shape.
+        called = {"role": "assistant", "content": choice["message"].get("content") or "",
+                  "function_call": {"name": call.get("name"), "arguments": call.get("arguments") or {}}}
+        if choice["message"].get("functions_state_id"):
+            called["functions_state_id"] = choice["message"]["functions_state_id"]
+        messages = [{"role": "user", "content": "Который час на сервере? Узнай через функцию."}, called,
+                    {"role": "function", "name": call.get("name"), "content": json.dumps({"time": "12:34"})}]
+        try:
+            final = text_of(await chat(messages, functions=probe, function_call="none", max_tokens=50))
+        except FunctionsRejected as e:
+            say(f"Функции: модель вызвала функцию, но не приняла её результат ({e}). ВИТШик будет пересказывать "
+                "найденное без функций; сообщите разработчику.")
+            return
+        say(f"Функции: работают — вызов, результат и ответ «{final}». ВИТШик понимает вопросы своими словами.")
+    else:
+        say("Функции: модель ответила без вызова функции; ВИТШик всё равно проверяет её ответы по данным портала.")

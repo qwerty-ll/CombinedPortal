@@ -4,6 +4,7 @@ Facts computed from data (lessons, rooms, where a teacher is now) are shown exac
 go through the language model, so times and rooms cannot be made up. GigaChat only rephrases answers
 found in the FAQ, the forum and the knowledge base, and only for signed-in students.
 """
+import asyncio
 import html
 import logging
 import re
@@ -15,7 +16,7 @@ from urllib.parse import quote
 from sqlalchemy.orm import Session, selectinload
 
 import app.models as models
-from app.services import document_drafts, documents, rag_service, timetable
+from app.services import agent, document_drafts, documents, rag_service, timetable
 
 logger = logging.getLogger("ivitsh_portal.assistant")
 
@@ -661,20 +662,44 @@ async def answer(
     knowledge = _knowledge_finding(q)
     if knowledge:
         found.append(knowledge)
-    if not found:
-        return NOT_FOUND_REPLY, [Action("Спросить на форуме", "/forum")], None
     found.sort(key=lambda f: -f.weight)
-    best = found[0]
+    not_found = NOT_FOUND_REPLY, [Action("Спросить на форуме", "/forum")], None
 
     if use_llm and rag_service.is_llm_configured():
-        try:
-            reply = await rag_service.ask_gigachat(_system_prompt(found[:3], now), history, message)
-        except Exception as e:
-            logger.warning("GigaChat unavailable, answering from portal data: %s", e)
-        else:
-            checked = _rephrase_or_raw(reply, found[:3], message, now)
-            if checked is None:
-                # The model saw that the found texts do not answer the question
-                return NOT_FOUND_REPLY, [Action("Спросить на форуме", "/forum")], None
-            return checked, _merge_actions(found), None
-    return best.text, _merge_actions(found), None
+        use_agent = agent.available()
+        if use_agent:
+            # GigaChat reads the question and calls the portal's functions; see app/services/agent.py
+            try:
+                result = await asyncio.wait_for(
+                    agent.run(message, history, user, db, group_hint, now, found), agent.ANSWER_DEADLINE,
+                )
+            except rag_service.FunctionsRejected:
+                agent.pause_functions()
+                use_agent = False
+            except (rag_service.GigaChatUnavailable, asyncio.TimeoutError) as e:
+                logger.warning("GigaChat unavailable, answering from portal data: %s", e or "timeout")
+                return (found[0].text, _merge_actions(found), None) if found else not_found
+            except Exception:
+                logger.exception("ВИТШик's agent failed, answering from portal data")
+                return (found[0].text, _merge_actions(found), None) if found else not_found
+            else:
+                if result is agent.NOT_IN_BASE:
+                    return not_found
+                if result:
+                    reply, actions = result
+                    return reply, actions, None
+        if not use_agent and found:
+            # Without functions GigaChat only retells what was found
+            try:
+                reply = await rag_service.ask_gigachat(_system_prompt(found[:3], now), history, message)
+            except Exception as e:
+                logger.warning("GigaChat unavailable, answering from portal data: %s", e)
+            else:
+                checked = _rephrase_or_raw(reply, found[:3], message, now)
+                if checked is None:
+                    # The model saw that the found texts do not answer the question
+                    return not_found
+                return checked, _merge_actions(found), None
+    if not found:
+        return not_found
+    return found[0].text, _merge_actions(found), None

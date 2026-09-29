@@ -235,8 +235,9 @@ export const contentApi = {
 // Chatbot Services
 export const chatApi = {
   // group: the group picked in the dashboard schedule, for visitors who have not signed in
+  // The server may wait for GigaChat's single stream and call the portal's functions: up to ~20 s
   sendMessage: (message, history, group = null) =>
-    apiFetch('/api/v1/chat', json('POST', { message, history, ...(group ? { group } : {}) })),
+    apiFetch('/api/v1/chat', { ...json('POST', { message, history, ...(group ? { group } : {}) }), timeout: 24000 }),
 };
 
 // Schedule EIOS Services
