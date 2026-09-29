@@ -89,7 +89,7 @@ docker compose -f infrastructure/docker-compose.yml exec backend python -m app.s
 без перефразирования GigaChat.
 
 У физлиц (`GIGACHAT_SCOPE=GIGACHAT_API_PERS`) GigaChat обрабатывает один запрос за раз, лишние получают
-HTTP 429. Портал выстраивает вопросы в очередь (`GIGACHAT_MAX_STREAMS=1`); кто ждал бы дольше 6 секунд,
+HTTP 429. Портал выстраивает вопросы в очередь (`GIGACHAT_MAX_STREAMS=1`); кто ждал бы дольше 5 секунд,
 сразу получает ответ из базы. Backend должен работать в одном процессе uvicorn, иначе очередей станет несколько.
 
 ### Шаг 5. Запуск

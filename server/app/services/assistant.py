@@ -4,6 +4,7 @@ Facts computed from data (lessons, rooms, where a teacher is now) are shown exac
 go through the language model, so times and rooms cannot be made up. GigaChat only rephrases answers
 found in the FAQ, the forum and the knowledge base, and only for signed-in students.
 """
+import asyncio
 import html
 import logging
 import re
@@ -15,7 +16,7 @@ from urllib.parse import quote
 from sqlalchemy.orm import Session, selectinload
 
 import app.models as models
-from app.services import document_drafts, documents, rag_service, timetable
+from app.services import agent, document_drafts, documents, rag_service, timetable
 
 logger = logging.getLogger("ivitsh_portal.assistant")
 
@@ -32,8 +33,9 @@ ROOM_IMAGES = {
 }
 
 NOT_FOUND_REPLY = (
-    "Не нашёл ответа ни в частых вопросах, ни на форуме. Задай вопрос на форуме: там отвечают "
-    "старшекурсники и кураторы. А про пары, аудитории и преподавателей спрашивай меня."
+    "Про это в базе портала ничего нет, а придумывать я не буду. Задай вопрос на форуме: там отвечают "
+    "старшекурсники и кураторы. А я подскажу пары, аудитории, преподавателей и напишу объяснительную — "
+    "спроси «что ты умеешь»."
 )
 
 
@@ -153,15 +155,16 @@ def _by_subgroup(lessons: List[timetable.Lesson]) -> str:
     )
 
 
-def _lesson_line(lesson: timetable.Lesson) -> str:
-    parts = [f"{lesson.start}–{lesson.end}", f"{lesson.discipline} ({lesson.kind})"]
+def _lesson_line(lesson: timetable.Lesson, with_discipline: bool = True) -> str:
+    """"08:30–10:00 — Базы данных, лабораторная, Б-207, 1 подгруппа"; without the name when the list is about it."""
+    parts = ([lesson.discipline] if with_discipline else []) + [lesson.kind]
     if lesson.room:
         parts.append(lesson.room)
     if lesson.subgroup:
         parts.append(f"{lesson.subgroup} подгруппа")
     if lesson.replaced:
         parts.append("замена")
-    return " · ".join(parts)
+    return f"{lesson.start}–{lesson.end} — " + ", ".join(parts)
 
 
 # --- Timetable ---------------------------------------------------------------------------------
@@ -219,7 +222,8 @@ def _schedule_answer(q: str, lessons: List[timetable.Lesson], group: str, now: d
         if not pool:
             where = f" {_day_label(when[0], today)}" if when and when[0] == when[1] else (" в эти дни" if when else " в ближайшие две недели")
             return finish(f"{title}{where} в расписании группы {group} нет.", None)
-        lines = [f"• {_day_label(l.day, today)}, {_lesson_line(l)}" for l in pool[:4]]
+        # One discipline: its name is in the title, the lines say when, what kind and where
+        lines = [f"• {_day_label(l.day, today).capitalize()}, {_lesson_line(l, len(disciplines) > 1)}" for l in pool[:4]]
         return finish(f"{title} у группы {group}:\n" + "\n".join(lines), pool[0])
 
     if when:
@@ -229,7 +233,7 @@ def _schedule_answer(q: str, lessons: List[timetable.Lesson], group: str, now: d
             label = _day_label(first, today)
             if not pool:
                 return finish(f"{label.capitalize()} у группы {group} пар нет.", None)
-            lines = [f"• {_lesson_line(l)}" + (" · сейчас" if l.starts_at <= now < l.ends_at else "") for l in pool]
+            lines = [f"• {_lesson_line(l)}" + (", идёт сейчас" if l.starts_at <= now < l.ends_at else "") for l in pool]
             return finish(f"{label.capitalize()} у группы {group}:\n" + "\n".join(lines), next((l for l in pool if l.ends_at > now), None))
         if not pool:
             return finish(f"В эти дни у группы {group} пар нет.", None)
@@ -318,8 +322,9 @@ def room_finding(q: str) -> Optional[Finding]:
     else:
         return None
     note = " (дирекция ИВИТШ)" if number == "209" else ""
+    hours = " Дирекция работает с понедельника по пятницу с 9:00 до 17:00, перерыв с 12:00 до 13:00." if number == "209" else ""
     if number in ROOM_IMAGES:
-        text = f"Аудитория Б-{number}{note} — на {floor} этаже корпуса Б (ул. Ивановская, 24а). На схеме этажа она выделена.\n\n[IMG:{number}.png]"
+        text = f"Аудитория Б-{number}{note} — на {floor} этаже корпуса Б (ул. Ивановская, 24а).{hours} На схеме этажа она выделена.\n\n[IMG:{number}.png]"
     else:
         text = f"Аудитория Б-{number} — на {floor} этаже корпуса Б (ул. Ивановская, 24а). Вот схема этажа.\n\n[IMG:floor{floor}.png]"
     return Finding(text, [Action("Открыть на карте", _link("/map", room=f"Б-{number}"))], exact=True, weight=90)
@@ -440,11 +445,73 @@ def _forum_findings(q: str, db: Session) -> List[Finding]:
     return sorted(findings, key=lambda f: -f.weight)[:2]
 
 
+# A question about the portal itself gets a button to the section it names
+_SECTION_LINKS = [
+    (r"путь|первокурсник|адаптаци|чек-лист", Action("Путь первокурсника", "/guide")),
+    (r"форум", Action("Форум", "/forum")),
+    (r"карт[аеуы]|кампус", Action("Карта кампуса", "/map")),
+    (r"преподавател", Action("Преподаватели", "/teachers")),
+    (r"частые|faq|вопросы и ответы", Action("Частые вопросы", "/faq")),
+    (r"кабинет|профил|телефон|установ|войти|вход", Action("Личный кабинет", "/profile")),
+]
+
+
 def _knowledge_finding(q: str) -> Optional[Finding]:
     score, chunk = rag_service.evaluate_query(q)
     if score < 4 or not chunk:
         return None
-    return Finding(chunk["content"], weight=score)
+    actions = [action for pattern, action in _SECTION_LINKS if re.search(pattern, q)] if chunk is rag_service.PORTAL_GUIDE else []
+    return Finding(chunk["content"], actions, weight=score)
+
+
+# --- Small talk --------------------------------------------------------------------------------
+
+CAPABILITIES_REPLY = (
+    "Я ВИТШик, помощник портала ИВИТШ. Вот что я умею:\n"
+    "• Пары: «где следующая пара?», «что завтра?», «когда философия?»\n"
+    "• Аудитории: «как найти Б-407?» — покажу этаж и схему\n"
+    "• Преподаватели: «где сейчас Киприна?» — кабинет, почта и где он по расписанию\n"
+    "• Документы: «объяснительная за вчера», «заявление на пересдачу» — соберу Word или PDF\n"
+    "• Справка ИВИТШ: стипендии, дирекция, клубы, где поесть, частые вопросы и форум\n\n"
+    "Отвечаю только по данным портала и ЭИОС, поэтому не выдумываю. Чего нет в базе, лучше спросить на форуме."
+)
+_CAPABILITY_ACTIONS = [Action("Частые вопросы", "/faq"), Action("Путь первокурсника", "/guide"), Action("Форум", "/forum")]
+
+_ABOUT = re.compile(
+    r"(что|чем|чему) (ты )?(умеешь|можешь|знаешь|помогаешь|поможешь)|что ты (делаешь|такое)|кто ты\b|"
+    r"как (тобой|с тобой) (пользоваться|общаться)|твои (функции|возможности|команды)|"
+    r"что (можно )?(у тебя )?(можно )?(спросить|узнать|спрашивать)|^(помощь|help|помоги|меню|команды)\W*$"
+)
+_HOW_ARE_YOU = re.compile(r"^(как (дела|ты|жизнь|поживаешь|настроение)|что нового)\W*$")
+_GREETING = re.compile(
+    r"^(привет\w*|здравствуй\w*|здорово|хай|хэй|hello|hi|ку|салют|добр\w+ (утро|день|вечер|ночи)|мяу\w*)[\s!.,)]*$"
+)
+_THANKS = re.compile(r"^(спасибо|спс|благодарю|пасиб\w*|thanks?|thank you|сенкс)\b")
+_BYE = re.compile(r"^(пока|до свидания|до встречи|бай|увидимся)[\s!.,)]*$")
+
+
+def _first_name(user: Optional[models.User]) -> str:
+    parts = (user.full_name or "").split() if user else []
+    # "Смирнов Макар Андреевич" → "Макар"; "Студент 24-isbo-001" has no real name
+    return parts[1] if len(parts) >= 2 and parts[0] != "Студент" else ""
+
+
+def _small_talk(q: str, user: Optional[models.User]) -> Optional[tuple]:
+    """Greetings, thanks and "что ты умеешь": answered here, not by searching the base for them."""
+    if _ABOUT.search(q):
+        return CAPABILITIES_REPLY, _CAPABILITY_ACTIONS, None
+    if _GREETING.match(q):
+        name = _first_name(user)
+        hello = f"Привет, {name}!" if name else "Привет!"
+        return (f"{hello} Спроси про пары, аудитории или преподавателей, или попроси написать объяснительную. "
+                "Что подсказать?"), [], None
+    if _HOW_ARE_YOU.match(q):
+        return "Отлично, сижу в расписании ЭИОС и жду вопросов. Спросить про пары или аудиторию?", [], None
+    if _THANKS.match(q):
+        return "Пожалуйста! Если что, я здесь.", [], None
+    if _BYE.match(q):
+        return "Пока! Удачи на парах.", [], None
+    return None
 
 
 # --- Answer ------------------------------------------------------------------------------------
@@ -580,6 +647,9 @@ async def answer(
     document = await _document_reply(q, user, now)
     if document:
         return document
+    chat = _small_talk(q, user)
+    if chat:
+        return chat
 
     exact = [f for f in (
         await _schedule_finding(q, previous_q, user, group_hint, now),
@@ -594,20 +664,44 @@ async def answer(
     knowledge = _knowledge_finding(q)
     if knowledge:
         found.append(knowledge)
-    if not found:
-        return NOT_FOUND_REPLY, [Action("Спросить на форуме", "/forum")], None
     found.sort(key=lambda f: -f.weight)
-    best = found[0]
+    not_found = NOT_FOUND_REPLY, [Action("Спросить на форуме", "/forum")], None
 
     if use_llm and rag_service.is_llm_configured():
-        try:
-            reply = await rag_service.ask_gigachat(_system_prompt(found[:3], now), history, message)
-        except Exception as e:
-            logger.warning("GigaChat unavailable, answering from portal data: %s", e)
-        else:
-            checked = _rephrase_or_raw(reply, found[:3], message, now)
-            if checked is None:
-                # The model saw that the found texts do not answer the question
-                return NOT_FOUND_REPLY, [Action("Спросить на форуме", "/forum")], None
-            return checked, _merge_actions(found), None
-    return best.text, _merge_actions(found), None
+        use_agent = agent.available()
+        if use_agent:
+            # GigaChat reads the question and calls the portal's functions; see app/services/agent.py
+            try:
+                result = await asyncio.wait_for(
+                    agent.run(message, history, user, db, group_hint, now, found), agent.ANSWER_DEADLINE,
+                )
+            except rag_service.FunctionsRejected:
+                agent.pause_functions()
+                use_agent = False
+            except (rag_service.GigaChatUnavailable, asyncio.TimeoutError) as e:
+                logger.warning("GigaChat unavailable, answering from portal data: %s", e or "timeout")
+                return (found[0].text, _merge_actions(found), None) if found else not_found
+            except Exception:
+                logger.exception("ВИТШик's agent failed, answering from portal data")
+                return (found[0].text, _merge_actions(found), None) if found else not_found
+            else:
+                if result is agent.NOT_IN_BASE:
+                    return not_found
+                if result:
+                    reply, actions = result
+                    return reply, actions, None
+        if not use_agent and found:
+            # Without functions GigaChat only retells what was found
+            try:
+                reply = await rag_service.ask_gigachat(_system_prompt(found[:3], now), history, message)
+            except Exception as e:
+                logger.warning("GigaChat unavailable, answering from portal data: %s", e)
+            else:
+                checked = _rephrase_or_raw(reply, found[:3], message, now)
+                if checked is None:
+                    # The model saw that the found texts do not answer the question
+                    return not_found
+                return checked, _merge_actions(found), None
+    if not found:
+        return not_found
+    return found[0].text, _merge_actions(found), None
