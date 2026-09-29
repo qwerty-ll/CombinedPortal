@@ -31,6 +31,13 @@ ANSWERS = {
     ("Rasp", frozenset({"year": "2026-2027", "idTeacher": 11, "sdate": "2026-09-24"}.items())): ok({"rasp": [
         lesson("2026-09-24", "10:10", "11:40", "лек Информатика", room="Б-305", teacher="Киприна Л.Ю."),
     ]}),
+    # A teacher's whole year, as the assistant asks for it
+    ("Rasp", frozenset({"year": "2026-2027", "idTeacher": 11}.items())): ok({"rasp": [
+        lesson("2026-09-24", "10:10", "11:40", "лек Информатика", room="Б-305", teacher="Киприна Л.Ю."),
+        lesson("2026-09-25", "08:30", "10:00", "пр Информатика, п/г 1", room="Б-214", teacher="Киприна Л.Ю."),
+        dict(lesson("2026-09-25", "08:30", "10:00", "пр Информатика, п/г 1", room="Б-214", teacher="Киприна Л.Ю."), группа="24-ИСбо-2"),
+        lesson("2026-09-25", "11:50", "13:20", "лек Информатика", room="Б-305", teacher="Киприна Л.Ю."),
+    ]}),
 }
 
 
@@ -66,9 +73,9 @@ def test_next_pair_is_computed_from_the_timetable(student):
 
 def test_pairs_on_a_day_and_follow_up(student):
     reply, _ = ask(student, "Какие пары завтра?")
-    assert reply == "Завтра у группы 24-ИСбо-1:\n• 13:40–15:10 — Базы данных, лабораторная, Б-407, замена"
+    assert reply == "Завтра у группы 24-ИСбо-1 — 1 пара:\n• 13:40–15:10 — Базы данных, лабораторная, Б-407, замена"
     reply, _ = ask(student, "а в понедельник?", history=[{"role": "user", "content": "Какие пары завтра?"}])
-    assert reply.startswith("В понедельник, 28.09 у группы 24-ИСбо-1:") and "Философия" in reply
+    assert reply.startswith("В понедельник, 28.09 у группы 24-ИСбо-1 — 1 пара:") and "Философия" in reply
     reply, _ = ask(student, "Что сегодня?")
     assert "• 10:10–11:40 — Программирование на Python, практика, Б-214, идёт сейчас" in reply
 
@@ -314,7 +321,7 @@ def test_pairs_of_another_group_and_one_subgroup(student, two_groups):
 
 def test_parallel_pairs_get_a_map_button_per_subgroup(student, two_groups):
     reply, actions = ask(student, "что завтра у 24-исбо-2")
-    assert reply == ("Завтра у группы 24-ИСбо-2:\n"
+    assert reply == ("Завтра у группы 24-ИСбо-2 — 3 пары:\n"
                      "• 08:30–10:00 — Базы данных, лабораторная, Б-207, 1 подгруппа\n"
                      "• 08:30–10:00 — Операционные системы, лабораторная, Б-104, 2 подгруппа\n"
                      "• 10:10–11:40 — Философия, лекция, Б-407")
@@ -325,7 +332,7 @@ def test_parallel_pairs_get_a_map_button_per_subgroup(student, two_groups):
 def test_a_subgroup_follow_up_keeps_the_group_and_days(student, two_groups):
     history = [{"role": "user", "content": "что завтра у 24-исбо-2"}, {"role": "assistant", "content": "…"}]
     reply, actions = ask(student, "а у второй подгруппы?", history=history)
-    assert reply == ("Завтра у группы 24-ИСбо-2, 2 подгруппа:\n"
+    assert reply == ("Завтра у группы 24-ИСбо-2, 2 подгруппа — 2 пары:\n"
                      "• 08:30–10:00 — Операционные системы, лабораторная, Б-104, 2 подгруппа\n"
                      "• 10:10–11:40 — Философия, лекция, Б-407")
     assert actions[0] == ("Б-104 на карте", "/map?room=Б-104")

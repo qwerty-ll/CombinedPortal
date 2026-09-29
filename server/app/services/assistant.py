@@ -10,7 +10,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from urllib.parse import quote
 
 from sqlalchemy.orm import Session, selectinload
@@ -151,8 +151,36 @@ _WEEKDAYS = [
 ]
 
 
+_MONTH_STEMS = ["январ", "феврал", "март", "апрел", "ма[йя]", "июн", "июл", "август", "сентябр", "октябр", "ноябр", "декабр"]
+_DATE_NUMBERS = re.compile(r"(?<![\d.:])(\d{1,2})\.(\d{1,2})(?:\.(\d{2}|\d{4}))?(?![\d:])")
+_DATE_WORDS = re.compile(r"(?<!\d)(\d{1,2})\s+(" + "|".join(_MONTH_STEMS) + r")[а-я]*")
+
+
+def _explicit_day(q: str, today: date) -> Optional[date]:
+    """"02.10", "2.10.2026", "1 октября": a day of this academic year unless the year is written."""
+    m = _DATE_NUMBERS.search(q)
+    if m:
+        day_n, month, year = int(m.group(1)), int(m.group(2)), m.group(3)
+    else:
+        m = _DATE_WORDS.search(q)
+        if not m:
+            return None
+        day_n = int(m.group(1))
+        month = next(i for i, stem in enumerate(_MONTH_STEMS, 1) if re.match(stem, m.group(2)))
+        year = None
+    start = today.year if today.month >= 9 else today.year - 1
+    full_year = (2000 + int(year) if len(year) == 2 else int(year)) if year else (start if month >= 9 else start + 1)
+    try:
+        return date(full_year, month, day_n)
+    except ValueError:
+        return None
+
+
 def parse_when(q: str, today: date) -> Optional[Tuple[date, date]]:
-    """The day range a question is about: "завтра", "в пятницу", "на этой неделе"…"""
+    """The day range a question is about: "завтра", "в пятницу", "на этой неделе", "02.10", "1 октября"…"""
+    day = _explicit_day(q, today)
+    if day:
+        return day, day
     if "послезавтра" in q:
         day = today + timedelta(days=2)
         return day, day
@@ -215,7 +243,30 @@ _PAIR_WORDS = re.compile(
 _ASKS_WHAT = re.compile(r"\b(что|какие|какая|какой|есть ли|есть|во сколько|у нас|у меня|куда)\b")
 
 
+_KINDS = [
+    (r"\bлаб", "лабораторная"), (r"лекци", "лекция"), (r"практик|семинар", "практика"),
+    (r"экзамен", "экзамен"), (r"зачет", "зачёт"), (r"консультац", "консультация"),
+]
+
+
+def _kind_in(q: str) -> Optional[str]:
+    """"Когда лаба по БД" → "лабораторная": only lessons of that kind."""
+    return next((kind for pattern, kind in _KINDS if re.search(pattern, q)), None)
+
+
+# "Во сколько завтра первая пара", "к какой паре", "когда начинаются пары"
+_FIRST_PAIR = re.compile(r"перв[а-я]* пар|к как[а-я]* пар|ко? скольки|когда начина|во сколько[а-я ]* (начина|приходить|вставать|на пары|к паре)")
+# "Когда последняя пара", "до скольки пары", "во сколько заканчиваются"
+_LAST_PAIR = re.compile(r"последн[а-я]* пар|до скольки|(когда|во сколько)[а-я ]* (заканчива|конча|освобож)")
+
+
+# "Что сейчас?", "а что дальше?", "что у меня потом"
+_NOW_OR_NEXT = re.compile(r"^(а |и )?(что|куда|где) (у меня |у нас |мне |нам )?(сейчас|дальше|потом|следующ)")
+
+
 def _asks_schedule(q: str, today: date) -> bool:
+    if _NOW_OR_NEXT.search(q) or _FIRST_PAIR.search(q) or _LAST_PAIR.search(q):
+        return True
     return bool(_PAIR_WORDS.search(q) or (parse_when(q, today) and _ASKS_WHAT.search(q)) or re.search(r"куда (мне )?идти|где у меня", q))
 
 
@@ -252,6 +303,9 @@ def _schedule_answer(q: str, lessons: List[timetable.Lesson], group: str, now: d
     if subgroup:
         lessons = [l for l in lessons if l.subgroup in (0, subgroup)]
         group = f"{group}, {subgroup} подгруппа"
+    kind = _kind_in(q)
+    if kind:
+        lessons = [l for l in lessons if l.kind == kind]
     soon = timetable.upcoming(lessons, now, LOOKAHEAD_DAYS)
     when = parse_when(q, today)
     disciplines = _matching_disciplines(q, soon)
@@ -273,6 +327,29 @@ def _schedule_answer(q: str, lessons: List[timetable.Lesson], group: str, now: d
         lines = [f"• {_day_label(l.day, today).capitalize()}, {_lesson_line(l, len(disciplines) > 1)}" for l in pool[:4]]
         return finish(f"{title} у группы {group}:\n" + "\n".join(lines), first_ahead(pool))
 
+    first_pair, last_pair = bool(_FIRST_PAIR.search(q)), bool(_LAST_PAIR.search(q))
+    if first_pair or last_pair:
+        # The asked day; without one, today while its pairs are ahead, else the next day with pairs
+        if when:
+            day = when[0]
+        else:
+            todays = [l for l in lessons if l.day == today]
+            later = next((l.day for l in soon if l.day > today), None)
+            ahead = todays and (todays[-1].ends_at > now if last_pair else todays[0].starts_at > now)
+            day = today if ahead or not later else later
+        pool = [l for l in lessons if l.day == day]
+        label = _day_label(day, today).capitalize()
+        if not pool:
+            return finish(f"{label} у группы {group} пар нет.", [])
+        if first_pair:
+            slot = _same_slot(pool, pool[0])
+            what = _by_subgroup(slot) if len(slot) > 1 else f"{slot[0].discipline} ({slot[0].kind})" + (f", {slot[0].room}" if slot[0].room else "")
+            return finish(f"{label} первая пара в {slot[0].start}: {what}.", slot)
+        ending = max(pool, key=lambda l: l.ends_at)
+        slot = _same_slot(pool, ending)
+        what = _by_subgroup(slot) if len(slot) > 1 else f"{ending.discipline} ({ending.kind})" + (f", {ending.room}" if ending.room else "")
+        return finish(f"{label} пары заканчиваются в {ending.end}, последняя — {what}.", slot)
+
     if when:
         first, last = when
         pool = [l for l in lessons if first <= l.day <= last and l.ends_at > now - timedelta(hours=12)]
@@ -281,7 +358,8 @@ def _schedule_answer(q: str, lessons: List[timetable.Lesson], group: str, now: d
             if not pool:
                 return finish(f"{label.capitalize()} у группы {group} пар нет.", [])
             lines = [f"• {_lesson_line(l)}" + (", идёт сейчас" if l.starts_at <= now < l.ends_at else "") for l in pool]
-            return finish(f"{label.capitalize()} у группы {group}:\n" + "\n".join(lines), first_ahead(pool))
+            count = f" — {len(pool)} {_pairs_word(len(pool))}"
+            return finish(f"{label.capitalize()} у группы {group}{count}:\n" + "\n".join(lines), first_ahead(pool))
         if not pool:
             return finish(f"В эти дни у группы {group} пар нет.", [])
         lines, current_day = [], None
@@ -292,7 +370,7 @@ def _schedule_answer(q: str, lessons: List[timetable.Lesson], group: str, now: d
             lines.append(f"• {_lesson_line(lesson)}")
         return finish(f"Пары группы {group}:\n" + "\n".join(lines), first_ahead(pool))
 
-    current = [l for l in soon if l.starts_at <= now < l.ends_at]
+    current = [] if re.search(r"дальше|потом", q) else [l for l in soon if l.starts_at <= now < l.ends_at]
     upcoming = [l for l in soon if l.starts_at > now]
     # Subgroups can have different pairs at the same time: name them all
     current = [l for l in current if l.starts_at == current[0].starts_at] if current else []
@@ -371,6 +449,12 @@ async def _schedule_finding(q, previous_q, user, hint, now, message: str = "") -
 _ROOM_RE = re.compile(r"(?:^|[^\d])(?:б|b)?\s*-?\s*([1-4])(0[1-9]|1\d|20)(?!\d)")
 
 
+def room_in(q: str) -> Optional[str]:
+    """The room number of a question: "Б-407", "407", "б407" → "407"."""
+    m = _ROOM_RE.search(q)
+    return m.group(1) + m.group(2) if m else None
+
+
 def room_finding(q: str) -> Optional[Finding]:
     if "коворкинг" in q:
         return Finding(
@@ -425,40 +509,237 @@ def teacher_status(teacher: models.Teacher, lessons: List[timetable.Lesson], now
     return "Сегодня пар по расписанию нет.", None
 
 
-async def _teacher_finding(q: str, db: Session, now: datetime) -> Optional[Finding]:
+def _name_stem(word: str) -> str:
+    """"Людмила" → "людми" (Людмилы, Людмиле), "Юрьевна" → "юрьев", "Илья" → "иль"."""
+    return word[:max(3, len(word) - 2)]
+
+
+def _distance(a: str, b: str) -> int:
+    """Edits between two words, a swap of neighbours counting as one ("Кипирна" is one edit from "Киприна")."""
+    prev2, prev = None, list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i] + [0] * len(b)
+        for j, cb in enumerate(b, 1):
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb))
+            if prev2 is not None and i > 1 and j > 1 and ca == b[j - 2] and a[i - 2] == cb:
+                cur[j] = min(cur[j], prev2[j - 2] + 1)
+        prev2, prev = prev, cur
+    return prev[-1]
+
+
+# A word right after "у", "к", "препод…" is likely a person: "пары у Варило", "к Киприной"
+_PERSON_CUE = re.compile(r"(?:^|\s)(?:у|к|препод[а-я]*|преподавател[а-я]*)\s+([а-я-]{5,})")
+
+
+def match_teachers(q: str, message: str, teachers: List[models.Teacher]) -> List[models.Teacher]:
+    """Teachers the question is about: by surname in any case, by first name and patronymic, or by a surname
+    with one typo when it follows "у"/"к"/"препод" or is written with a capital letter."""
     words = _words(q)
-    matched = [
-        t for t in db.query(models.Teacher).all()
-        if (stem := _surname_stem(t.name)) and len(stem) >= 4 and any(w.startswith(stem) for w in words)
-    ][:3]
-    if not matched:
-        return None
+    exact = [t for t in teachers if (stem := _surname_stem(t.name)) and len(stem) >= 4 and any(w.startswith(stem) for w in words)]
+    if exact:
+        return exact[:3]
+    pairs = list(zip(words, words[1:]))
+    named = []
+    for teacher in teachers:
+        parts = _norm(teacher.name).split()
+        if len(parts) >= 3:
+            first, patronymic = _name_stem(parts[1]), _name_stem(parts[2])
+            if any(a.startswith(first) and b.startswith(patronymic) for a, b in pairs):
+                named.append(teacher)
+    if named:
+        return named[:3]
+    candidates = set(_PERSON_CUE.findall(q)) | {_norm(w) for w in re.findall(r"(?<=\s)[А-ЯЁ][а-яё]{4,}", message or "")}
+    fuzzy = []
+    for teacher in teachers:
+        stem = _surname_stem(teacher.name)
+        # One typo, never in the last letter of the stem: that is where declension changes a word
+        # ("с логином" is not "Логинова")
+        if len(stem) >= 5 and any(
+            len(stem) <= len(w) <= len(stem) + 3 and (
+                (w[len(stem) - 1] == stem[-1] and _distance(w[:len(stem) - 1], stem[:-1]) <= 1)
+                # a letter too many before the last one: "Барилло"
+                or (len(w) > len(stem) and w[len(stem)] == stem[-1] and _distance(w[:len(stem)], stem[:-1]) <= 1)
+            )
+            for w in candidates
+        ):
+            fuzzy.append(teacher)
+    return fuzzy[:3]
+
+
+def _short_name(name: str) -> str:
+    """Surname and initials: "Киприна Людмила Юрьевна" → "Киприна Л. Ю."."""
+    parts = name.split()
+    return " ".join(parts[:1] + [f"{p[0]}." for p in parts[1:3]]) if parts else name
+
+
+def _teacher_line(lesson: timetable.Lesson) -> str:
+    parts = [lesson.discipline, lesson.kind] + ([lesson.room] if lesson.room else [])
+    who = ", ".join(lesson.groups) + (f" ({lesson.subgroup} пг)" if lesson.subgroup else "")
+    return f"{lesson.start}–{lesson.end} — " + ", ".join(parts) + (f" · {who}" if who else "") + (", замена" if lesson.replaced else "")
+
+
+def _room_line(lesson: timetable.Lesson) -> str:
+    parts = [lesson.discipline, lesson.kind] + ([lesson.teacher] if lesson.teacher else [])
+    who = ", ".join(lesson.groups) + (f" ({lesson.subgroup} пг)" if lesson.subgroup else "")
+    return f"{lesson.start}–{lesson.end} — " + ", ".join(parts) + (f" · {who}" if who else "")
+
+
+def _lessons_by_day(pool: List[timetable.Lesson], today: date, line) -> List[str]:
+    lines, current_day = [], None
+    for lesson in pool:
+        if lesson.day != current_day:
+            current_day = lesson.day
+            lines.append(_day_label(lesson.day, today).capitalize() + ":")
+        lines.append(f"• {line(lesson)}")
+    return lines
+
+
+def _period(q: str, today: date, dates: Tuple[Optional[date], Optional[date]] = (None, None)) -> Optional[Tuple[date, date]]:
+    """Days named in the question, else days passed by the model."""
+    when = parse_when(q, today)
+    if when:
+        return when
+    first, last = dates
+    if first:
+        last = last if last and first <= last <= first + timedelta(days=13) else first
+        return first, last
+    return None
+
+
+def _day_list(title: str, pool: List[timetable.Lesson], when: Optional[Tuple[date, date]], today: date, line,
+              empty: str, now: Optional[datetime] = None) -> str:
+    """"<title>, завтра — 2 пары:" and the lines; several days are grouped by day; the pair on now is marked."""
+    if now:
+        plain = line
+        line = lambda l: plain(l) + (", идёт сейчас" if l.starts_at <= now < l.ends_at else "")
+    if when and when[0] == when[1]:
+        label = _day_label(when[0], today)
+        if not pool:
+            return f"{title}: {label} {empty}."
+        return f"{title}, {label} — {len(pool)} {_pairs_word(len(pool))}:\n" + "\n".join(f"• {line(l)}" for l in pool)
+    if not pool:
+        return f"{title}: {'в эти дни' if when else 'в ближайшие две недели'} {empty}."
+    head = f"{title} — пары на эти дни:" if when else f"{title} — ближайшие пары:"
+    return head + "\n" + "\n".join(_lessons_by_day(pool, today, line))
+
+
+# "Какие пары завтра у Киприной", "когда у Барило лекции", "где Киприна в пятницу"
+_ASKS_TEACHER_PAIRS = re.compile(r"\bпар|распис|заняти|ведет|преподает|лекци|практик|\bлаб|экзамен|зачет|консультац|когда у\b|когда он|когда она")
+# "У нас", "у меня": only the student's own group
+_OWN_GROUP = re.compile(r"\bу (нас|меня)\b|\bнаш|\bмо[яейю]\b|\bмы\b")
+
+
+async def _teacher_card(teacher: models.Teacher, ids: Dict[str, List[int]], now: datetime) -> Tuple[str, List[Action]]:
+    role = f" — {teacher.role[:1].lower() + teacher.role[1:]}" if teacher.role else ""
+    facts, actions = [f"**{teacher.name}**{role}."], []
+    if teacher.office:
+        facts.append(f"Кабинет: {teacher.office}.")
+    if teacher.email:
+        facts.append(f"E-mail: {teacher.email}")
+    eios_ids = ids.get(timetable.normalize_name(teacher.name))
+    if eios_ids:
+        try:
+            lessons = await timetable.teacher_lessons(eios_ids, timetable.academic_year(now.date()))
+            status, lesson = teacher_status(teacher, [l for l in lessons if l.day == now.date()], now)
+            if not lesson:
+                later = next((l for l in lessons if l.day > now.date()), None)
+                if later and (later.day - now.date()).days <= LOOKAHEAD_DAYS:
+                    where = f" в {later.room}" if later.room else ""
+                    status += f" Ближайшая пара — {_day_label(later.day, now.date())} в {later.start}{where}."
+                    lesson = later
+            facts.append(status)
+            actions += _map_actions([lesson] if lesson else [])
+        except timetable.TimetableUnavailable:
+            pass
+    return "\n".join(facts), actions
+
+
+async def _teacher_pairs(teacher: models.Teacher, ids: Dict[str, List[int]], q: str, user: Optional[models.User],
+                         now: datetime, dates=(None, None)) -> Tuple[str, List[Action]]:
+    today = now.date()
+    eios_ids = ids.get(timetable.normalize_name(teacher.name))
+    if not eios_ids:
+        return f"У преподавателя **{teacher.name}** нет пар в расписании ЭИОС на этот учебный год.", []
+    lessons = await timetable.teacher_lessons(eios_ids, timetable.academic_year(today))
+    own = user.group_number if user else None
+    empty = "пар по расписанию нет"
+    if own and _OWN_GROUP.search(q):
+        lessons = [l for l in lessons if any(timetable.normalize_name(g) == timetable.normalize_name(own) for g in l.groups)]
+        empty = f"у группы {own} пар с этим преподавателем нет"
+    kind = _kind_in(q)
+    if kind:
+        lessons = [l for l in lessons if l.kind == kind]
+    when = _period(q, today, dates)
+    if when:
+        pool = [l for l in lessons if when[0] <= l.day <= when[1]]
+    else:
+        pool = timetable.upcoming(lessons, now, LOOKAHEAD_DAYS)[:8]
+    text = _day_list(f"**{teacher.name}**", pool, when, today, _teacher_line, empty, now)
+    return text, _map_actions(_same_slot(pool, next((l for l in pool if l.ends_at > now), None)))
+
+
+async def teacher_answer(teachers: List[models.Teacher], q: str, user: Optional[models.User], now: datetime,
+                         dates=(None, None)) -> Finding:
+    """Pairs of the teacher when the question is about pairs or days, else their card and where they are now."""
     try:
         ids = await timetable.teacher_ids(timetable.academic_year(now.date()))
     except timetable.TimetableUnavailable:
         ids = {}
-
+    wants_pairs = bool(_ASKS_TEACHER_PAIRS.search(q) or _period(q, now.date(), dates))
     blocks, actions = [], []
-    for teacher in matched:
-        role = f" — {teacher.role[:1].lower() + teacher.role[1:]}" if teacher.role else ""
-        facts = [f"**{teacher.name}**{role}."]
-        if teacher.office:
-            facts.append(f"Кабинет: {teacher.office}.")
-        if teacher.email:
-            facts.append(f"E-mail: {teacher.email}")
-        eios_ids = ids.get(timetable.normalize_name(teacher.name))
-        if eios_ids:
-            try:
-                status, lesson = teacher_status(teacher, await timetable.teacher_day(eios_ids, now.date()), now)
-                facts.append(status)
-                room = _map_action(lesson.room) if lesson else None
-                if room:
-                    actions.append(room)
-            except timetable.TimetableUnavailable:
-                pass
-        blocks.append("\n".join(facts))
-        actions.append(Action("Карточка преподавателя", _link("/teachers", q=teacher.name.split()[0])))
-    return Finding("\n\n".join(blocks), actions, exact=True, weight=80)
+    try:
+        for teacher in teachers:
+            text, found = await (_teacher_pairs(teacher, ids, q, user, now, dates) if wants_pairs else _teacher_card(teacher, ids, now))
+            blocks.append(text)
+            actions += found
+    except timetable.TimetableUnavailable:
+        return Finding("ЭИОС сейчас не отвечает, и расписание преподавателя я не вижу. Попробуй чуть позже.",
+                       [Action("Преподаватели", "/teachers")], exact=True, weight=100)
+    actions += [Action("Карточка преподавателя", _link("/teachers", q=t.name.split()[0])) for t in teachers]
+    return Finding("\n\n".join(blocks), _unique_actions(actions)[:MAX_ACTIONS], exact=True, weight=100)
+
+
+def _unique_actions(actions: List[Action]) -> List[Action]:
+    seen, unique = set(), []
+    for action in actions:
+        if action.to not in seen:
+            seen.add(action.to)
+            unique.append(action)
+    return unique
+
+
+# "Свободна ли 407", "что сейчас в Б-305", "какие пары в 214 завтра"
+_ASKS_ROOM_PAIRS = re.compile(r"занят|свобод|\bпар|распис|что (сейчас |будет |идет )?(в|во)\b|кто (сейчас )?(в|во)\b")
+
+
+async def room_answer(number: str, q: str, now: datetime, dates=(None, None)) -> Optional[Finding]:
+    """What is on in a room: now, on a day or in the coming days; None when EIOS has no such room."""
+    today = now.date()
+    name = f"Б-{number}"
+    try:
+        year = timetable.academic_year(today)
+        room = await timetable.find_room(name, year)
+        if not room:
+            return None
+        lessons = await timetable.room_lessons(room["id"], year)
+    except timetable.TimetableUnavailable:
+        return Finding("ЭИОС сейчас не отвечает, и расписание аудитории я не вижу. Попробуй чуть позже.",
+                       [Action(f"{name} на карте", _link("/map", room=name))], exact=True, weight=100)
+    when = _period(q, today, dates) or (today, today)
+    pool = [l for l in lessons if when[0] <= l.day <= when[1]]
+    text = _day_list(name, pool, when, today, _room_line, "пар нет, аудитория свободна", now)
+    if when == (today, today):
+        current = next((l for l in pool if l.starts_at <= now < l.ends_at), None)
+        later = next((l for l in pool if l.starts_at > now), None)
+        if current:
+            status = f"Сейчас {name} занята: {current.discipline} ({current.kind}) до {current.end}."
+        elif later:
+            status = f"Сейчас {name} свободна до {later.start}."
+        else:
+            status = f"Сейчас {name} свободна, на сегодня пар больше нет."
+        text = f"{status}\n\n{text}"
+    return Finding(text, [Action(f"{name} на карте", _link("/map", room=name)), Action("Расписание на главной", "/#schedule-section")],
+                   exact=True, weight=100)
 
 
 # --- FAQ, forum, knowledge base ----------------------------------------------------------------
@@ -714,11 +995,17 @@ async def answer(
     if chat:
         return chat
 
-    exact = [f for f in (
-        await _schedule_finding(q, previous_q, user, group_hint, now, message),
-        room_finding(q),
-        await _teacher_finding(q, db, now),
-    ) if f]
+    # One subject per answer: a teacher, else a room's pairs, else the pairs of a group, else where a room is
+    teachers = match_teachers(q, message, db.query(models.Teacher).all())
+    if teachers:
+        finding = await teacher_answer(teachers, q, user, now)
+        return finding.text, finding.actions, None
+    number = room_in(q)
+    if number and _ASKS_ROOM_PAIRS.search(q):
+        finding = await room_answer(number, q, now)
+        if finding:
+            return finding.text, finding.actions, None
+    exact = [f for f in (await _schedule_finding(q, previous_q, user, group_hint, now, message), room_finding(q)) if f]
     if exact:
         shown = sorted(exact, key=lambda f: -f.weight)[:2]
         return "\n\n".join(f.text for f in shown), _merge_actions(shown), None

@@ -72,20 +72,28 @@ def functions(today: date) -> List[dict]:
         },
         {
             "name": "find_room",
-            "description": "Где аудитория корпуса Б ИВИТШ: этаж, адрес и схема этажа.",
+            "description": "Аудитория корпуса Б ИВИТШ: этаж и схема; с датами — какие в ней пары и свободна ли она.",
             "parameters": {
                 "type": "object",
-                "properties": {"room": {"type": "string", "description": "Номер аудитории, например Б-407 или 305."}},
+                "properties": {
+                    "room": {"type": "string", "description": "Номер аудитории, например Б-407 или 305."},
+                    "date_from": {"type": "string", "description": "Если спрашивают, что в аудитории или свободна ли она: первый день, ГГГГ-ММ-ДД."},
+                    "date_to": {"type": "string", "description": "Последний день, ГГГГ-ММ-ДД."},
+                },
                 "required": ["room"],
             },
             "few_shot_examples": [{"request": "как пройти в 305", "params": {"room": "Б-305"}}],
         },
         {
             "name": "find_teacher",
-            "description": "Преподаватель ИВИТШ: должность, кабинет, почта и где он сейчас по расписанию.",
+            "description": "Преподаватель ИВИТШ: должность, кабинет, почта, где он сейчас; с датами — его пары в эти дни.",
             "parameters": {
                 "type": "object",
-                "properties": {"name": {"type": "string", "description": "Фамилия или ФИО преподавателя."}},
+                "properties": {
+                    "name": {"type": "string", "description": "Фамилия или ФИО преподавателя."},
+                    "date_from": {"type": "string", "description": "Если спрашивают про его пары: первый день, ГГГГ-ММ-ДД."},
+                    "date_to": {"type": "string", "description": "Последний день, ГГГГ-ММ-ДД."},
+                },
                 "required": ["name"],
             },
             "few_shot_examples": [{"request": "где найти Киприну", "params": {"name": "Киприна"}}],
@@ -215,8 +223,18 @@ async def _schedule(args: dict, ctx: Context) -> dict:
     return result
 
 
+def _dates(args: dict) -> Tuple[Optional[date], Optional[date]]:
+    return _iso_day(args.get("date_from")), _iso_day(args.get("date_to"))
+
+
 async def _find_room(args: dict, ctx: Context) -> dict:
-    finding = assistant.room_finding(assistant._norm(_text(args.get("room"), 20)))
+    """Where a room is; with days or a question about it being free, what is on there."""
+    room = _text(args.get("room"), 20)
+    number = assistant.room_in(assistant._norm(room))
+    finding = None
+    if number and (any(_dates(args)) or assistant._ASKS_ROOM_PAIRS.search(ctx.question)):
+        finding = await assistant.room_answer(number, ctx.question, ctx.now, _dates(args))
+    finding = finding or assistant.room_finding(assistant._norm(room))
     if not finding:
         return {"error": "Такой аудитории в корпусе Б нет. Номера аудиторий: 101–420."}
     ctx.actions.extend(finding.actions)
@@ -225,9 +243,12 @@ async def _find_room(args: dict, ctx: Context) -> dict:
 
 
 async def _find_teacher(args: dict, ctx: Context) -> dict:
-    finding = await assistant._teacher_finding(assistant._norm(_text(args.get("name"), 80)), ctx.db, ctx.now)
-    if not finding:
+    """A teacher's card and where they are now; with days or a question about pairs, their pairs."""
+    name = _text(args.get("name"), 80)
+    teachers = assistant.match_teachers(assistant._norm(name), name, ctx.db.query(models.Teacher).all())
+    if not teachers:
         return {"error": "Такого преподавателя в справочнике портала нет."}
+    finding = await assistant.teacher_answer(teachers, ctx.question, ctx.user, ctx.now, _dates(args))
     ctx.actions.extend(finding.actions)
     ctx.plain.append(finding.text)
     return {"answer": finding.text}
