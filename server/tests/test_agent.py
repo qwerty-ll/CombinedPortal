@@ -164,7 +164,7 @@ def test_a_follow_up_about_pairs_is_answered_from_the_timetable(student, monkeyp
     history = [{"role": "user", "content": "что у меня в четверг"}, {"role": "assistant", "content": "В четверг 2 пары."}]
     r = student.post("/api/v1/chat", json={"message": "а в пятницу", "history": history},
                      headers={"X-Requested-With": "XMLHttpRequest"})
-    assert r.json()["reply"].startswith("Завтра у группы 24-ИСбо-1:\n• 13:40–15:10 — Базы данных")
+    assert r.json()["reply"].startswith("Завтра у группы 24-ИСбо-1 — 1 пара:\n• 13:40–15:10 — Базы данных")
     assert sent == []
 
 

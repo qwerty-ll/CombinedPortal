@@ -1,0 +1,186 @@
+"""What students actually ask ВИТШик, answered from a realistic EIOS timetable without the language model.
+
+Thursday 24.09.2026, 10:15 in Moscow; the student is in 24-ИСбо-1, whose subgroups have parallel labs.
+"""
+import pytest
+
+from app.services import eios, timetable
+from conftest import CSRF, login_student
+
+NOW = timetable.datetime(2026, 9, 24, 10, 15, tzinfo=timetable.MSK)
+
+
+def lesson(day, start, end, discipline, room, teacher, group="24-ИСбо-1"):
+    return {"дата": f"{day}T00:00:00", "начало": start, "конец": end, "дисциплина": discipline, "аудитория": room,
+            "группа": group, "преподаватель": teacher, "номерПодгруппы": 0, "замена": False}
+
+
+KIPRINA, BARILO, ORLOV, IVANOV = "Киприна Л.Ю.", "Барило И.И.", "Орлов А.В.", "Иванов И.И."
+GROUP_1 = [
+    lesson("2026-09-24", "08:30", "10:00", "лек Философия", "Б-305", IVANOV),
+    lesson("2026-09-24", "10:10", "11:40", "пр Программирование на Python, п/г 1", "Б-214", KIPRINA),
+    lesson("2026-09-24", "10:10", "11:40", "лаб Базы данных, п/г 2", "Б-407", BARILO),
+    lesson("2026-09-24", "11:50", "13:20", "лек Базы данных", "Б-407", BARILO),
+    lesson("2026-09-25", "08:30", "10:00", "лаб Базы данных, п/г 1", "Б-207", BARILO),
+    lesson("2026-09-25", "08:30", "10:00", "лаб Операционные системы, п/г 2", "Б-104", ORLOV),
+    lesson("2026-09-25", "10:10", "11:40", "лек Философия", "Б-407", IVANOV),
+    lesson("2026-09-28", "08:30", "10:00", "лек Философия", "Б-305", IVANOV),
+    lesson("2026-10-01", "13:40", "15:10", "конс Философия", "Б-305", IVANOV),
+    lesson("2026-10-02", "08:30", "11:40", "экз Философия", "Б-305", IVANOV),
+]
+GROUP_2 = [
+    lesson("2026-09-25", "08:30", "10:00", "пр Программирование на Python, п/г 1", "Б-214", KIPRINA, "24-ИСбо-2"),
+    lesson("2026-09-25", "11:50", "13:20", "лек Информатика", "Б-305", KIPRINA, "24-ИСбо-2"),
+]
+EVERYTHING = GROUP_1 + GROUP_2
+
+
+def by_teacher(short):
+    return [row for row in EVERYTHING if row["преподаватель"] == short]
+
+
+def by_room(room):
+    return [row for row in EVERYTHING if row["аудитория"] == room]
+
+
+def ok(data):
+    return {"state": 1, "data": data}
+
+
+YEAR = {"year": "2026-2027"}
+ANSWERS = {
+    ("raspGrouplist", frozenset(YEAR.items())): ok([{"id": 1, "name": "24-ИСбо-1"}, {"id": 2, "name": "24-ИСбо-2"}]),
+    ("Rasp", frozenset({**YEAR, "idGroup": 1}.items())): ok({"rasp": GROUP_1}),
+    ("Rasp", frozenset({**YEAR, "idGroup": 2}.items())): ok({"rasp": GROUP_2}),
+    ("raspTeacherlist", frozenset(YEAR.items())): ok([
+        {"id": 11, "name": "Киприна Людмила Юрьевна"}, {"id": 12, "name": "Барило Илья Иванович"},
+        {"id": 13, "name": "Орлов Александр Валерьевич"},
+    ]),
+    ("Rasp", frozenset({**YEAR, "idTeacher": 11}.items())): ok({"rasp": by_teacher(KIPRINA)}),
+    ("Rasp", frozenset({**YEAR, "idTeacher": 12}.items())): ok({"rasp": by_teacher(BARILO)}),
+    ("Rasp", frozenset({**YEAR, "idTeacher": 13}.items())): ok({"rasp": by_teacher(ORLOV)}),
+    ("raspAudlist", frozenset(YEAR.items())): ok([{"id": 407, "name": "Б-407"}, {"id": 305, "name": "Б-305"}]),
+    ("Rasp", frozenset({**YEAR, "idAud": 407}.items())): ok({"rasp": by_room("Б-407")}),
+    ("Rasp", frozenset({**YEAR, "idAud": 305}.items())): ok({"rasp": by_room("Б-305")}),
+}
+
+
+@pytest.fixture
+def student(app, fake_eios, monkeypatch):
+    async def fetch_json(endpoint, params, timeout=5.0):
+        return ANSWERS.get((endpoint, frozenset(params.items())))
+
+    monkeypatch.setattr(eios, "fetch_json", fetch_json)
+    monkeypatch.setattr(timetable, "msk_now", lambda: NOW)
+    return login_student(app, fake_eios, full_name="Смирнов Макар Андреевич", group="24-ИСбо-1")
+
+
+def ask(client, message, history=None):
+    r = client.post("/api/v1/chat", json={"message": message, "history": history or []}, headers=CSRF)
+    assert r.status_code == 200, r.text
+    data = r.json()
+    return data["reply"], [a["label"] for a in data["actions"]]
+
+
+SCENARIOS = [
+    # --- My group: now, next, days, dates
+    ("где у меня следующая пара", "Сейчас идут пары по подгруппам, до 11:40: 1 подгруппа — Программирование на Python (практика), Б-214; 2 подгруппа — Базы данных (лабораторная), Б-407."),
+    ("что сейчас", "Сейчас идут пары по подгруппам, до 11:40"),
+    ("а что дальше?", "Следующая пара — сегодня в 11:50: Базы данных (лекция), Б-407."),
+    ("какая сейчас пара", "Сейчас идут пары по подгруппам"),
+    ("расписание на завтра", "Завтра у группы 24-ИСбо-1 — 3 пары:"),
+    ("сегодня есть пары?", "Сегодня у группы 24-ИСбо-1 — 4 пары:"),
+    ("какие пары завтра", "Завтра у группы 24-ИСбо-1 — 3 пары:\n• 08:30–10:00 — Базы данных, лабораторная, Б-207, 1 подгруппа\n"
+                          "• 08:30–10:00 — Операционные системы, лабораторная, Б-104, 2 подгруппа\n• 10:10–11:40 — Философия, лекция, Б-407"),
+    ("сколько пар завтра", "Завтра у группы 24-ИСбо-1 — 3 пары:"),
+    ("пары 02.10", "В пятницу, 02.10 у группы 24-ИСбо-1 — 1 пара:\n• 08:30–11:40 — Философия, экзамен, Б-305"),
+    ("что 1 октября", "В четверг, 01.10 у группы 24-ИСбо-1 — 1 пара:\n• 13:40–15:10 — Философия, консультация, Б-305"),
+    ("есть ли пары в субботу", "В субботу, 26.09 у группы 24-ИСбо-1 пар нет."),
+    ("пары на следующей неделе", "Пары группы 24-ИСбо-1:\nВ понедельник, 28.09:\n• 08:30–10:00 — Философия, лекция, Б-305"),
+    # --- First and last pair
+    ("во сколько завтра первая пара", "Завтра первая пара в 08:30: 1 подгруппа — Базы данных (лабораторная), Б-207; 2 подгруппа — Операционные системы (лабораторная), Б-104."),
+    ("к какой паре мне завтра", "Завтра первая пара в 08:30"),
+    ("до скольки сегодня пары", "Сегодня пары заканчиваются в 13:20, последняя — Базы данных (лекция), Б-407."),
+    ("когда последняя пара", "Сегодня пары заканчиваются в 13:20"),
+    ("во сколько я сегодня освобожусь", "Сегодня пары заканчиваются в 13:20"),
+    ("мне завтра к скольки", "Завтра первая пара в 08:30"),
+    # --- One discipline, one kind
+    ("когда лаба по базам данных", "«Базы данных» у группы 24-ИСбо-1:\n• Сегодня, 10:10–11:40 — лабораторная, Б-407, 2 подгруппа\n• Завтра, 08:30–10:00 — лабораторная, Б-207, 1 подгруппа"),
+    ("когда экзамен по философии", "«Философия» у группы 24-ИСбо-1:\n• В пятницу, 02.10, 08:30–11:40 — экзамен, Б-305"),
+    ("какие лекции завтра", "Завтра у группы 24-ИСбо-1 — 1 пара:\n• 10:10–11:40 — Философия, лекция, Б-407"),
+    # --- Subgroups and other groups
+    ("какие пары завтра у 2 пг", "Завтра у группы 24-ИСбо-1, 2 подгруппа — 2 пары:\n• 08:30–10:00 — Операционные системы, лабораторная, Б-104, 2 подгруппа"),
+    ("что завтра у 24-ИСбо-2", "Завтра у группы 24-ИСбо-2 — 2 пары:"),
+    ("что у 2 подгруппы сегодня", "Сегодня у группы 24-ИСбо-1, 2 подгруппа — 3 пары:"),
+    # --- Teachers
+    ("какие пары завтра у Варило Ильи Иваныч", "**Барило Илья Иванович**, завтра — 1 пара:\n• 08:30–10:00 — Базы данных, лабораторная, Б-207 · 24-ИСбо-1 (1 пг)"),
+    ("Какие завтра пары у Киприной Людмилы Юрьевны", "**Киприна Людмила Юрьевна**, завтра — 2 пары:\n• 08:30–10:00 — Программирование на Python, практика, Б-214 · 24-ИСбо-2 (1 пг)\n• 11:50–13:20 — Информатика, лекция, Б-305 · 24-ИСбо-2"),
+    ("у Людмилы Юрьевны сегодня пары?", "**Киприна Людмила Юрьевна**, сегодня — 1 пара:\n• 10:10–11:40 — Программирование на Python, практика, Б-214 · 24-ИСбо-1 (1 пг), идёт сейчас"),
+    ("где сейчас Киприна", "**Киприна Людмила Юрьевна** — заведующая кафедрой"),
+    ("когда у Барило лекции", "**Барило Илья Иванович** — ближайшие пары:\nСегодня:\n• 11:50–13:20 — Базы данных, лекция, Б-407 · 24-ИСбо-1"),
+    ("что у нас с Киприной завтра", "**Киприна Людмила Юрьевна**: завтра у группы 24-ИСбо-1 пар с этим преподавателем нет."),
+    ("почта Орлова", "**Орлов Александр Валерьевич** — доцент кафедры, кандидат технических наук, доцент.\nКабинет: Корпус Б.\n"
+                     "Сегодня пар по расписанию нет. Ближайшая пара — завтра в 08:30 в Б-104."),
+    ("где Барилло в пятницу", "**Барило Илья Иванович**, завтра — 1 пара:"),
+    ("Барило сейчас где", "**Барило Илья Иванович** — доцент кафедры"),
+    ("в какой аудитории у Барило пара завтра", "**Барило Илья Иванович**, завтра — 1 пара:\n• 08:30–10:00 — Базы данных, лабораторная, Б-207"),
+    ("какой кабинет у Киприной", "**Киприна Людмила Юрьевна** — заведующая кафедрой"),
+    ("кабинет Кипирной", "**Киприна Людмила Юрьевна**"),
+    # --- Rooms
+    ("свободна ли 407", "Сейчас Б-407 занята: Базы данных (лабораторная) до 11:40."),
+    ("б-305 свободна?", "Сейчас Б-305 свободна, на сегодня пар больше нет."),
+    ("у кого сейчас пара в 407", "Сейчас Б-407 занята"),
+    ("что в Б-407 завтра", "Б-407, завтра — 1 пара:\n• 10:10–11:40 — Философия, лекция, Иванов И.И. · 24-ИСбо-1"),
+    ("где 407", "Аудитория Б-407 — на 4 этаже корпуса Б"),
+    ("как найти б-305", "Аудитория Б-305 — на 3 этаже корпуса Б"),
+    # --- Not a teacher, not a pair
+    ("как войти с логином?", None),
+]
+
+
+@pytest.mark.parametrize("question, expected", SCENARIOS, ids=[q for q, _ in SCENARIOS])
+def test_scenario(student, question, expected, monkeypatch):
+    from app.core import rate_limit
+    monkeypatch.setattr(rate_limit.chat_requests, "hit", lambda key: True)
+    reply, actions = ask(student, question)
+    print(f"\n### {question}\n{reply}\n  {actions}")
+    if expected is None:
+        assert "Логинова" not in reply
+    else:
+        assert reply.startswith(expected), reply
+
+
+ODD_INPUTS = [
+    "?", "407", "2 пг", "!!!", "а", "у", "12.13", "31.02", "32 декабря", "б-999", "24-ИСбо-9", "у Ааааа", "🙂",
+    "пары " * 100, "SELECT * FROM users", "<script>alert(1)</script>", "что в 1000 аудитории", "первая подгруппа",
+    "у Иванова", "где препод", "пары у", "кабинет", "расписание 99-ХХ-1 на 45.45",
+]
+
+
+@pytest.mark.parametrize("message", ODD_INPUTS)
+def test_odd_questions_never_break_the_chat(student, message, monkeypatch):
+    from app.core import rate_limit
+    monkeypatch.setattr(rate_limit.chat_requests, "hit", lambda key: True)
+    r = student.post("/api/v1/chat", json={"message": message[:500]}, headers=CSRF)
+    assert r.status_code == 200 and r.json()["reply"]
+
+
+def test_the_agent_asks_a_teacher_s_day(student, monkeypatch):
+    from app.services import rag_service
+    sent = []
+    steps = [
+        {"message": {"role": "assistant", "content": "", "function_call": {"name": "find_teacher", "arguments": {
+            "name": "Илья Иванович", "date_from": "2026-09-30"}}}, "finish_reason": "function_call"},
+        {"message": {"role": "assistant", "content": "Завтра у Ильи Ивановича одна пара: в 08:30 в Б-207."}, "finish_reason": "stop"},
+    ]
+
+    async def chat(messages, functions=None, function_call="auto", max_tokens=350):
+        sent.append(messages)
+        return steps.pop(0)
+
+    monkeypatch.setattr(rag_service, "chat", chat)
+    monkeypatch.setattr(rag_service.settings, "GIGACHAT_AUTH_KEY", "configured")
+    # Colloquial "Иваныч" is beyond the portal's own matching; the model names the teacher, the day comes from the question
+    reply, actions = ask(student, "а Илья Иваныч завтра где будет?")
+    assert reply == "Завтра у Ильи Ивановича одна пара: в 08:30 в Б-207."
+    assert "**Барило Илья Иванович**, завтра — 1 пара" in sent[1][-1]["content"]

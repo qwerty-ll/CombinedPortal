@@ -228,6 +228,30 @@ async def teacher_day(ids: Iterable[int], day: date) -> List[Lesson]:
     return sorted(unique.values(), key=lambda l: l.start)
 
 
+async def teacher_lessons(ids: Iterable[int], year: str) -> List[Lesson]:
+    """One teacher's whole-year timetable; several EIOS ids for the same name are merged."""
+    answers = await asyncio.gather(*(cached("Rasp", {"year": year, "idTeacher": tid}, RASP_TTL) for tid in ids))
+    lessons: List[Lesson] = []
+    for payload in answers:
+        lessons.extend(parse_lessons(payload))
+    unique = {(l.day, l.start, l.end, l.discipline, l.room, l.subgroup): l for l in lessons}
+    return sorted(unique.values(), key=lambda l: (l.day, l.start, l.subgroup))
+
+
+async def find_room(name: str, year: str) -> Optional[dict]:
+    """{"id", "name"} of a room in that academic year's list ("Б-407")."""
+    wanted = normalize_name(name).replace(" ", "")
+    payload = await cached("raspAudlist", {"year": year}, LIST_TTL)
+    for item in payload.get("data") or []:
+        if isinstance(item, dict) and item.get("id") and normalize_name(str(item.get("name") or "")).replace(" ", "") == wanted:
+            return {"id": int(item["id"]), "name": str(item["name"])}
+    return None
+
+
+async def room_lessons(room_id: int, year: str) -> List[Lesson]:
+    return parse_lessons(await cached("Rasp", {"year": year, "idAud": room_id}, RASP_TTL))
+
+
 def upcoming(lessons: Iterable[Lesson], now: datetime, days: int) -> List[Lesson]:
     """Lessons not yet over, up to `days` days ahead."""
     until = (now + timedelta(days=days)).date()
