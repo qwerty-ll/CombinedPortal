@@ -147,6 +147,10 @@ async def get_access_token(force_refresh: bool = False) -> str:
 
 KNOWLEDGE_CHUNKS = [
     {
+        "keywords": ["директор", "руководител", "руководит ивитш", "руководит витш", "руководит высш", "глава", "борисов"],
+        "content": "Директор Высшей ИТ-школы (ИВИТШ) КГУ — Борисов Александр Сергеевич. Дирекция находится в Корпусе Б на 2 этаже, кабинет Б-209 (ул. Ивановская, 24а) [IMG:209.png]."
+    },
+    {
         "keywords": ["дирекц", "деканат", "209", "корпус б", "ивановск", "кабинет", "администр", "часы работ"],
         "content": "Дирекция Высшей ИТ-школы (ИВИТШ) КГУ находится в Корпусе Б на 2 этаже, кабинет Б-209. Работает с Пн по Пт с 9:00 до 17:00 (перерыв 12:00-13:00). Адрес Корпуса Б: ул. Ивановская, 24а [IMG:209.png]."
     },
@@ -201,6 +205,9 @@ KNOWLEDGE_CHUNKS = [
 ]
 
 
+_FOOD_CHUNK = next(chunk for chunk in KNOWLEDGE_CHUNKS if "столовая" in chunk["keywords"])
+
+
 def evaluate_query(query: str):
     q_lower = query.lower().strip()
     q_words = re.findall(r"\w{2,}", q_lower)
@@ -217,7 +224,7 @@ def evaluate_query(query: str):
         }
 
     if any(k in q_lower for k in ("поесть", "голоден", "столов", "еда", "шаурм", "обед")):
-        return 100, KNOWLEDGE_CHUNKS[4]
+        return 100, _FOOD_CHUNK
 
     best_match = None
     max_score = 0

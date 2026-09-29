@@ -221,6 +221,15 @@ def test_grounded(reply, ok):
     assert assistant.grounded(reply, facts) is ok
 
 
+def test_who_is_the_director(client, fake_timetable):
+    for question in ("как зовут директора ивитш?", "кто руководит ИВИТШ", "где кабинет директора"):
+        reply, _ = ask(client, question)
+        assert reply.startswith("Директор Высшей ИТ-школы (ИВИТШ) КГУ — Борисов Александр Сергеевич."), question
+    # Club leaders are still the clubs' answer
+    assert ask(client, "кто руководит спортивным программированием")[0].startswith("ВИТШ-медиа")
+    assert ask(client, "где поесть рядом")[0].startswith("Рядом с Корпусом Б можно покушать")
+
+
 def test_faq_needs_more_than_one_shared_word(client, fake_timetable, db):
     db.add(models.FaqItem(question="Как получить справку об обучении?", answer="<p>Закажи в дирекции, Б-209.</p>"))
     db.commit()
