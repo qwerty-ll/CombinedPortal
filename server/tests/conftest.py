@@ -23,7 +23,7 @@ import main  # noqa: E402
 from app.core import rate_limit  # noqa: E402
 from app.db.database import Base, SessionLocal  # noqa: E402
 from app.routers import schedule  # noqa: E402
-from app.services import eios  # noqa: E402
+from app.services import eios, rag_service  # noqa: E402
 
 CSRF = {"X-Requested-With": "XMLHttpRequest"}
 
@@ -45,6 +45,7 @@ def clean_state(app):
     db.close()
     rate_limit.reset_all()
     schedule.clear_cache()
+    rag_service._state["cooldown_until"] = 0.0
 
 
 @pytest.fixture

@@ -1,6 +1,5 @@
 from datetime import datetime
 
-from app.routers import calendar_feed
 from app.services import eios, timetable
 
 NOW = datetime(2026, 9, 24, 10, 15, tzinfo=timetable.MSK)  # Thursday
@@ -55,46 +54,6 @@ def test_parse_lessons_merges_groups_and_cleans_titles():
     python = next(l for l in lessons if l.subgroup == 1)
     assert python.discipline == "Программирование на Python" and python.kind == "практика"
     assert timetable.parse_lessons({"state": 1, "data": {"rasp": [{"дата": "bad"}]}}) == []
-
-
-def test_group_calendar_feed(client, monkeypatch):
-    calls = fake_eios(monkeypatch, GROUP_ANSWERS)
-    r = client.get("/api/v1/calendar/group.ics", params={"name": " 24-исбо-1 "})
-    assert r.status_code == 200
-    assert r.headers["content-type"].startswith("text/calendar")
-    body = r.text
-    assert body.startswith("BEGIN:VCALENDAR\r\n") and body.endswith("END:VCALENDAR\r\n")
-    assert all(len(line.encode()) <= 75 for line in body.split("\r\n"))
-    unfolded = body.replace("\r\n ", "")
-    assert "X-WR-CALNAME:Пары 24-ИСбо-1" in unfolded
-    assert unfolded.count("BEGIN:VEVENT") == 3  # the August lesson is too old, the shared lecture counts once
-    # 08:30 Moscow time is 05:30 UTC
-    assert "DTSTART:20260924T053000Z\r\nDTEND:20260924T070000Z" in unfolded
-    assert "SUMMARY:Программирование на Python (практика)\\, п/г 1" in unfolded
-    assert "SUMMARY:Замена: Базы данных\\; SQL\\, запросы (лабораторная)" in unfolded
-    assert "LOCATION:Б-214" in unfolded
-    assert "DESCRIPTION:Преподаватель: Иванов И.И.\\n3-я пара\\nРасписание ЭИОС КГУ" in unfolded
-    # UIDs stay the same between refreshes, so calendar apps update events instead of duplicating them
-    again = client.get("/api/v1/calendar/group.ics", params={"name": "24-ИСбо-1"}).text
-    uids = lambda text: [line for line in text.split("\r\n") if line.startswith("UID:")]
-    assert uids(body) == uids(again)
-    # The widget and the feed share one cached EIOS request
-    assert [c for c in calls if c[0] == "Rasp"] == [("Rasp", {"year": "2026-2027", "idGroup": 4242})]
-
-
-def test_group_calendar_errors(client, monkeypatch):
-    fake_eios(monkeypatch, GROUP_ANSWERS)
-    assert client.get("/api/v1/calendar/group.ics", params={"name": "99-XXбо-9"}).status_code == 404
-    assert client.get("/api/v1/calendar/group.ics", params={"name": "<script>"}).status_code == 400
-    timetable.clear_cache()
-    fake_eios(monkeypatch, {})
-    assert client.get("/api/v1/calendar/group.ics", params={"name": "24-ИСбо-1"}).status_code == 503
-
-
-def test_fold_never_splits_a_character():
-    lines = calendar_feed._fold("SUMMARY:" + "Ж" * 100)
-    assert all(len(line.encode()) <= 75 for line in lines)
-    assert "".join(line[1:] if i else line for i, line in enumerate(lines)) == "SUMMARY:" + "Ж" * 100
 
 
 def test_teachers_today(client, monkeypatch, db):

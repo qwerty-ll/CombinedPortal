@@ -1,4 +1,4 @@
-"""EIOS timetable: a shared cache plus helpers for the calendar feed, teacher status and the assistant.
+"""EIOS timetable: a shared cache plus helpers for the schedule, teacher status, documents and the assistant.
 
 EIOS answers only with local Kostroma time (Moscow time, UTC+3, no daylight saving since 2014).
 """

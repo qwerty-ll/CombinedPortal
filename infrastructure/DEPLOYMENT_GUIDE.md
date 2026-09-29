@@ -76,9 +76,20 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=localhost" \
 Проверку TLS мы не отключаем — вместо этого нужно доверить этот сертификат:
 1. Скачайте «Russian Trusted Root CA» с официальной страницы Госуслуг (раздел «Сертификаты Минцифры»)
    в формате PEM и сохраните как `infrastructure/gigachat-ca/russian_trusted_root_ca.pem`.
-2. В `.env`: `GIGACHAT_CA_BUNDLE=/app/certs/russian_trusted_root_ca.pem`.
+2. Всё: в Docker файл подхватывается сам (`/app/certs/russian_trusted_root_ca.pem`). Вне Docker укажите путь
+   в `GIGACHAT_CA_BUNDLE`.
 
-Без этого чат-бот продолжит работать, но будет отвечать текстом из базы знаний без перефразирования GigaChat.
+Проверить ключ, сертификат и модель реальными запросами (ключ и токен не печатаются):
+```bash
+docker compose -f infrastructure/docker-compose.yml exec backend python -m app.services.gigachat_check
+```
+
+Без ключа или сертификата чат-бот продолжит работать, но будет отвечать текстом из базы портала
+без перефразирования GigaChat.
+
+У физлиц (`GIGACHAT_SCOPE=GIGACHAT_API_PERS`) GigaChat обрабатывает один запрос за раз, лишние получают
+HTTP 429. Портал выстраивает вопросы в очередь (`GIGACHAT_MAX_STREAMS=1`); кто ждал бы дольше 6 секунд,
+сразу получает ответ из базы. Backend должен работать в одном процессе uvicorn, иначе очередей станет несколько.
 
 ### Шаг 5. Запуск
 ```bash

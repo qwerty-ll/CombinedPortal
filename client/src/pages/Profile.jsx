@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   GraduationCap, ShieldCheck, BadgeCheck, CheckCircle2,
   LogIn, LogOut, Camera, AlertCircle, Clock, Loader2, Eye, EyeOff, CalendarDays,
-  Smartphone, CalendarPlus, Share
+  Smartphone, Share
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { adaptationApi, forumApi } from '../services/api';
 import MiniGamesSection from '../components/MiniGamesSection';
-import CalendarDialog from '../components/CalendarDialog';
 import { useInstallApp } from '../utils/install';
 import SectionIcon from '../components/SectionIcon';
 import { initialsOf, shrinkAvatar } from '../utils/avatar';
@@ -46,7 +45,6 @@ const Profile = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [capsLockOn, setCapsLockOn] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
-  const [calendarOpen, setCalendarOpen] = useState(false);
   const app = useInstallApp();
 
   // Load stats from localStorage and API
@@ -453,7 +451,7 @@ const Profile = () => {
             </ul>
           </section>
 
-          {/* ON THE PHONE: install the portal, subscribe to the timetable */}
+          {/* ON THE PHONE: install the portal as an app */}
           <section aria-labelledby="profile-phone-title">
             <div className="section-header">
               <h2 id="profile-phone-title">На телефоне</h2>
@@ -466,11 +464,11 @@ const Profile = () => {
                   <span className="profile-stat-label">Портал как приложение</span>
                   <span className="profile-stat-meta">
                     {app.installed
-                      ? 'Установлен: открывается с главного экрана и без интернета'
+                      ? 'Установлен: открывается с главного экрана'
                       : app.ios
                         ? <>В Safari нажмите «Поделиться» <Share size={14} {...ICON} /> и «На экран „Домой“»</>
                         : app.canInstall
-                          ? 'Иконка на главном экране, расписание открывается без интернета'
+                          ? 'Иконка на главном экране, открывается как отдельное приложение'
                           : 'Откройте портал в Chrome на Android или в Safari на iPhone и добавьте на главный экран'}
                   </span>
                 </div>
@@ -480,25 +478,7 @@ const Profile = () => {
                   </button>
                 )}
               </li>
-
-              <li className="list-row profile-phone-row">
-                <span className="tile tile-quiet" aria-hidden="true"><CalendarPlus size={20} {...ICON} /></span>
-                <div className="profile-stat-text">
-                  <span className="profile-stat-label">Пары в календаре телефона</span>
-                  <span className="profile-stat-meta">
-                    {user.group
-                      ? <>Группа <span className="tabular">{user.group}</span>, календарь обновляется сам</>
-                      : 'Группа не указана: выберите её в расписании на главной'}
-                  </span>
-                </div>
-                {user.group && (
-                  <button type="button" className="btn btn-secondary profile-phone-action" onClick={() => setCalendarOpen(true)} aria-haspopup="dialog">
-                    Подключить
-                  </button>
-                )}
-              </li>
             </ul>
-            <CalendarDialog groupName={user.group} open={calendarOpen} onClose={() => setCalendarOpen(false)} />
           </section>
 
           {/* ADAPTATION MINI-GAMES */}

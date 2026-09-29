@@ -93,7 +93,7 @@ def test_explanatory_note_as_word(student):
     assert r.headers["content-type"].startswith("application/vnd.openxmlformats-officedocument.wordprocessingml")
     assert "filename*=UTF-8''%D0%9E%D0%B1%D1%8A" in r.headers["content-disposition"]  # "Объяснительная_…"
     text = docx_text(r.content)
-    assert "Директору Высшей ИТ-школы КГУ\n__________________________\nстудентки 3 курса группы 24-ИСбо-1\nИвановой Анны Сергеевны" in text
+    assert "Директору Высшей ИТ-школы КГУ\nА. С. Борисову\nстудентки 3 курса группы 24-ИСбо-1\nИвановой Анны Сергеевны" in text
     assert ("Я, Иванова Анна Сергеевна, студентка группы 24-ИСбо-1, отсутствовала на занятиях "
             "23 сентября 2026 г. по причине: болезнь.") in text
     assert "– 08:30–10:00 — Философия (лекция), преподаватель Иванов И.И.;" in text
@@ -102,6 +102,12 @@ def test_explanatory_note_as_word(student):
     assert text.endswith("«24» сентября 2026 г.\t____________ / А. С. Иванова")
     style = Document(io.BytesIO(r.content)).styles["Normal"].font
     assert style.name == "Times New Roman" and style.size.pt == 14
+
+
+def test_the_addressee_line_can_be_left_blank(student, monkeypatch):
+    monkeypatch.setattr(documents.settings, "DOCUMENT_ADDRESSEE_NAME", "")
+    text = docx_text(student.post("/api/v1/documents/explanatory", json=EXPLANATORY, headers=CSRF).content)
+    assert "Директору Высшей ИТ-школы КГУ\n__________________________\nстудентки" in text
 
 
 def test_explanatory_note_as_pdf(student):

@@ -305,9 +305,3 @@ export const documentsApi = {
     return name;
   },
 };
-
-// iCalendar feed of a group's timetable, for subscribing in a phone calendar
-export const groupCalendarUrl = (groupName) => {
-  const base = /^https?:\/\//.test(API_BASE_URL) ? API_BASE_URL : `${window.location.origin}${API_BASE_URL}`;
-  return `${base}/api/v1/calendar/group.ics?name=${encodeURIComponent(groupName)}`;
-};
