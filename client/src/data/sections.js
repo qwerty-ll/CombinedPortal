@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Compass, MessageSquare, Map, Users, HelpCircle, UserSquare, Shield
+  LayoutDashboard, Compass, MessageSquare, Map, Users, HelpCircle, UserSquare, Shield, Lock
 } from 'lucide-react';
 
 // One place for every section's name, route, icon and wayfinding hue.
@@ -13,6 +13,7 @@ export const SECTIONS = {
   faq: { label: 'Вопросы и ответы', short: 'FAQ', path: '/faq', Icon: HelpCircle, hue: 'amber', hint: 'Частые вопросы' },
   profile: { label: 'Личный кабинет', short: 'Профиль', path: '/profile', Icon: UserSquare, hue: 'cyan' },
   admin: { label: 'Панель управления', short: 'Админка', path: '/admin', Icon: Shield, hue: 'slate' },
+  privacy: { label: 'Конфиденциальность', short: 'Cookie', path: '/privacy', Icon: Lock, hue: 'slate' },
 };
 
 export const NAV_ORDER = ['dashboard', 'guide', 'forum', 'map', 'teachers', 'faq', 'profile'];

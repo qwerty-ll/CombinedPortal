@@ -9,6 +9,7 @@ no context between calls and one student's chat can never leak into another's.
 """
 import asyncio
 import logging
+import os
 import re
 import ssl
 import time
@@ -21,6 +22,9 @@ import httpx
 from app.core.config import settings
 
 logger = logging.getLogger("ivitsh_portal.rag")
+
+# НУЦ Минцифры: Russian Trusted Root CA and its Sub CAs (2022, 2024), checked by SHA-256 fingerprint
+RUSSIAN_CA_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "certs", "russian_trusted_ca.pem")
 
 OAUTH_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
 CHAT_URL = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
@@ -44,16 +48,18 @@ class GigaChatUnavailable(RuntimeError):
 def _build_ssl_context() -> ssl.SSLContext:
     """GigaChat certificates are issued by the Russian Trusted Root CA, which is not in certifi.
 
-    Instead of disabling verification, trust certifi plus the CA file from GIGACHAT_CA_BUNDLE.
-    A missing or broken file must not stop the portal: the chat then answers without GigaChat.
+    Instead of disabling verification, this context (used for GigaChat only) trusts certifi, the
+    bundled Russian CAs and the optional GIGACHAT_CA_BUNDLE. A missing or broken extra file must not
+    stop the portal.
     """
     context = ssl.create_default_context(cafile=certifi.where())
-    if settings.GIGACHAT_CA_BUNDLE:
+    for path in (RUSSIAN_CA_FILE, settings.GIGACHAT_CA_BUNDLE):
+        if not path:
+            continue
         try:
-            context.load_verify_locations(cafile=settings.GIGACHAT_CA_BUNDLE)
+            context.load_verify_locations(cafile=path)
         except (OSError, ssl.SSLError) as e:
-            logger.error("GIGACHAT_CA_BUNDLE=%s could not be loaded (%s); GigaChat calls will fail TLS checks",
-                         settings.GIGACHAT_CA_BUNDLE, e)
+            logger.error("CA file %s could not be loaded (%s); GigaChat calls may fail TLS checks", path, e)
     return context
 
 
@@ -94,7 +100,7 @@ def _token_is_fresh(now: float) -> bool:
 def _explain(error: Exception) -> str:
     text = str(error) or type(error).__name__
     if "CERTIFICATE_VERIFY_FAILED" in text:
-        text += " (set GIGACHAT_CA_BUNDLE to the Russian Trusted Root CA, see DEPLOYMENT_GUIDE.md)"
+        text += " (the server certificate is not signed by the bundled Russian CAs; put the current one in GIGACHAT_CA_BUNDLE)"
     return text
 
 
@@ -340,7 +346,8 @@ async def self_check(say=print, question: str = "Ответь одним сло�
         return
     say(f"Ключ задан, scope {settings.GIGACHAT_SCOPE}, модель {settings.GIGACHAT_MODEL}, "
         f"одновременных запросов {settings.GIGACHAT_MAX_STREAMS}.")
-    say(f"Сертификат Минцифры: {settings.GIGACHAT_CA_BUNDLE or 'не указан (GIGACHAT_CA_BUNDLE)'}.")
+    extra = f" + {settings.GIGACHAT_CA_BUNDLE}" if settings.GIGACHAT_CA_BUNDLE else ""
+    say(f"Сертификаты Минцифры: встроенные{extra}.")
     token = await get_access_token(force_refresh=True)
     say(f"OAuth: токен получен, действует ещё {(_token_cache['expires_at'] - time.time()) / 60:.0f} мин.")
     async with httpx.AsyncClient(verify=_ssl_context, timeout=REQUEST_TIMEOUT) as client:

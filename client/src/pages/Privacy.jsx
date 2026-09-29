@@ -1,0 +1,127 @@
+import React, { useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import SectionIcon from '../components/SectionIcon';
+
+// Edition of these texts. The server records it with each consent (server/app/routers/auth.py,
+// PD_CONSENT_VERSION = "2026-09-29"): change both together.
+const EDITION = '29 сентября 2026 г.';
+
+const STORAGE = [
+  { name: 'portal_token', kind: 'cookie', what: 'Вход в аккаунт. Недоступна скриптам страницы (httpOnly), действует 24 часа, удаляется при выходе.' },
+  { name: 'portal_auth_user', kind: 'браузер', what: 'Имя и группа, чтобы профиль показывался сразу. Удаляется при выходе.' },
+  { name: 'portal_avatar_…', kind: 'браузер', what: 'Фото, которое вы выбрали в профиле. Хранится только в этом браузере и не отправляется на сервер.' },
+  { name: 'portal_sched_…', kind: 'браузер', what: 'Группа, преподаватель или аудитория, выбранные в расписании.' },
+  { name: 'portal_swr_cache_…', kind: 'браузер', what: 'Копия общедоступных данных (объявления, преподаватели, расписание) для быстрой загрузки.' },
+  { name: 'portal_onboarding_…, onboarding_…, freshman_roadmap_…', kind: 'браузер', what: 'Прогресс знакомства с порталом и пути первокурсника.' },
+  { name: 'vitshik_…, ivitsh_last_daily_notif', kind: 'браузер', what: 'Мини-игры с ВИТШиком и дата последнего напоминания.' },
+  { name: 'portal_cookie_notice', kind: 'браузер', what: 'Что вы закрыли уведомление о cookie.' },
+];
+
+const Privacy = () => {
+  const { hash } = useLocation();
+
+  // /privacy#consent and #cookies open on their section; after the frame, so the scroll-to-top on
+  // navigation does not undo it
+  useEffect(() => {
+    if (!hash) return undefined;
+    const frame = requestAnimationFrame(() => document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' }));
+    return () => cancelAnimationFrame(frame);
+  }, [hash]);
+
+  return (
+    <div className="container legal-page">
+      <header className="page-header">
+        <div className="page-heading">
+          <SectionIcon section="privacy" size="lg" />
+          <div>
+            <h1>Ваши данные и cookie</h1>
+            <p className="page-subtitle">Какие данные собирает портал ИВИТШ, зачем и как их удалить. Редакция от {EDITION}</p>
+          </div>
+        </div>
+      </header>
+
+      <section className="legal-section" aria-labelledby="legal-operator">
+        <h2 id="legal-operator">Кто обрабатывает данные</h2>
+        <p>
+          Портал ИВИТШ — сервис Высшей ИТ-школы Костромского государственного университета (КГУ).
+          Вопросы о персональных данных принимает дирекция Высшей ИТ-школы: корпус Б, кабинет Б-209,
+          ул. Ивановская, 24а, Кострома.
+        </p>
+      </section>
+
+      <section className="legal-section" aria-labelledby="legal-data">
+        <h2 id="legal-data">Какие данные и зачем</h2>
+        <ul className="legal-list">
+          <li><strong>Логин и пароль ЭИОС КГУ</strong> — только чтобы проверить вход в ЭИОС в момент входа. Пароль портал не сохраняет.</li>
+          <li><strong>ФИО, группа, идентификатор и фото профиля из ЭИОС</strong> — чтобы показать профиль и расписание вашей группы и подставить данные в документы, которые вы попросите подготовить.</li>
+          <li><strong>То, что вы публикуете сами</strong> — вопросы и ответы на форуме, прогресс пути первокурсника.</li>
+          <li><strong>Дата и редакция согласия</strong> — чтобы подтвердить, что согласие было дано.</li>
+          <li><strong>Журнал входов</strong> — логин и IP-адрес при попытках входа, для защиты от подбора пароля.</li>
+        </ul>
+        <p>
+          Объяснительные и заявления собираются в момент скачивания и на сервере не хранятся. Вопросы в чате
+          ВИТШику тоже не сохраняются. Для вошедших пользователей текст вопроса и найденные на портале ответы
+          передаются в сервис GigaChat (ПАО Сбербанк), чтобы сформулировать ответ; ФИО и группа туда не
+          передаются. Не пишите в чат пароли и лишние личные данные.
+        </p>
+      </section>
+
+      <section className="legal-section" id="cookies" aria-labelledby="legal-cookies">
+        <h2 id="legal-cookies">Cookie и данные в браузере</h2>
+        <p>
+          Портал использует одну cookie — для входа в аккаунт — и хранит настройки в памяти вашего браузера.
+          Рекламных и аналитических cookie нет. Фотографии преподавателей загружаются с сайта kosgos.ru.
+        </p>
+        <div className="legal-table-wrap">
+          <table className="legal-table">
+            <thead>
+              <tr><th scope="col">Название</th><th scope="col">Где</th><th scope="col">Зачем</th></tr>
+            </thead>
+            <tbody>
+              {STORAGE.map((row) => (
+                <tr key={row.name}>
+                  <td><code>{row.name}</code></td>
+                  <td>{row.kind}</td>
+                  <td>{row.what}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p>Данные в браузере можно удалить в его настройках; после этого придётся войти снова.</p>
+      </section>
+
+      <section className="legal-section" aria-labelledby="legal-rights">
+        <h2 id="legal-rights">Сроки и ваши права</h2>
+        <p>
+          Данные аккаунта хранятся, пока аккаунт существует. Вы можете узнать, какие данные о вас хранятся,
+          попросить исправить их, удалить аккаунт или отозвать согласие — обратитесь в дирекцию Высшей ИТ-школы
+          (адрес выше). После удаления аккаунта портал удаляет ваш профиль, прогресс и публикации на форуме.
+        </p>
+      </section>
+
+      <section className="legal-section legal-consent" id="consent" aria-labelledby="legal-consent-title">
+        <h2 id="legal-consent-title">Согласие на обработку персональных данных</h2>
+        <p>
+          Входя на портал ИВИТШ через учётную запись ЭИОС КГУ и отмечая согласие, я свободно, своей волей и в своём
+          интересе даю Костромскому государственному университету согласие на обработку моих персональных данных:
+          фамилии, имени, отчества, учебной группы, логина и идентификатора в ЭИОС КГУ, фотографии профиля ЭИОС,
+          сведений о моих действиях на портале (прогресс адаптации, публикации на форуме).
+        </p>
+        <p>
+          Цель обработки — работа личного кабинета портала ИВИТШ: показ профиля и расписания, подготовка документов
+          по моему запросу, участие в форуме. Действия: получение из ЭИОС КГУ, запись, хранение, уточнение,
+          использование и удаление, в том числе с помощью средств автоматизации. Тексты моих вопросов чат-помощнику
+          могут передаваться в сервис GigaChat (ПАО Сбербанк) без моих ФИО и группы.
+        </p>
+        <p>
+          Согласие действует до удаления аккаунта или до его отзыва. Отозвать согласие можно, обратившись в дирекцию
+          Высшей ИТ-школы КГУ. Редакция от {EDITION}.
+        </p>
+        <p className="legal-back"><Link to="/profile">Вернуться ко входу</Link></p>
+      </section>
+    </div>
+  );
+};
+
+export default Privacy;

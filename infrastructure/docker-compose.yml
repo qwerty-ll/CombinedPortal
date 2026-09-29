@@ -29,9 +29,6 @@ services:
       - ../.env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-portal_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-portal_db}
-    volumes:
-      # Optional Russian Trusted Root CA for GigaChat (set GIGACHAT_CA_BUNDLE=/app/certs/russian_trusted_root_ca.pem).
-      - ./gigachat-ca:/app/certs:ro
     depends_on:
       db:
         condition: service_healthy

@@ -7,6 +7,7 @@ import './styles/index.css';
 import Sidebar from './components/Sidebar';
 import TabBar from './components/TabBar';
 import ChatWidget from './components/ChatWidget';
+import CookieNotice from './components/CookieNotice';
 
 // Lazy Loaded Pages for Optimal Bundle Splitting
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -18,6 +19,7 @@ const Teachers = lazy(() => import('./pages/Teachers'));
 const FaqPage = lazy(() => import('./pages/FaqPage'));
 const Profile = lazy(() => import('./pages/Profile'));
 const AdminPanel = lazy(() => import('./pages/AdminPanel'));
+const Privacy = lazy(() => import('./pages/Privacy'));
 
 // Route loading placeholder: page-shaped skeleton instead of a spinner
 const PageLoader = () => (
@@ -103,13 +105,19 @@ function App() {
             <Route path="/faq" element={<FaqPage />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/privacy" element={<Privacy />} />
           </Routes>
         </Suspense>
+        <footer className="app-footer">
+          <span>Портал ИВИТШ КГУ</span>
+          <Link to="/privacy">Конфиденциальность и cookie</Link>
+        </footer>
       </main>
 
       <TabBar />
       {/* A new account (or signing out) starts a clean chat: nobody sees or continues someone else's conversation */}
       <ChatWidget key={user?.id ?? 'guest'} />
+      <CookieNotice />
     </div>
   );
 }

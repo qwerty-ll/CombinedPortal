@@ -11,6 +11,8 @@ class EiosLoginRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=80)
     password: str = Field(..., min_length=1, max_length=128)
     group_number: Optional[str] = Field(None, max_length=50)
+    # The "I agree to personal data processing" box at sign-in; nothing is sent to EIOS without it
+    consent: bool = False
 
 class UserUpdateProfile(BaseModel):
     group_number: Optional[str] = Field(None, max_length=50)

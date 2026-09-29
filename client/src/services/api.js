@@ -126,8 +126,9 @@ const json = (method, body) => ({ method, body: JSON.stringify(body) });
 
 // Auth Services
 export const authApi = {
-  eiosLogin: (username, password, groupNumber = '') =>
-    apiFetch('/api/v1/auth/eios-login', json('POST', { username, password, group_number: groupNumber })),
+  // consent: the "I agree to personal data processing" box; the server refuses the sign-in without it
+  eiosLogin: (username, password, groupNumber = '', consent = false) =>
+    apiFetch('/api/v1/auth/eios-login', json('POST', { username, password, group_number: groupNumber, consent })),
   adminLogin: (username, password) =>
     apiFetch('/api/v1/auth/admin-login', json('POST', { username, password })),
   logout: () =>

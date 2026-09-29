@@ -91,5 +91,7 @@ infrastructure/certs/*
 infrastructure/certbot-www/
 infrastructure/gigachat-ca/
 *.pem
+# Public CA certificates of the Russian Ministry of Digital Development, used for GigaChat
+!server/app/assets/certs/russian_trusted_ca.pem
 *.key
 scratch/

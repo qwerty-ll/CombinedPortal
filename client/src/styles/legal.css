@@ -1,0 +1,131 @@
+/* Privacy page, cookie notice, site footer and the consent box at sign-in */
+
+/* ---------- Privacy page ---------- */
+.legal-page { max-width: 52rem; }
+.legal-section { margin-top: var(--space-8); }
+.legal-section[id] { scroll-margin-top: var(--space-6); }
+.legal-section h2 { font-size: var(--text-lg); margin-bottom: var(--space-3); }
+.legal-section p,
+.legal-list { max-width: var(--prose-width); }
+.legal-section p + p { margin-top: var(--space-3); }
+.legal-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding-left: var(--space-5);
+  list-style: disc;
+}
+.legal-table-wrap {
+  margin: var(--space-4) 0;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.legal-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.legal-table th,
+.legal-table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.legal-table th { color: var(--text-2); font-weight: var(--weight-medium); background: var(--surface-2); }
+.legal-table tr:last-child td { border-bottom: 0; }
+.legal-table td:first-child { width: 34%; }
+.legal-table code { font-size: var(--text-xs); overflow-wrap: anywhere; }
+.legal-consent {
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.legal-back { margin-top: var(--space-4); }
+
+/* ---------- Footer on every page ---------- */
+.app-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  max-width: var(--content-width);
+  margin: var(--space-12) auto 0;
+  padding: var(--space-4) var(--space-6) 0;
+  border-top: 1px solid var(--border);
+  color: var(--text-3);
+  font-size: var(--text-sm);
+}
+.app-footer a { color: var(--text-2); }
+
+/* ---------- Cookie notice ---------- */
+.cookie-notice {
+  position: fixed;
+  left: calc(var(--sidebar-width) + var(--space-6));
+  bottom: var(--space-6);
+  z-index: var(--z-chat);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 36rem;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-overlay);
+}
+.sidebar-collapsed .cookie-notice { left: calc(var(--sidebar-width-collapsed) + var(--space-6)); }
+.cookie-notice-icon { flex-shrink: 0; color: var(--warm-strong); }
+.cookie-notice-text { font-size: var(--text-sm); color: var(--text); }
+.cookie-notice-link { white-space: nowrap; }
+.cookie-notice-ok { flex-shrink: 0; }
+
+@media (max-width: 1024px) {
+  .cookie-notice,
+  .sidebar-collapsed .cookie-notice { left: var(--space-4); }
+}
+@media (max-width: 768px) {
+  /* Above the tab bar, leaving room for the chat button on the right */
+  .cookie-notice,
+  .sidebar-collapsed .cookie-notice {
+    left: var(--space-3);
+    right: calc(var(--space-4) + 3.5rem + var(--space-2));
+    bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom) + var(--space-3));
+    max-width: none;
+    flex-wrap: wrap;
+    padding: var(--space-3);
+  }
+  .cookie-notice-icon { display: none; }
+  .app-footer { padding-inline: var(--space-4); }
+}
+@media (max-width: 600px) {
+  /* Each row becomes a small card: name and place on one line, the purpose under them */
+  .legal-table thead { display: none; }
+  .legal-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: var(--space-3);
+    padding: var(--space-3);
+    border-bottom: 1px solid var(--border);
+  }
+  .legal-table tr:last-child { border-bottom: 0; }
+  .legal-table td { padding: 0; border: 0; }
+  .legal-table td:first-child { width: auto; }
+  .legal-table td:nth-child(2) { color: var(--text-3); }
+  .legal-table td:last-child { grid-column: 1 / -1; margin-top: var(--space-1); }
+}
+
+/* ---------- Consent at sign-in ---------- */
+.login-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.login-consent input {
+  flex-shrink: 0;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: 0.125rem;
+  accent-color: var(--accent);
+}
+.login-consent a { white-space: nowrap; }

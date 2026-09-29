@@ -1,6 +1,7 @@
 import logging
 import re
 import secrets
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
@@ -22,6 +23,8 @@ router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 _LOGIN_LOOKS_LIKE_RAW_ID = re.compile(r"^\d{2}-[a-zа-я]+-\d+", re.IGNORECASE)
 _INVALID_CREDENTIALS = "Неверный логин или пароль ЭИОС КГУ. Проверьте данные и попробуйте снова."
 _INVALID_ADMIN_CREDENTIALS = "Неверный логин или пароль Администратора ИВИТШ"
+# Edition of the consent text on /privacy#consent (client/src/pages/Privacy.jsx, EDITION): change both together
+PD_CONSENT_VERSION = "2026-09-29"
 
 
 def _find_user(db: Session, username: str) -> Optional[models.User]:
@@ -108,6 +111,10 @@ async def eios_login(req: schemas.EiosLoginRequest, request: Request, response: 
     password = req.password  # passwords may legitimately start or end with spaces
     if not username or not password:
         raise HTTPException(status_code=400, detail="Логин и пароль обязательны для входа через ЭИОС КГУ")
+    # 152-ФЗ: personal data is requested from EIOS and stored only after the student agreed to it
+    if not req.consent:
+        raise HTTPException(status_code=400, detail="Чтобы войти, отметьте согласие на обработку персональных данных.")
+    consent_at = datetime.now(timezone.utc)
 
     ip = rate_limit.client_ip(request)
     user_key = f"eios:{username.lower()}"
@@ -160,6 +167,7 @@ async def eios_login(req: schemas.EiosLoginRequest, request: Request, response: 
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Учётная запись заблокирована администратором портала.")
         db_user.sdo_id = db_user.sdo_id or identity.eios_id
         db_user.full_name = full_name
+        db_user.pd_consent_at, db_user.pd_consent_version = consent_at, PD_CONSENT_VERSION
         if group:
             db_user.group_number = group
             db_user.eios_group_id = group_id
@@ -178,6 +186,8 @@ async def eios_login(req: schemas.EiosLoginRequest, request: Request, response: 
             auth_source="eios",
             sdo_id=identity.eios_id,
             avatar_url=avatar_url,
+            pd_consent_at=consent_at,
+            pd_consent_version=PD_CONSENT_VERSION,
         )
         db.add(db_user)
         try:
