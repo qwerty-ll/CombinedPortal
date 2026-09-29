@@ -61,6 +61,7 @@ def functions(today: date) -> List[dict]:
                     "date_to": {"type": "string", "description": "Последний день, ГГГГ-ММ-ДД. Для одного дня равен date_from."},
                     "discipline": {"type": "string", "description": "Название дисциплины или его часть, если спрашивают про один предмет."},
                     "group": {"type": "string", "description": "Номер группы, если спрашивают не про свою, например 23-ПИбо-2."},
+                    "subgroup": {"type": "integer", "description": "Номер подгруппы (1 или 2), если спрашивают про одну подгруппу."},
                 },
             },
             "few_shot_examples": [
@@ -157,7 +158,8 @@ def _lesson(lesson: timetable.Lesson, now: datetime) -> dict:
 async def _schedule(args: dict, ctx: Context) -> dict:
     today = ctx.now.date()
     year = timetable.academic_year(today)
-    wanted = _text(args.get("group"), 50)
+    # A group or subgroup named in the question wins over what the model passed, like the days below
+    wanted = assistant.group_in(ctx.question) or _text(args.get("group"), 50)
     if wanted:
         group = await timetable.find_group(wanted, year)
         if not group:
@@ -184,15 +186,16 @@ async def _schedule(args: dict, ctx: Context) -> dict:
     if discipline:
         names = assistant._matching_disciplines(assistant._norm(discipline), pool) or assistant._matching_disciplines(ctx.question, pool)
         pool = [l for l in pool if l.discipline in names]
+    subgroup = assistant.subgroup_in(ctx.question) or (args.get("subgroup") if args.get("subgroup") in (1, 2) else 0)
+    if subgroup:
+        pool = [l for l in pool if l.subgroup in (0, subgroup)]
     if not first:
         pool = pool[:8]
     pool = pool[:MAX_LESSONS]
 
     ctx.actions.append(assistant.Action("Расписание на главной", "/#schedule-section"))
     upcoming = next((l for l in pool if l.ends_at > ctx.now), None)
-    room = assistant._map_action(upcoming.room) if upcoming else None
-    if room:
-        ctx.actions.insert(0, room)
+    ctx.actions[:0] = assistant._map_actions(assistant._same_slot(pool, upcoming))
     label = f"{first:%d.%m}" + (f"–{last:%d.%m}" if last and last != first else "") if first else "ближайшие дни"
     ctx.plain.append(
         f"Пары группы {group['name']} ({label}):\n" + "\n".join(f"• {l.day:%d.%m}, {assistant._lesson_line(l)}" for l in pool)
@@ -200,7 +203,7 @@ async def _schedule(args: dict, ctx: Context) -> dict:
     )
     result = {
         # The student's own group stays on the portal; a group they named themselves is echoed back
-        "group": group["name"] if wanted else "группа студента",
+        "group": (group["name"] if wanted else "группа студента") + (f", {subgroup} подгруппа" if subgroup else ""),
         "period": {"from": first.isoformat(), "to": last.isoformat()} if first else "ближайшие пары",
         "count": len(pool),
         "lessons": [_lesson(l, ctx.now) for l in pool],

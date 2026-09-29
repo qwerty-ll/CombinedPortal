@@ -98,9 +98,49 @@ def _link(path: str, **params: str) -> str:
     return path + "?" + "&".join(f"{key}={quote(value)}" for key, value in params.items()) if params else path
 
 
-def _map_action(room: str) -> Optional[Action]:
+def _map_action(room: str, note: str = "") -> Optional[Action]:
     m = re.match(r"^Б-?([1-4]\d{2})$", (room or "").strip(), re.IGNORECASE)
-    return Action(f"Б-{m.group(1)} на карте", _link("/map", room=f"Б-{m.group(1)}")) if m else None
+    return Action(f"Б-{m.group(1)} на карте{note}", _link("/map", room=f"Б-{m.group(1)}")) if m else None
+
+
+def _map_actions(lessons: List[timetable.Lesson]) -> List[Action]:
+    """Map buttons for the rooms of one time slot; parallel subgroup pairs get one each, marked "(1 пг)"."""
+    parallel = len({l.room for l in lessons}) > 1
+    actions, seen = [], set()
+    for lesson in lessons:
+        note = f" ({lesson.subgroup} пг)" if parallel and lesson.subgroup else ""
+        action = _map_action(lesson.room, note)
+        if action and action.to not in seen:
+            seen.add(action.to)
+            actions.append(action)
+    return actions[:2]
+
+
+def _same_slot(lessons: List[timetable.Lesson], first: Optional[timetable.Lesson]) -> List[timetable.Lesson]:
+    return [l for l in lessons if first and l.day == first.day and l.start == first.start] if first else []
+
+
+# "24-ИСбо-2" in a question: the pairs of that group, not the student's own
+_GROUP_IN_QUESTION = re.compile(r"(?<![\w-])(\d{2})\s*-\s*([а-яёa-z]{2,8})\s*-\s*(\d{1,2}[а-яё]?)(?![\wа-яё])", re.IGNORECASE)
+# "2 пг", "п/г 2", "подгруппа 2", "2-я подгруппа", "второй подгруппы"
+_SUBGROUP_IN_QUESTION = re.compile(
+    r"(?<![\d-])([12])\s*-?\s*(?:я|ая|й)?\s*(?:п/?г|подгр[а-яё]*)(?![а-яё])|(?:п/?г|подгр[а-яё]*)\.?\s*№?\s*([12])(?!\d)"
+    r"|(перв|втор)[а-яё]*\s+подгр"
+)
+
+
+def group_in(text: str) -> Optional[str]:
+    m = _GROUP_IN_QUESTION.search(text or "")
+    return f"{m.group(1)}-{m.group(2)}-{m.group(3)}" if m else None
+
+
+def subgroup_in(text: str) -> int:
+    m = _SUBGROUP_IN_QUESTION.search(_norm(text))
+    if not m:
+        return 0
+    if m.group(3):
+        return 1 if m.group(3) == "перв" else 2
+    return int(m.group(1) or m.group(2))
 
 
 # --- Dates in questions ------------------------------------------------------------------------
@@ -205,26 +245,33 @@ async def _group_for(user: Optional[models.User], hint: Optional[str], year: str
     return None, missing
 
 
-def _schedule_answer(q: str, lessons: List[timetable.Lesson], group: str, now: datetime) -> Finding:
+def _schedule_answer(q: str, lessons: List[timetable.Lesson], group: str, now: datetime,
+                     subgroup: int = 0, other_group: bool = False) -> Finding:
+    """Pairs for the question; with a subgroup only its pairs and the whole group's, named in the reply."""
     today = now.date()
+    if subgroup:
+        lessons = [l for l in lessons if l.subgroup in (0, subgroup)]
+        group = f"{group}, {subgroup} подгруппа"
     soon = timetable.upcoming(lessons, now, LOOKAHEAD_DAYS)
     when = parse_when(q, today)
     disciplines = _matching_disciplines(q, soon)
     actions = [Action("Расписание на главной", "/#schedule-section")]
 
-    def finish(text: str, focus: Optional[timetable.Lesson]) -> Finding:
-        room = _map_action(focus.room) if focus else None
-        return Finding(text=text, actions=([room] if room else []) + actions, exact=True, weight=100)
+    def finish(text: str, focus: List[timetable.Lesson]) -> Finding:
+        return Finding(text=text, actions=_map_actions(focus) + actions, exact=True, weight=100)
+
+    def first_ahead(pool: List[timetable.Lesson]) -> List[timetable.Lesson]:
+        return _same_slot(pool, next((l for l in pool if l.ends_at > now), None))
 
     if disciplines:
         pool = [l for l in soon if l.discipline in disciplines and (not when or when[0] <= l.day <= when[1])]
         title = ", ".join(f"«{d}»" for d in disciplines)
         if not pool:
             where = f" {_day_label(when[0], today)}" if when and when[0] == when[1] else (" в эти дни" if when else " в ближайшие две недели")
-            return finish(f"{title}{where} в расписании группы {group} нет.", None)
+            return finish(f"{title}{where} в расписании группы {group} нет.", [])
         # One discipline: its name is in the title, the lines say when, what kind and where
         lines = [f"• {_day_label(l.day, today).capitalize()}, {_lesson_line(l, len(disciplines) > 1)}" for l in pool[:4]]
-        return finish(f"{title} у группы {group}:\n" + "\n".join(lines), pool[0])
+        return finish(f"{title} у группы {group}:\n" + "\n".join(lines), first_ahead(pool))
 
     if when:
         first, last = when
@@ -232,18 +279,18 @@ def _schedule_answer(q: str, lessons: List[timetable.Lesson], group: str, now: d
         if first == last:
             label = _day_label(first, today)
             if not pool:
-                return finish(f"{label.capitalize()} у группы {group} пар нет.", None)
+                return finish(f"{label.capitalize()} у группы {group} пар нет.", [])
             lines = [f"• {_lesson_line(l)}" + (", идёт сейчас" if l.starts_at <= now < l.ends_at else "") for l in pool]
-            return finish(f"{label.capitalize()} у группы {group}:\n" + "\n".join(lines), next((l for l in pool if l.ends_at > now), None))
+            return finish(f"{label.capitalize()} у группы {group}:\n" + "\n".join(lines), first_ahead(pool))
         if not pool:
-            return finish(f"В эти дни у группы {group} пар нет.", None)
+            return finish(f"В эти дни у группы {group} пар нет.", [])
         lines, current_day = [], None
         for lesson in pool[:14]:
             if lesson.day != current_day:
                 current_day = lesson.day
                 lines.append(_day_label(lesson.day, today).capitalize() + ":")
             lines.append(f"• {_lesson_line(lesson)}")
-        return finish(f"Пары группы {group}:\n" + "\n".join(lines), next((l for l in pool if l.ends_at > now), None))
+        return finish(f"Пары группы {group}:\n" + "\n".join(lines), first_ahead(pool))
 
     current = [l for l in soon if l.starts_at <= now < l.ends_at]
     upcoming = [l for l in soon if l.starts_at > now]
@@ -267,20 +314,34 @@ def _schedule_answer(q: str, lessons: List[timetable.Lesson], group: str, now: d
         else:
             parts.append(f"Следующая пара — {when}: {n.discipline} ({n.kind}){_whose(n)}" + (f", {n.room}" if n.room else "") + ".")
     if not parts:
-        return finish(f"В ближайшие две недели у группы {group} пар в расписании нет.", None)
-    return finish(" ".join(parts), current[0] if current else upcoming[0])
+        return finish(f"В ближайшие две недели у группы {group} пар в расписании нет.", [])
+    # Another group or one subgroup: say whose pairs these are
+    lead = f"{group}:\n" if subgroup or other_group else ""
+    return finish(lead + " ".join(parts), current or upcoming)
 
 
-async def _schedule_finding(q, previous_q, user, hint, now) -> Optional[Finding]:
+async def _schedule_finding(q, previous_q, user, hint, now, message: str = "") -> Optional[Finding]:
     today = now.date()
-    # "А завтра?" right after a question about pairs is a question about pairs too
-    asked = _asks_schedule(q, today) or bool(parse_when(q, today) and previous_q and _asks_schedule(previous_q, today))
-    has_group = bool((user and user.group_number) or hint)
+    named, subgroup = group_in(message or q), subgroup_in(q)
+    # "А завтра?", "а у второй подгруппы?" right after a question about pairs are questions about pairs too
+    follow_up = bool(previous_q and _asks_schedule(previous_q, today)
+                     and not _asks_schedule(q, today) and (parse_when(q, today) or named or subgroup))
+    asked = _asks_schedule(q, today) or follow_up
+    if follow_up:
+        named = named or group_in(previous_q)
+        subgroup = subgroup or subgroup_in(previous_q)
+        if not parse_when(q, today):
+            q = f"{previous_q} {q}"  # the days and the discipline of the question it follows
+    has_group = bool((user and user.group_number) or hint or named)
     if not asked and not has_group:
         return None
     try:
         year = timetable.academic_year(today)
-        group, missing = await _group_for(user, hint, year)
+        if named:
+            found_group = await timetable.find_group(named, year)
+            group, missing = (found_group, None) if found_group else (None, named)
+        else:
+            group, missing = await _group_for(user, hint, year)
         lessons, stale = (await timetable.group_lessons(group["id"], year)) if group else ([], False)
     except timetable.TimetableUnavailable:
         if not asked:
@@ -297,7 +358,9 @@ async def _schedule_finding(q, previous_q, user, hint, now) -> Optional[Finding]
         text = "Я пока не знаю твою группу. Войди через ЭИОС в «Личном кабинете» или выбери группу в расписании на главной, и я подскажу пары."
         return Finding(text, [Action("Войти через ЭИОС", "/profile"), Action("Расписание на главной", "/#schedule-section")], exact=True, weight=100)
 
-    finding = _schedule_answer(q, lessons, group["name"], now)
+    own = (user.group_number if user else None) or hint or ""
+    other = bool(named) and timetable.normalize_name(group["name"]) != timetable.normalize_name(own)
+    finding = _schedule_answer(q, lessons, group["name"], now, subgroup=subgroup, other_group=other)
     if stale:
         finding.text += "\n\nЭИОС сейчас не отвечает, это последнее сохранённое расписание."
     return finding
@@ -652,7 +715,7 @@ async def answer(
         return chat
 
     exact = [f for f in (
-        await _schedule_finding(q, previous_q, user, group_hint, now),
+        await _schedule_finding(q, previous_q, user, group_hint, now, message),
         room_finding(q),
         await _teacher_finding(q, db, now),
     ) if f]
