@@ -58,6 +58,10 @@ const ChatWidget = () => {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  // Each started chat gets a number: a reply that arrives after the chat was ended or restarted is dropped,
+  // so it can never land in the next conversation.
+  const chatIdRef = useRef(0);
+  useEffect(() => () => { chatIdRef.current += 1; }, []);
 
   const isMobile = useIsMobile();
 
@@ -101,30 +105,37 @@ const ChatWidget = () => {
     setChatMessages(prev => [...prev, { text: messageToSend, sender: 'user' }]);
     setInputValue('');
     setIsTyping(true);
+    const chatId = chatIdRef.current;
 
     try {
       const data = await chatApi.sendMessage(messageToSend, historyPayload, pickedGroupName());
+      if (chatId !== chatIdRef.current) return;
       const actions = Array.isArray(data?.actions)
         ? data.actions.filter(a => typeof a?.to === 'string' && a.to.startsWith('/') && !a.to.startsWith('//'))
         : [];
       const draft = data?.document && ['explanatory', 'retake'].includes(data.document.kind) ? data.document : null;
       setChatMessages(prev => [...prev, { text: data?.reply || 'Не удалось получить ответ. Попробуй спросить иначе.', sender: 'bot', actions, document: draft }]);
     } catch (e) {
+      if (chatId !== chatIdRef.current) return;
       const text = e.status === 429
         ? e.message
         : 'ВИТШик сейчас не на связи. Попробуй ещё раз чуть позже или загляни в раздел FAQ.';
       setChatMessages(prev => [...prev, { text, sender: 'bot', isSystem: true }]);
     } finally {
-      setIsTyping(false);
+      if (chatId === chatIdRef.current) setIsTyping(false);
     }
   };
 
   const startChat = () => {
+    chatIdRef.current += 1;
+    setIsTyping(false);
     setChatMessages([{ text: GREETING, sender: 'bot', isInitial: true }]);
     setIsChatActive(true);
   };
 
   const endChat = () => {
+    chatIdRef.current += 1;
+    setIsTyping(false);
     setIsChatActive(false);
     setChatMessages(prev => [...prev, { text: 'Чат завершён. Надеюсь, я смог помочь — обращайся ещё.', sender: 'bot', isSystem: true }]);
   };

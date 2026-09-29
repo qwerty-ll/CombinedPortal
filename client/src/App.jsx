@@ -116,7 +116,8 @@ function App() {
       </main>
 
       <TabBar />
-      <ChatWidget />
+      {/* A new account (or signing out) starts a clean chat: nobody sees or continues someone else's conversation */}
+      <ChatWidget key={user?.id ?? 'guest'} />
     </div>
   );
 }

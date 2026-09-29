@@ -3,6 +3,8 @@
 #
 # Students sign in with their EIOS account. For the admin panel ("Сотрудник ИВИТШ") put
 # ADMIN_USERNAME and ADMIN_PASSWORD into a .env file next to this one (see .env.example).
+# The same .env takes GIGACHAT_AUTH_KEY for the assistant; check it with
+#   docker compose exec portal python -m app.services.gigachat_check
 # Data lives in the "portal_data" volume; `docker compose down -v` deletes it.
 #
 # Production (PostgreSQL, HTTPS, separate services) is infrastructure/docker-compose.yml.
@@ -22,8 +24,17 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       # Empty: a key is generated once and kept in the data volume.
       SECRET_KEY: ${SECRET_KEY:-}
+      # ВИТШик rephrases answers with GigaChat when a key is set (see .env.example)
+      GIGACHAT_AUTH_KEY: ${GIGACHAT_AUTH_KEY:-}
+      GIGACHAT_SCOPE: ${GIGACHAT_SCOPE:-}
+      GIGACHAT_MODEL: ${GIGACHAT_MODEL:-}
+      GIGACHAT_MAX_STREAMS: ${GIGACHAT_MAX_STREAMS:-}
+      DOCUMENT_ADDRESSEE_TITLE: ${DOCUMENT_ADDRESSEE_TITLE:-}
+      DOCUMENT_ADDRESSEE_NAME: ${DOCUMENT_ADDRESSEE_NAME:-}
     volumes:
       - portal_data:/app/data
+      # The Russian Trusted Root CA for GigaChat: infrastructure/gigachat-ca/russian_trusted_root_ca.pem
+      - ./infrastructure/gigachat-ca:/app/certs:ro
 
 volumes:
   portal_data:
