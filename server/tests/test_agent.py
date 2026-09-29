@@ -173,3 +173,18 @@ def test_without_any_data_the_model_may_only_talk_about_itself(student, monkeypa
            text("Я ВИТШик! Могу подсказать пары, аудитории и преподавателей."))
     assert ask(student, "где библиотека")[0] == assistant.NOT_FOUND_REPLY
     assert ask(student, "ты вообще кто такой")[0] == "Я ВИТШик! Могу подсказать пары, аудитории и преподавателей."
+
+
+def test_rooms_facts_reach_the_model(student, monkeypatch):
+    sent = script(
+        monkeypatch,
+        call("find_room", room="Б-301"),
+        call("search_portal", query="PyCharm"),
+        text("В Б-301 13 ПК и 12 ноутбуков на Linux, PyCharm там есть."),
+    )
+    # The floor plan of the room found comes along
+    assert ask(student, "подскажи, куда пойти покодить вечером")[0] == \
+        "В Б-301 13 ПК и 12 ноутбуков на Linux, PyCharm там есть.\n\n[IMG:301.png]"
+    room, found = function_results(sent[2])
+    assert room["room"].startswith("Б-301 — учебная: 25 мест, 13 ПК и 12 ноутбуков на Linux, 3 этаж.")
+    assert found["results"][0].startswith("PyCharm есть в 12 аудиториях:")

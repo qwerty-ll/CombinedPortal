@@ -832,40 +832,6 @@
 
 .map-stage { position: relative; }
 
-.map-viewport {
-  position: relative;
-  overflow: hidden;
-  width: 100%;
-  min-width: 0;
-  aspect-ratio: 2.6;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  user-select: none;
-}
-.map-viewport.is-zoomed {
-  cursor: grab;
-  touch-action: none;
-}
-.map-viewport.is-dragging { cursor: grabbing; }
-
-.map-image-frame {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.map-image {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  transform-origin: center center;
-  transition: transform var(--dur-fast) var(--ease);
-  pointer-events: none;
-}
-.map-viewport.is-dragging .map-image { transition: none; }
-
 .map-zoom {
   position: absolute;
   right: var(--space-3);
@@ -900,38 +866,6 @@
 @media (hover: hover) {
   .map-zoom-btn:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
 }
-
-.map-info {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
-  gap: var(--space-8);
-  margin-top: var(--space-6);
-  padding-top: var(--space-6);
-  border-top: 1px solid var(--border);
-}
-.map-info-block h3 {
-  font-size: var(--text-base);
-  letter-spacing: 0;
-}
-.map-info-block p {
-  max-width: var(--prose-width);
-  margin-top: var(--space-2);
-  color: var(--text-2);
-}
-.map-places {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-.map-places li {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-weight: var(--weight-medium);
-}
-.map-places svg { color: var(--accent); }
 
 /* =========================================================================
    Responsive
@@ -1046,10 +980,6 @@
   .map-finder-row { flex-direction: column; }
   .map-finder-row .cm-search { max-width: none; }
   .map-panel-head { align-items: stretch; }
-  .map-viewport {
-    aspect-ratio: auto;
-    height: 12rem;
-  }
   .map-zoom {
     position: static;
     justify-content: flex-end;
@@ -1063,15 +993,10 @@
     flex: 1;
     justify-content: center;
   }
-  .map-info {
-    grid-template-columns: 1fr;
-    gap: var(--space-6);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .cm-vote-btn,
   .faq-chevron,
-  .teacher-chevron,
-  .map-image { transition: none; }
+  .teacher-chevron { transition: none; }
 }

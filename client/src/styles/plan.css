@@ -1,0 +1,408 @@
+/* =========================================================================
+   Floor plans of корпус Б (components/FloorPlan.jsx) and the campus map around them
+   ========================================================================= */
+
+.plan {
+  --plan-wall: #3A465C;
+  --plan-floor: #F7F9FC;
+  --plan-step: #8C97AA;
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font-sans);
+  user-select: none;
+}
+
+.plan-shell { fill: var(--plan-wall); }
+.plan-corridor { fill: var(--plan-floor); }
+.plan-porch { fill: var(--plan-floor); stroke: var(--plan-wall); stroke-width: 4; }
+.plan-stairs { stroke: var(--plan-wall); stroke-width: 4; }
+.plan-step { stroke: var(--plan-step); stroke-width: 2; }
+.plan-wc { fill: #E6EBF2; stroke: var(--plan-wall); stroke-width: 4; }
+.plan-wc-label { fill: #6B768A; font-weight: 600; letter-spacing: 0.04em; }
+.plan-hall-label { fill: #6B768A; font-weight: 500; }
+.plan-entrance-arrow { fill: none; stroke: var(--hue-green); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.plan-entrance-label { fill: var(--hue-green); font-weight: 600; }
+
+/* Rooms: a soft fill by kind, walls from the stroke */
+.plan-room-shape {
+  stroke: var(--plan-wall);
+  stroke-width: 5;
+  transition: fill var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+}
+.plan-room-number {
+  font-weight: 600;
+  fill: var(--text);
+  pointer-events: none;
+}
+.plan-room-number.is-word { font-weight: 500; }
+.plan-room-sub { fill: var(--text-2); font-weight: 500; pointer-events: none; }
+.plan-room-ring { fill: none; stroke: var(--accent); stroke-width: 4; pointer-events: none; }
+
+.tone-blue { --tone: var(--hue-blue); --tone-soft: var(--hue-blue-soft); }
+.tone-cyan { --tone: var(--hue-cyan); --tone-soft: var(--hue-cyan-soft); }
+.tone-violet { --tone: var(--hue-violet); --tone-soft: var(--hue-violet-soft); }
+.tone-green { --tone: var(--hue-green); --tone-soft: var(--hue-green-soft); }
+.tone-amber { --tone: var(--hue-amber); --tone-soft: var(--hue-amber-soft); }
+.tone-orange { --tone: var(--hue-orange); --tone-soft: var(--hue-orange-soft); }
+.tone-pink { --tone: var(--hue-pink); --tone-soft: var(--hue-pink-soft); }
+.tone-slate { --tone: var(--hue-slate); --tone-soft: #DCE3EE; }
+.tone-neutral { --tone: #7A8497; --tone-soft: #ECEFF4; }
+
+.plan-room .plan-room-shape { fill: var(--tone-soft); }
+.plan-room.tone-neutral .plan-room-number { fill: var(--text-2); }
+
+.plan-room.is-pickable { cursor: pointer; }
+.plan-room.is-pickable:focus { outline: none; }
+.plan-room.is-pickable:focus-visible .plan-room-shape { stroke: var(--accent); stroke-width: 9; }
+@media (hover: hover) {
+  .plan-room.is-pickable:hover .plan-room-shape { fill: color-mix(in srgb, var(--tone-soft) 70%, var(--tone) 30%); }
+}
+
+/* A filter: the rooms that fit keep their colour, the rest fade */
+.plan-room.is-dim .plan-room-shape { fill: #EEF1F5; }
+.plan-room.is-dim .plan-room-number,
+.plan-room.is-dim .plan-room-sub { fill: #97A0B0; }
+
+.plan-room.is-selected .plan-room-shape { fill: var(--accent); }
+.plan-room.is-selected .plan-room-number,
+.plan-room.is-selected .plan-room-sub { fill: var(--on-accent); }
+@media (hover: hover) {
+  .plan-room.is-selected.is-pickable:hover .plan-room-shape { fill: var(--accent-hover); }
+}
+
+.plan-pin path { fill: var(--warm-strong); stroke: #FFFFFF; stroke-width: 4; }
+.plan-pin circle { fill: #FFFFFF; }
+.plan-pin-body { animation: plan-pin-drop 420ms var(--ease) both; transform-origin: 0 0; }
+@keyframes plan-pin-drop {
+  from { opacity: 0; transform: translateY(-40px) scale(0.8); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .plan-pin-body { animation: none; }
+}
+
+.plan-compact .plan-pin path { stroke-width: 5; }
+
+/* ---------- The map page ---------- */
+
+.map-floors .segmented-item { gap: var(--space-2); }
+.map-floor-count {
+  min-width: 1.375rem;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--text-xs);
+  line-height: 1.375rem;
+  text-align: center;
+}
+.map-floor-count.is-zero { background: var(--surface); color: var(--text-3); }
+
+.map-finder .field-label { display: block; margin-bottom: var(--space-2); }
+
+.map-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.map-filters .chip { gap: var(--space-1); }
+.map-filter-summary {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.map-filter-summary.is-error { color: var(--danger); }
+.map-link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: var(--weight-medium);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .map-link-button:hover { color: var(--accent-hover); }
+}
+
+.map-scroll {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+.map-scroll.is-dragging { cursor: grabbing; }
+.map-scroll.is-dragging .plan-room.is-pickable { cursor: grabbing; }
+.map-canvas {
+  width: calc(100% * var(--zoom, 1));
+  min-width: 760px;
+  padding: var(--space-3);
+}
+
+.map-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.map-legend li { display: inline-flex; align-items: center; gap: var(--space-2); }
+
+.room-kind-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 4px;
+  background: var(--tone-soft);
+  box-shadow: inset 0 0 0 1.5px var(--tone);
+}
+
+.map-details {
+  scroll-margin-top: 5rem;  /* under the phone header */
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border);
+}
+.map-howto h3,
+.map-room-list h3 { font-size: var(--text-base); letter-spacing: 0; }
+.map-howto p {
+  max-width: var(--prose-width);
+  margin-top: var(--space-2);
+  color: var(--text-2);
+}
+
+.map-room-list ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+}
+.map-room-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.map-room-row[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); }
+.map-room-row.is-dim { color: var(--text-3); }
+.map-room-row.is-dim .room-kind-dot { opacity: 0.45; }
+@media (hover: hover) {
+  .map-room-row:hover:not([aria-pressed='true']) { background: var(--surface-hover); }
+}
+.map-room-name { font-weight: var(--weight-semibold); white-space: nowrap; }
+.map-room-meta {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.map-room-row.is-dim .map-room-meta { color: var(--text-3); }
+.map-room-list-more {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+
+/* ---------- Room card ---------- */
+
+.room-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.room-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.room-card-title { font-size: var(--text-lg); }
+.room-card-kind {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.room-card-close { flex-shrink: 0; margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) 0 0; }
+.room-card-note { color: var(--text-2); font-size: var(--text-sm); }
+
+.room-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: var(--space-2);
+}
+.room-stats > div {
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.room-stats dt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-2);
+}
+.room-stats dd {
+  margin-top: var(--space-1);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: 1.2;
+}
+
+.room-today {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-medium);
+}
+.room-today-muted { color: var(--text-2); font-weight: var(--weight-regular); font-size: var(--text-sm); }
+.room-today-dot {
+  flex-shrink: 0;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+}
+.room-today.is-free { color: var(--success); }
+.room-today.is-free .room-today-dot { background: var(--success); }
+.room-today.is-busy { color: var(--danger); }
+.room-today.is-busy .room-today-dot { background: var(--danger); }
+.room-lessons {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+}
+.room-lessons li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+.room-lessons li.is-past { color: var(--text-3); }
+.room-lessons li.is-live { background: var(--danger-soft); }
+.room-lesson-time { color: var(--text-2); }
+.room-lessons li.is-past .room-lesson-time { color: var(--text-3); }
+.room-lesson-groups { color: var(--text-2); }
+
+.room-card-group h4 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+}
+.room-count {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  font-size: var(--text-xs);
+  color: var(--text-2);
+}
+.room-tags {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.room-tags > li:not(:has(button)) {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+}
+.room-tag-btn {
+  min-height: 2rem;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+@media (hover: hover) {
+  .room-tag-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+}
+.room-more { margin-top: var(--space-2); }
+
+/* ---------- The plan in the chat and in the freshman guide ---------- */
+
+.chat-plan {
+  display: block;
+  margin-top: var(--space-3);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+@media (hover: hover) {
+  .chat-plan:hover { border-color: var(--accent); }
+}
+
+.guide-plan {
+  margin-top: var(--space-4);
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.guide-plan .plan { min-width: 640px; padding: var(--space-2); }
+
+@media (max-width: 900px) {
+  .map-details { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 768px) {
+  .map-canvas { min-width: 900px; }
+  .map-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-inline: calc(-1 * var(--space-4));
+    padding: var(--space-1) var(--space-4);
+  }
+  .map-filters::-webkit-scrollbar { display: none; }
+  .room-card { padding: var(--space-4); }
+  .room-tag-btn { min-height: var(--touch-target); }
+}

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import {
-  Zap, GraduationCap, Users, Heart, LifeBuoy, ChevronDown, ExternalLink,
+  Zap, GraduationCap, Users, Heart, LifeBuoy, ChevronDown, ExternalLink, ArrowRight,
   FileText, CalendarDays, LogIn, Globe, Laptop, Building2, Shield, Wallet,
   BedDouble, HeartHandshake, Phone, Lightbulb, MessageSquareQuote, BookOpen
 } from 'lucide-react';
@@ -13,6 +14,7 @@ import FunLayerModal from '../components/FunLayerModal';
 import RewardsModal, { GuideDialog } from '../components/RewardsModal';
 import { contentApi, adaptationApi } from '../services/api';
 import SectionIcon from '../components/SectionIcon';
+import FloorPlan from '../components/FloorPlan';
 
 const EASE = [0.16, 1, 0.3, 1];
 
@@ -412,12 +414,13 @@ const FreshmanGuide = () => {
                   ))}
                 </div>
                 <div id="floor-panel" role="tabpanel" aria-labelledby={`floor-tab-${selectedFloor}`}>
-                  <img src={`/floor${selectedFloor}.png`} alt={`Схема ${selectedFloor} этажа`} className="floor-plan" />
-                  <a className="floor-plan-link" href={`/floor${selectedFloor}.png`} target="_blank" rel="noopener noreferrer">
-                    Открыть схему {selectedFloor} этажа в полном размере
-                    <ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />
-                    <span className="visually-hidden"> (откроется в новой вкладке)</span>
-                  </a>
+                  <div className="guide-plan">
+                    <FloorPlan floor={selectedFloor} />
+                  </div>
+                  <Link className="floor-plan-link" to="/map" state={{ selectedFloor }}>
+                    Открыть {selectedFloor} этаж на карте кампуса: техника и программы в аудиториях
+                    <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
+                  </Link>
                 </div>
                 <button type="button" onClick={() => { completeStep(5); closeStepModal(); }} className="btn btn-primary btn-block step-complete">
                   Завершить этап 6
