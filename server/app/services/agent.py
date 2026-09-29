@@ -74,7 +74,7 @@ def functions(today: date) -> List[dict]:
         {
             "name": "find_room",
             "description": (
-                "Аудитория корпуса Б ИВИТШ: этаж и схема, места, компьютеры и ноутбуки, ОС, техника и программы; "
+                "Аудитория корпуса Б ИВИТШ: этаж и схема, места, компьютеры и ноутбуки, ОС и техника; "
                 "с датами — какие в ней пары и свободна ли она."
             ),
             "parameters": {
@@ -106,7 +106,7 @@ def functions(today: date) -> List[dict]:
             "name": "search_portal",
             "description": (
                 "Поиск по частым вопросам, форуму и справке ИВИТШ: стипендии, дирекция, документы, общежитие, "
-                "клубы, еда рядом, разделы портала; где установлена программа, где компьютеры на Linux или Windows, "
+                "клубы, еда рядом, разделы портала; где компьютеры на Linux или Windows, "
                 "где проектор, коворкинги, самая большая аудитория. Не для пар и не для преподавателей."
             ),
             "parameters": {
@@ -246,7 +246,7 @@ async def _find_room(args: dict, ctx: Context) -> dict:
     ctx.plain.append(finding.text)
     facts = rooms_base.get(number) if number else None
     if facts:
-        # Places, computers, OS, equipment and programs of the room
+        # Places, computers, OS and equipment of the room
         return {"answer": finding.text, "room": rooms_base.details(facts)}
     return {"answer": finding.text}
 
@@ -265,7 +265,7 @@ async def _find_teacher(args: dict, ctx: Context) -> dict:
 
 def _search(query: str, db: Session) -> List[assistant.Finding]:
     found = assistant._faq_findings(query, db) + assistant._forum_findings(query, db)
-    # Rooms with a program, an OS, a projector; coworkings; the biggest room
+    # Rooms with an OS or a projector; coworkings; the biggest room
     rooms = assistant.room_facts_finding(f"где есть {query}", None)
     if rooms:
         found.insert(0, rooms)

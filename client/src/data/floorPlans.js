@@ -2,7 +2,7 @@
 // Rooms are [x0, y0, x1, y1] rectangles or { points } polygons; their facts (places, computers, OS) come
 // from /api/v1/rooms. `kind` colours the rooms that are not in that table.
 
-export const VIEW = { x: 14, y: 50, width: 1858, height: 584 };
+export const VIEW = { x: 14, y: 16, width: 1858, height: 618 };
 
 const rect = (x0, y0, x1, y1) => ({ x0, y0, x1, y1 });
 
@@ -19,7 +19,7 @@ export const FLOOR_PLANS = {
       { id: '101', ...rect(1371, 97, 1809, 245) },
       { id: '104', ...rect(1275, 338, 1542, 487) },
       { id: '102', ...rect(1544, 337, 1809, 486) },
-      { id: '1-hall-top', ...rect(740, 77, 1175, 234), kind: 'office' },
+      { id: 'ит-улей', ...rect(740, 77, 1175, 234), kind: 'коворкинг', label: 'ИТ улей' },
       { id: '1-post', ...rect(647, 338, 740, 412), kind: 'office' },
     ],
     halls: [{ label: 'Холл', x: 955, y: 450 }],
@@ -86,7 +86,7 @@ export const FLOOR_PLANS = {
       { id: '408', ...rect(44, 394, 231, 557) },
       { id: '406', ...rect(232, 394, 606, 557) },
       { id: '4-hall', ...rect(617, 394, 1267, 558), kind: 'office' },
-      { id: 'коворкинг', ...rect(1276, 394, 1836, 558), kind: 'коворкинг', label: 'Коворкинг' },
+      { id: 'коворкинг', ...rect(1276, 394, 1836, 558), kind: 'коворкинг', label: 'Коворкинг', note: '64 бит' },
     ],
     stairs: stairs(87),
     wc: [rect(518, 130, 607, 295), rect(1276, 130, 1374, 295)],
@@ -109,8 +109,8 @@ export const roomShape = (id) => {
   return null;
 };
 
-// Rooms a visitor can pick: numbered rooms and the coworking, not offices without a number
-export const isPickable = (room) => /^\d{3}$/.test(room.id) ? room.kind !== 'office' : room.id === 'коворкинг';
+// Rooms a visitor can pick: numbered rooms and the coworkings, not offices without a number
+export const isPickable = (room) => (/^\d{3}$/.test(room.id) ? room.kind !== 'office' : room.kind === 'коворкинг');
 
 export const boundsOf = (room) => {
   if (!room.points) return room;

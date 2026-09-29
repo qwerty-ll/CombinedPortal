@@ -16,18 +16,6 @@
     "веб-камера",
     "кликер",
     "наушники"
-   ],
-   "software": [
-    "Deductor",
-    "GIMP",
-    "IntelliJ IDEA",
-    "LibreOffice",
-    "Loginom",
-    "PascalABC",
-    "PuTTY",
-    "Unity Hub",
-    "Visual Studio 2022",
-    "просмотр PDF"
    ]
   },
   {
@@ -42,16 +30,6 @@
    "equipment": [
     "переносная доска",
     "сенсорный стол"
-   ],
-   "software": [
-    "Code::Blocks",
-    "LibreOffice",
-    "PascalABC",
-    "PuTTY",
-    "PyCharm",
-    "VirtualBox",
-    "Visual Studio 2022",
-    "VS Code"
    ]
   },
   {
@@ -67,12 +45,6 @@
     "переносная доска",
     "проектор",
     "веб-камера"
-   ],
-   "software": [
-    "Cisco Packet Tracer",
-    "LibreOffice",
-    "VirtualBox",
-    "просмотр PDF"
    ]
   },
   {
@@ -91,9 +63,6 @@
     "видеокамеры",
     "веб-камера",
     "кликер"
-   ],
-   "software": [
-    "просмотр PDF"
    ]
   },
   {
@@ -109,34 +78,6 @@
     "переносная доска",
     "телевизор",
     "кликер"
-   ],
-   "software": [
-    "Android Studio",
-    "Code::Blocks",
-    "Deductor",
-    "DipTrace",
-    "GameMaker",
-    "GIMP",
-    "LibreOffice",
-    "Loginom",
-    "LTspice",
-    "MS SQL Server",
-    "MySQL и MySQL Workbench",
-    "PascalABC",
-    "PostgreSQL",
-    "PyCharm",
-    "SSMS",
-    "TINA-TI",
-    "Trace Mode 6",
-    "Unity 2019.4",
-    "Unity Hub",
-    "Veyon",
-    "VirtualBox",
-    "Visual Studio 2022",
-    "VS Code",
-    "WPF и Windows Forms",
-    "КОМПАС-3D",
-    "просмотр PDF"
    ]
   },
   {
@@ -151,9 +92,6 @@
    "equipment": [
     "переносная доска",
     "телевизор"
-   ],
-   "software": [
-    "просмотр PDF"
    ]
   },
   {
@@ -168,9 +106,6 @@
    "equipment": [
     "маркерная доска",
     "телевизор"
-   ],
-   "software": [
-    "просмотр PDF"
    ]
   },
   {
@@ -187,9 +122,6 @@
     "грифельная доска",
     "проектор",
     "кликер"
-   ],
-   "software": [
-    "просмотр PDF"
    ]
   },
   {
@@ -206,12 +138,6 @@
     "грифельная доска",
     "проектор",
     "кликер"
-   ],
-   "software": [
-    "DipTrace",
-    "Trace Mode 6",
-    "WPF и Windows Forms",
-    "просмотр PDF"
    ]
   },
   {
@@ -226,24 +152,6 @@
    "equipment": [
     "маркерная доска",
     "телевизор"
-   ],
-   "software": [
-    "Code::Blocks",
-    "GIMP",
-    "LibreOffice",
-    "LTspice",
-    "MS SQL Server",
-    "MySQL и MySQL Workbench",
-    "PascalABC",
-    "PostgreSQL",
-    "PyCharm",
-    "SSMS",
-    "Unity Hub",
-    "VirtualBox",
-    "Visual Studio 2022",
-    "VS Code",
-    "WPF и Windows Forms",
-    "просмотр PDF"
    ]
   },
   {
@@ -258,27 +166,6 @@
    "equipment": [
     "переносная доска",
     "проектор"
-   ],
-   "software": [
-    "Code::Blocks",
-    "CrypTool 2",
-    "Deductor",
-    "GameMaker",
-    "GIMP",
-    "LibreOffice",
-    "Loginom",
-    "LTspice",
-    "MySQL и MySQL Workbench",
-    "PascalABC",
-    "Phoenix Code",
-    "PyCharm",
-    "Unity Hub",
-    "VirtualBox",
-    "Visual Studio 2022",
-    "VS Code",
-    "WPF и Windows Forms",
-    "КОМПАС-3D",
-    "просмотр PDF"
    ]
   },
   {
@@ -294,27 +181,6 @@
     "переносная доска",
     "телевизор",
     "кликер"
-   ],
-   "software": [
-    "1С:Предприятие",
-    "Basic",
-    "Blender",
-    "Bluefish",
-    "Brackets",
-    "Code::Blocks",
-    "DaVinci Resolve",
-    "GIMP",
-    "IDLE",
-    "Inkscape",
-    "IntelliJ IDEA",
-    "Krita",
-    "LibreOffice",
-    "PascalABC",
-    "PyCharm",
-    "Veyon",
-    "VS Code",
-    "КуМир",
-    "просмотр PDF"
    ]
   },
   {
@@ -329,28 +195,6 @@
    "equipment": [
     "переносная доска",
     "проектор"
-   ],
-   "software": [
-    "1С:Предприятие",
-    "Android Studio",
-    "Basic",
-    "Blender",
-    "Bluefish",
-    "Brackets",
-    "Code::Blocks",
-    "DaVinci Resolve",
-    "GIMP",
-    "GNU Octave",
-    "IDLE",
-    "Inkscape",
-    "Krita",
-    "LibreOffice",
-    "PascalABC",
-    "PyCharm",
-    "Veyon",
-    "VS Code",
-    "КуМир",
-    "просмотр PDF"
    ]
   },
   {
@@ -366,9 +210,6 @@
     "переносная доска",
     "телевизор",
     "кликер"
-   ],
-   "software": [
-    "просмотр PDF"
    ]
   },
   {
@@ -383,27 +224,6 @@
    "equipment": [
     "переносная доска",
     "проектор"
-   ],
-   "software": [
-    "Android Studio",
-    "Basic",
-    "Blender",
-    "Bluefish",
-    "Brackets",
-    "Code::Blocks",
-    "DaVinci Resolve",
-    "GIMP",
-    "GNU Octave",
-    "IDLE",
-    "Inkscape",
-    "Krita",
-    "LibreOffice",
-    "PascalABC",
-    "PyCharm",
-    "Veyon",
-    "VS Code",
-    "КуМир",
-    "просмотр PDF"
    ]
   },
   {
@@ -419,9 +239,6 @@
     "меловая доска",
     "грифельная доска",
     "проектор"
-   ],
-   "software": [
-    "просмотр PDF"
    ]
   },
   {
@@ -437,20 +254,6 @@
     "переносная доска",
     "телевизор",
     "кликер"
-   ],
-   "software": [
-    "Code::Blocks",
-    "CrypTool 2",
-    "Deductor",
-    "LibreOffice",
-    "Loginom",
-    "LTspice",
-    "PascalABC",
-    "PyCharm",
-    "VirtualBox",
-    "VS Code",
-    "WPF и Windows Forms",
-    "просмотр PDF"
    ]
   },
   {
@@ -466,26 +269,6 @@
     "меловая доска",
     "грифельная доска",
     "проектор"
-   ],
-   "software": [
-    "Blender",
-    "Bluefish",
-    "Code::Blocks",
-    "Dia",
-    "Gambas 3",
-    "GIMP",
-    "GNU Octave",
-    "IDLE",
-    "Inkscape",
-    "Lazarus",
-    "LibreOffice",
-    "PascalABC",
-    "Phoenix Code",
-    "SMath Studio",
-    "Veyon",
-    "VS Code",
-    "КуМир",
-    "просмотр PDF"
    ]
   },
   {
@@ -502,32 +285,6 @@
     "грифельная доска",
     "телевизор",
     "кликер"
-   ],
-   "software": [
-    "Basic",
-    "Blender",
-    "Bluefish",
-    "Brackets",
-    "Code::Blocks",
-    "Deductor",
-    "Dia",
-    "Gambas 3",
-    "GIMP",
-    "GNU Octave",
-    "IDLE",
-    "Inkscape",
-    "Java",
-    "JetBrains",
-    "Lazarus",
-    "LibreOffice",
-    "Loginom",
-    "PascalABC",
-    "Python 3",
-    "SMath Studio",
-    "TINA-TI",
-    "Veyon",
-    "КуМир",
-    "просмотр PDF"
    ]
   },
   {
@@ -543,9 +300,6 @@
     "меловая доска",
     "грифельная доска",
     "проектор"
-   ],
-   "software": [
-    "просмотр PDF"
    ]
   },
   {
@@ -561,20 +315,6 @@
     "переносная доска",
     "телевизор",
     "кликер"
-   ],
-   "software": [
-    "1С:Предприятие",
-    "Code::Blocks",
-    "LibreOffice",
-    "LTspice",
-    "PascalABC",
-    "PyCharm",
-    "SMath Studio",
-    "VirtualBox",
-    "Visual Studio 2022",
-    "VS Code",
-    "WPF и Windows Forms",
-    "просмотр PDF"
    ]
   },
   {
@@ -590,9 +330,6 @@
     "меловая доска",
     "грифельная доска",
     "проектор"
-   ],
-   "software": [
-    "просмотр PDF"
    ]
   },
   {
@@ -607,31 +344,6 @@
    "equipment": [
     "переносная доска",
     "проектор"
-   ],
-   "software": [
-    "Blackmagic Design",
-    "Blender",
-    "Code::Blocks",
-    "Deductor",
-    "DipTrace",
-    "GIMP",
-    "Krita",
-    "LibreOffice",
-    "Loginom",
-    "LTspice",
-    "MS SQL Server",
-    "nanoCAD",
-    "PascalABC",
-    "PostgreSQL",
-    "PyCharm",
-    "Scribus",
-    "SSMS",
-    "Trace Mode 6",
-    "VirtualBox",
-    "Visual Studio 2022",
-    "VS Code",
-    "WPF и Windows Forms",
-    "просмотр PDF"
    ]
   },
   {
@@ -647,16 +359,6 @@
     "переносная доска",
     "сенсорный стол",
     "веб-камера"
-   ],
-   "software": [
-    "Blender",
-    "Neat Office",
-    "PyCharm",
-    "Unity 2019.4",
-    "Unity Hub",
-    "Visual Studio 2019",
-    "Viveport",
-    "просмотр PDF"
    ]
   },
   {
@@ -672,9 +374,6 @@
     "меловая доска",
     "грифельная доска",
     "проектор"
-   ],
-   "software": [
-    "просмотр PDF"
    ]
   },
   {
@@ -694,12 +393,6 @@
     "микрофоны",
     "видеокамеры",
     "кликер"
-   ],
-   "software": [
-    "Deductor",
-    "Loginom",
-    "WPF и Windows Forms",
-    "просмотр PDF"
    ]
   },
   {
@@ -714,23 +407,6 @@
    "equipment": [
     "маркерная доска",
     "телевизор"
-   ],
-   "software": [
-    "Code::Blocks",
-    "DipTrace",
-    "GIMP",
-    "LibreOffice",
-    "LTspice",
-    "MySQL и MySQL Workbench",
-    "PascalABC",
-    "PyCharm",
-    "TINA-TI",
-    "Trace Mode 6",
-    "VirtualBox",
-    "Visual Studio 2022",
-    "VS Code",
-    "WPF и Windows Forms",
-    "просмотр PDF"
    ]
   },
   {
@@ -746,9 +422,6 @@
     "меловая доска",
     "грифельная доска",
     "проектор"
-   ],
-   "software": [
-    "просмотр PDF"
    ]
   }
  ],
@@ -759,7 +432,9 @@
    "seats": 50,
    "equipment": [
     "телевизор"
-   ]
+   ],
+   "floor": 1,
+   "room": "ит-улей"
   },
   {
    "name": "8 бит",
@@ -799,15 +474,6 @@
     "переносная доска",
     "телевизор",
     "проектор"
-   ]
-  },
-  {
-   "name": "Коворкинг ВИТШ",
-   "type": "коворкинг",
-   "seats": 50,
-   "equipment": [
-    "переносная доска",
-    "телевизор"
    ],
    "floor": 4,
    "room": "коворкинг"

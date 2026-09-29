@@ -11,7 +11,7 @@ import { openChat } from '../utils/chat';
 const ICON = { strokeWidth: 1.75 };
 const ZOOMS = [1, 1.5, 2, 3];
 
-// Ready-made filters; a program comes from the search field
+// Ready-made filters
 const PRESETS = [
   { key: 'computers', label: 'С компьютерами', test: (f) => f && f.pcs + f.laptops > 0 },
   { key: 'os:Linux', label: 'Linux', test: (f) => f?.os === 'Linux' && f.pcs + f.laptops > 0 },
@@ -31,9 +31,8 @@ const plural = (n, one, few, many) => {
   return many;
 };
 
-// The filter described by the address: ?soft=PyCharm, ?os=Linux, ?eq=проектор, ?type=лекционная, ?filter=computers
+// The filter described by the address: ?os=Linux, ?eq=проектор, ?type=лекционная, ?filter=computers
 const filterFromParams = (params) => {
-  if (params.get('soft')) return { key: `soft:${params.get('soft')}`, label: params.get('soft') };
   for (const name of ['os', 'eq', 'type']) {
     const value = params.get(name);
     if (value) {
@@ -50,7 +49,6 @@ const testOf = (filter) => {
   const preset = PRESETS.find((p) => p.key === filter.key);
   if (preset) return preset.test;
   const [kind, value] = [filter.key.slice(0, filter.key.indexOf(':')), filter.key.slice(filter.key.indexOf(':') + 1)];
-  if (kind === 'soft') return (f) => !!f?.software.includes(value);
   if (kind === 'os') return (f) => f?.os === value && f.pcs + f.laptops > 0;
   if (kind === 'eq') return (f) => !!f?.equipment.includes(value);
   if (kind === 'type') return (f) => f?.type === value;
@@ -64,12 +62,13 @@ const paramsOfFilter = (filter) => {
   return { [filter.key.slice(0, at)]: filter.key.slice(at + 1) };
 };
 
-// What was typed: a room, a place, a program or an OS
-const resolve = (raw, software) => {
+// What was typed: a room, a place or an OS
+const resolve = (raw) => {
   const text = raw.trim();
   const low = text.toLowerCase().replace(/ё/g, 'е');
-  if (!text) return { error: 'Введите номер аудитории, например 305, или программу, например PyCharm.' };
-  if (/коворк|ковер/.test(low)) return { room: 'коворкинг' };
+  if (!text) return { error: 'Введите номер аудитории, например 305.' };
+  if (/улей|улья/.test(low)) return { room: 'ит-улей' };
+  if (/коворк|ковер|64\s*бит/.test(low)) return { room: 'коворкинг' };
   if (/8\s*бит|игров/.test(low)) return { room: '108' };
   if (/дирекц|деканат/.test(low)) return { room: '209' };
   const m = low.match(/(\d)(\d{2})/);
@@ -83,11 +82,7 @@ const resolve = (raw, software) => {
   }
   if (/линукс|linux|убунт/.test(low)) return { filter: { key: 'os:Linux', label: 'Linux' } };
   if (/виндо|windows|винд/.test(low)) return { filter: { key: 'os:Windows', label: 'Windows' } };
-  const program = software.find((p) => p.toLowerCase() === low)
-    || software.find((p) => p.toLowerCase().includes(low) && low.length >= 2)
-    || software.find((p) => low.includes(p.toLowerCase()));
-  if (program) return { filter: { key: `soft:${program}`, label: program } };
-  return { error: `Не нашёл «${text}». Введите номер аудитории, например 305, или программу, например PyCharm.` };
+  return { error: `Не нашёл «${text}». Введите номер аудитории, например 305, или «Linux», «коворкинг».` };
 };
 
 // Now / next pair in a room from today's lessons, by Moscow time
@@ -147,17 +142,13 @@ const RoomToday = ({ number }) => {
   );
 };
 
-const RoomCard = ({ id, facts, spaces, onClose, onSoftware }) => {
-  const [allSoftware, setAllSoftware] = useState(false);
-  useEffect(() => setAllSoftware(false), [id]);
+const RoomCard = ({ id, facts, spaces, onClose }) => {
   const shape = roomShape(id);
   const fact = facts?.[id];
   const space = spaces?.find((s) => s.room === id);
   const kind = fact?.type || shape?.kind;
   const tone = (KIND_STYLE[kind] || KIND_STYLE.office).tone;
   const floor = floorOf(id);
-  const programs = (fact?.software || []).filter((p) => p !== 'просмотр PDF');
-  const shown = allSoftware ? programs : programs.slice(0, 12);
   const numbered = /^\d{3}$/.test(id);
   const equipment = fact?.equipment || space?.equipment || [];
 
@@ -166,7 +157,7 @@ const RoomCard = ({ id, facts, spaces, onClose, onSoftware }) => {
       <header className="room-card-head">
         <div>
           <h3 id="room-card-title" className="room-card-title">
-            {space && numbered ? `Б-${id} · ${space.name}` : space ? space.name : roomTitle(shape)}
+            {space && numbered ? `Б-${id} · ${space.name}` : space?.type === 'коворкинг' ? `Коворкинг «${space.name}»` : space ? space.name : roomTitle(shape)}
           </h3>
           <p className="room-card-kind">
             <span className={`room-kind-dot tone-${tone}`} aria-hidden="true" />
@@ -205,24 +196,6 @@ const RoomCard = ({ id, facts, spaces, onClose, onSoftware }) => {
         </div>
       )}
 
-      {programs.length > 0 && (
-        <div className="room-card-group">
-          <h4>Программы <span className="room-count tabular">{programs.length}</span></h4>
-          <ul className="room-tags">
-            {shown.map((p) => (
-              <li key={p}>
-                <button type="button" className="room-tag-btn" onClick={() => onSoftware(p)} title={`Где ещё есть ${p}`}>{p}</button>
-              </li>
-            ))}
-          </ul>
-          {programs.length > 12 && (
-            <button type="button" className="btn btn-ghost btn-sm room-more" onClick={() => setAllSoftware((v) => !v)} aria-expanded={allSoftware}>
-              {allSoftware ? 'Свернуть' : `Показать все ${programs.length}`}
-            </button>
-          )}
-        </div>
-      )}
-
       {!fact && !space && id !== '209' && (
         <p className="room-card-note">О технике в этой аудитории в базе портала пока ничего нет.</p>
       )}
@@ -249,16 +222,11 @@ const CampusMap = () => {
   }, []);
 
   const facts = useMemo(() => Object.fromEntries((base?.rooms || []).map((r) => [r.number, r])), [base]);
-  const software = useMemo(
-    () => [...new Set((base?.rooms || []).flatMap((r) => r.software))].filter((p) => p !== 'просмотр PDF').sort((a, b) => a.localeCompare(b, 'ru')),
-    [base],
-  );
-
-  // The address is the state: /map?room=Б-301, /map?soft=PyCharm — links from the chat and the schedule land here
+  // The address is the state: /map?room=Б-301, /map?os=Linux — links from the chat and the schedule land here
   const rawRoom = searchParams.get('room') || '';
   const selected = useMemo(() => {
     if (!rawRoom) return null;
-    const found = resolve(rawRoom, []);
+    const found = resolve(rawRoom);
     return found.room || null;
   }, [rawRoom]);
   const filter = useMemo(() => filterFromParams(searchParams), [searchParams]);
@@ -270,7 +238,7 @@ const CampusMap = () => {
   // A room in the address opens its floor; a bad one says so
   useEffect(() => {
     if (!rawRoom) return;
-    const found = resolve(rawRoom, []);
+    const found = resolve(rawRoom);
     if (found.room) {
       setFloor(floorOf(found.room));
       setQuery(rawRoom);
@@ -360,7 +328,7 @@ const CampusMap = () => {
 
   const onSubmit = (e) => {
     e.preventDefault();
-    const found = resolve(query, software);
+    const found = resolve(query);
     if (found.room) {
       setMessage(null);
       select(found.room);
@@ -395,7 +363,7 @@ const CampusMap = () => {
           <SectionIcon section="map" size="lg" />
           <div>
             <h1>Карта кампуса</h1>
-            <p className="page-subtitle">Корпус Б ИВИТШ КГУ: схемы этажей, техника и программы в аудиториях.</p>
+            <p className="page-subtitle">Корпус Б ИВИТШ КГУ: схемы этажей, компьютеры и техника в аудиториях.</p>
           </div>
         </div>
       </header>
@@ -417,7 +385,7 @@ const CampusMap = () => {
         <div className="map-panel-head">
           <div>
             <h2 id="map-plans-heading">Схемы этажей корпуса Б</h2>
-            <p className="map-panel-hint">Нажмите на аудиторию: покажу места, компьютеры, ОС, программы и свободна ли она сейчас.</p>
+            <p className="map-panel-hint">Нажмите на аудиторию: покажу места, компьютеры, ОС, технику и свободна ли она сейчас.</p>
           </div>
           <div className="segmented map-floors" role="tablist" aria-label="Этаж">
             {FLOORS.map((f) => (
@@ -441,8 +409,8 @@ const CampusMap = () => {
           </div>
         </div>
 
-        <form className="map-finder" onSubmit={onSubmit} role="search" aria-label="Найти аудиторию или программу">
-          <label className="field-label" htmlFor="room-search">Найти аудиторию или программу</label>
+        <form className="map-finder" onSubmit={onSubmit} role="search" aria-label="Найти аудиторию">
+          <label className="field-label" htmlFor="room-search">Найти аудиторию</label>
           <div className="map-finder-row">
             <div className="cm-search">
               <Search size={18} {...ICON} className="cm-search-icon" aria-hidden="true" />
@@ -450,15 +418,11 @@ const CampusMap = () => {
                 id="room-search"
                 className="input"
                 autoComplete="off"
-                list="map-software"
-                placeholder="Например, Б-305, PyCharm или Linux"
+                placeholder="Например, Б-305, коворкинг или Linux"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 aria-describedby="room-result"
               />
-              <datalist id="map-software">
-                {software.map((p) => <option key={p} value={p} />)}
-              </datalist>
             </div>
             <button type="submit" className="btn btn-primary">Показать</button>
           </div>
@@ -496,7 +460,7 @@ const CampusMap = () => {
             <button type="button" className="map-link-button" onClick={() => applyFilter(null)}>Снять подсветку</button>
           </p>
         )}
-        {base?.failed && <p className="map-filter-summary is-error">Не удалось загрузить сведения об аудиториях — схема работает, но без техники и программ.</p>}
+        {base?.failed && <p className="map-filter-summary is-error">Не удалось загрузить сведения об аудиториях — схема работает, но без техники.</p>}
 
         <div id="floor-panel" role="tabpanel" aria-labelledby={`floor-tab-${floor}`} className="map-floor">
           <div className="map-stage">
@@ -540,7 +504,6 @@ const CampusMap = () => {
                 facts={facts}
                 spaces={base?.spaces}
                 onClose={() => select(null)}
-                onSoftware={(p) => update({ soft: p, room: rawRoom })}
               />
             ) : (
               <div className="map-howto">
@@ -549,7 +512,7 @@ const CampusMap = () => {
                   Все аудитории <span className="tabular">101–409</span> — в корпусе Б (ул. Ивановская, 24а). Первая цифра номера — этаж:
                   {' '}<span className="tabular">200</span>-е на 2 этаже (там же дирекция Б-209), <span className="tabular">400</span>-е и коворкинг — на 4.
                 </p>
-                <p>Выберите аудиторию на схеме или в списке, чтобы увидеть технику, программы и пары на сегодня.</p>
+                <p>Выберите аудиторию на схеме или в списке, чтобы увидеть компьютеры, технику и пары на сегодня.</p>
               </div>
             )}
 
@@ -582,7 +545,7 @@ const CampusMap = () => {
                 })}
               </ul>
               <p className="map-room-list-more">
-                Про технику знает и ВИТШик: «где есть PyCharm?», «сколько компов в 301?».{' '}
+                Про технику знает и ВИТШик: «сколько компов в 301?», «где Linux?».{' '}
                 <button type="button" className="map-link-button" onClick={openChat}>Спросить ВИТШика</button>
               </p>
             </div>
