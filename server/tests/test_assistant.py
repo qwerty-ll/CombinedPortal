@@ -287,3 +287,49 @@ def test_parallel_subgroup_pairs_are_both_named(student, monkeypatch):
     )
     reply, _ = ask(student, "Что сегодня?")
     assert "• 10:10–11:40 — Базы данных, лабораторная, Б-407, 2 подгруппа, идёт сейчас" in reply
+
+
+OTHER_GROUP = [
+    lesson("2026-09-25", "08:30", "10:00", "лаб Базы данных, п/г 1", room="Б-207"),
+    lesson("2026-09-25", "08:30", "10:00", "лаб Операционные системы, п/г 2", room="Б-104"),
+    lesson("2026-09-25", "10:10", "11:40", "лек Философия", room="Б-407"),
+]
+
+
+@pytest.fixture
+def two_groups(monkeypatch):
+    monkeypatch.setitem(ANSWERS, ("raspGrouplist", frozenset({"year": "2026-2027"}.items())),
+                        ok([{"id": 4242, "name": "24-ИСбо-1"}, {"id": 4243, "name": "24-ИСбо-2"}]))
+    monkeypatch.setitem(ANSWERS, ("Rasp", frozenset({"year": "2026-2027", "idGroup": 4243}.items())), ok({"rasp": OTHER_GROUP}))
+    timetable.clear_cache()
+
+
+def test_pairs_of_another_group_and_one_subgroup(student, two_groups):
+    reply, actions = ask(student, "какие пары у 24-ИСбо-2 2 пг")
+    assert reply == ("24-ИСбо-2, 2 подгруппа:\n"
+                     "Следующая пара — завтра в 08:30: Операционные системы (лабораторная) у 2 подгруппы, Б-104.")
+    # The map button is the room of the asked subgroup, not the first one in the list
+    assert actions == [("Б-104 на карте", "/map?room=Б-104"), ("Расписание на главной", "/#schedule-section")]
+
+
+def test_parallel_pairs_get_a_map_button_per_subgroup(student, two_groups):
+    reply, actions = ask(student, "что завтра у 24-исбо-2")
+    assert reply == ("Завтра у группы 24-ИСбо-2:\n"
+                     "• 08:30–10:00 — Базы данных, лабораторная, Б-207, 1 подгруппа\n"
+                     "• 08:30–10:00 — Операционные системы, лабораторная, Б-104, 2 подгруппа\n"
+                     "• 10:10–11:40 — Философия, лекция, Б-407")
+    assert actions == [("Б-207 на карте (1 пг)", "/map?room=Б-207"), ("Б-104 на карте (2 пг)", "/map?room=Б-104"),
+                       ("Расписание на главной", "/#schedule-section")]
+
+
+def test_a_subgroup_follow_up_keeps_the_group_and_days(student, two_groups):
+    history = [{"role": "user", "content": "что завтра у 24-исбо-2"}, {"role": "assistant", "content": "…"}]
+    reply, actions = ask(student, "а у второй подгруппы?", history=history)
+    assert reply == ("Завтра у группы 24-ИСбо-2, 2 подгруппа:\n"
+                     "• 08:30–10:00 — Операционные системы, лабораторная, Б-104, 2 подгруппа\n"
+                     "• 10:10–11:40 — Философия, лекция, Б-407")
+    assert actions[0] == ("Б-104 на карте", "/map?room=Б-104")
+
+
+def test_an_unknown_group_is_said_so(student, two_groups):
+    assert ask(student, "пары у 99-ХХбо-9")[0].startswith("Не нашёл группу «99-ХХбо-9» в расписании ЭИОС")
