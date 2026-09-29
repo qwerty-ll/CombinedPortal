@@ -23,11 +23,16 @@ export const isStandalone = () => typeof window !== 'undefined'
 export const isIos = () => typeof navigator !== 'undefined'
   && (/iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 
-export const registerServiceWorker = () => {
-  if (!import.meta.env.PROD || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => console.warn('[PWA] Service worker not registered:', err));
-  });
+// The portal no longer opens offline. Browsers that registered the earlier offline worker drop it
+// and its saved copies of the app, so every visit gets the current version from the server. The old worker
+// still serves the page it was removed on and may save files again; the next visit clears them for good.
+export const removeServiceWorker = () => {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.getRegistrations()
+    .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+    .then(() => (typeof caches === 'undefined' ? [] : caches.keys()))
+    .then((keys) => Promise.all(keys.filter((key) => key.startsWith('portal-')).map((key) => caches.delete(key))))
+    .catch(() => {});
 };
 
 export const useInstallApp = () => {
@@ -49,20 +54,4 @@ export const useInstallApp = () => {
   };
 
   return { canInstall: !!installEvent, installed: isStandalone(), ios: isIos(), install };
-};
-
-// Online / offline, for the "no internet" notice
-export const useOnline = () => {
-  const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine !== false);
-  useEffect(() => {
-    const on = () => setOnline(true);
-    const off = () => setOnline(false);
-    window.addEventListener('online', on);
-    window.addEventListener('offline', off);
-    return () => {
-      window.removeEventListener('online', on);
-      window.removeEventListener('offline', off);
-    };
-  }, []);
-  return online;
 };

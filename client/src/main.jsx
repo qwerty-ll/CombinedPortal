@@ -5,9 +5,9 @@ import { MotionConfig } from 'framer-motion';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import App from './App';
-import { registerServiceWorker } from './utils/install';
+import { removeServiceWorker } from './utils/install';
 
-registerServiceWorker();
+removeServiceWorker();
 
 class ErrorBoundary extends Component {
   constructor(props) {
