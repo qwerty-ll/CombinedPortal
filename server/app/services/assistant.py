@@ -458,11 +458,10 @@ def room_in(q: str) -> Optional[str]:
 
 def room_finding(q: str) -> Optional[Finding]:
     if "коворкинг" in q:
-        others = [s for s in rooms_base.spaces() if s["name"] != "Коворкинг ВИТШ"]
-        more = "; ".join(s["name"] + (f" ({rooms_base.where(s)})" if rooms_base.where(s) else "") for s in others)
+        places = "; ".join(s["name"] + (f" ({rooms_base.where(s)})" if rooms_base.where(s) else "") for s in rooms_base.spaces())
         return Finding(
-            "Коворкинг ВИТШ — на 4 этаже корпуса Б (ул. Ивановская, 24а), 50 мест, есть переносная доска и телевизор. "
-            f"Там можно заниматься между парами.\nЕщё коворкинги и переговорные: {more}.\n\n[IMG:coworking.png]",
+            "Коворкинг ВИТШ «64 бит» — на 4 этаже корпуса Б (ул. Ивановская, 24а), 50 мест, есть переносная доска, "
+            f"телевизор и проектор. Там можно заниматься между парами.\nВсе коворкинги и переговорные: {places}.\n\n[IMG:coworking.png]",
             [Action("Коворкинг на карте", _link("/map", room="коворкинг"))], exact=True, weight=90,
         )
     m = _ROOM_RE.search(q)
@@ -483,15 +482,15 @@ def room_finding(q: str) -> Optional[Finding]:
     return Finding(text, [Action("Открыть на карте", _link("/map", room=f"Б-{number}"))], exact=True, weight=90)
 
 
-# --- What is in the rooms: computers, OS, equipment, software (app/assets/rooms.json) ------------
+# --- What is in the rooms: computers, OS, equipment (app/assets/rooms.json) ----------------------
 
 _ROOM_FACTS = re.compile(
     r"комп|\bпк\b|ноут|\bос\b|операционк|линукс|linux|убунт|ubuntu|виндо|windows|винд[аеуы]\b|оборудован|техник|"
-    r"программ|софт|установлен|\bстоит\b|мест[аоу]?\b|вмеща|вмест|человек|что за|что есть|есть ли|какая это|"
+    r"программ|софт|\bстоит\b|мест[аоу]?\b|вмеща|вмест|человек|что за|что есть|есть ли|какая это|"
     r"тип аудитори|какой класс|" + "|".join(rooms_base.EQUIPMENT_WORDS.values())
 )
 # "Где", "в каких", "есть ли": a question about where something is, not how to install or learn it
-_WHERE_IS = re.compile(r"\bгде\b|в как[а-я]*\b|на как[а-я]*\b|какие аудитори|установлен|\bстоит\b|есть ли|\bесть\b|список|покажи|\bвсе\b")
+_WHERE_IS = re.compile(r"\bгде\b|в как[а-я]*\b|на как[а-я]*\b|какие аудитори|\bстоит\b|есть ли|\bесть\b|список|покажи|\bвсе\b")
 _BIGGEST = re.compile(r"сам[а-я]* (больш|вместительн|крупн)|больш[а-я]* всего мест")
 _FOR_PEOPLE = re.compile(r"(?:на|для|вмест[а-я]*|помест[а-я]*)\s+(\d{2,3})\s*(?:человек|чел|мест|студент)")
 _MOST_COMPUTERS = re.compile(r"больше всего (компьютер|компов|пк|ноут|машин)")
@@ -526,14 +525,8 @@ def _room_card(room: dict, lead: str = "") -> Finding:
 def _about_room(room: dict, q: str) -> Finding:
     """"сколько компов в 301", "есть ли проектор в 204", "какая ОС в 302", "есть ли pycharm в 308"."""
     name = f"Б-{room['number']}"
-    programs = rooms_base.software_in(q)
-    if programs:
-        have = [p for p in programs if p in room["software"]]
-        if have:
-            return _room_card(room, f"Да, в {name} есть {', '.join(have)}.")
-        elsewhere = sorted({r["number"] for r in rooms_base.rooms() if set(programs) & set(r["software"])})
-        other = f" {programs[0]} есть в " + ", ".join(f"Б-{n}" for n in elsewhere) + "." if elsewhere else ""
-        return _room_card(room, f"В {name} {' и '.join(programs[:2])} нет.{other}")
+    if re.search(r"программ|софт|установлен", q):
+        return _room_card(room, f"Какие программы стоят на компьютерах {name}, я не подсказываю.")
     equipment = rooms_base.equipment_in(q)
     if equipment:
         if equipment in room["equipment"]:
@@ -554,7 +547,7 @@ def _about_room(room: dict, q: str) -> Finding:
 
 
 def room_facts_finding(q: str, number: Optional[str]) -> Optional[Finding]:
-    """Places, computers, OS, equipment and software of one room or of the whole building."""
+    """Places, computers, OS and equipment of one room or of the whole building."""
     if number:
         if not _ROOM_FACTS.search(q) or _ASKS_ROOM_PAIRS.search(q):
             return None
@@ -600,14 +593,6 @@ def room_facts_finding(q: str, number: Optional[str]) -> Optional[Finding]:
 
     if not _WHERE_IS.search(q):
         return None
-    programs = sorted(rooms_base.software_in(q), key=lambda p: -sum(p in r["software"] for r in every))
-    if len(programs) == 1:
-        found = [r for r in every if programs[0] in r["software"]]
-        return Finding(f"{programs[0]} есть {_in_rooms(len(found))}:\n" + _rooms_by_floor(found, lambda r: f"Б-{r['number']}"),
-                       [Action("Показать на карте", _link("/map", soft=programs[0]))], exact=True, weight=100)
-    if programs:
-        lines = [f"• {p}: " + ", ".join(f"Б-{r['number']}" for r in every if p in r["software"]) for p in programs]
-        return Finding("Где установлено:\n" + "\n".join(lines), [Action("Показать на карте", _link("/map", soft=programs[0]))], exact=True, weight=100)
     os = rooms_base.os_in(q)
     if os:
         found = [r for r in every if r["os"] == os and (r["pcs"] or r["laptops"])]
@@ -974,7 +959,7 @@ def _knowledge_finding(q: str) -> Optional[Finding]:
 CAPABILITIES_REPLY = (
     "Я ВИТШик, помощник портала ИВИТШ. Вот что я умею:\n"
     "• Пары: «где следующая пара?», «что завтра?», «когда философия?»\n"
-    "• Аудитории: «как найти Б-407?», «свободна ли 305?», «сколько компов в 301?», «где есть PyCharm?», «где Linux?»\n"
+    "• Аудитории: «как найти Б-407?», «свободна ли 305?», «сколько компов в 301?», «где Linux?», «где проектор?»\n"
     "• Преподаватели: «где сейчас Киприна?» — кабинет, почта и где он по расписанию\n"
     "• Документы: «объяснительная за вчера», «заявление на пересдачу» — соберу Word или PDF\n"
     "• Справка ИВИТШ: стипендии, дирекция, клубы, где поесть, частые вопросы и форум\n\n"
@@ -1162,7 +1147,7 @@ async def answer(
         finding = await teacher_answer(teachers, q, user, now)
         return finding.text, finding.actions, None
     number = room_in(q)
-    # Computers, OS, programs, equipment, places: of the room named, else where in the building
+    # Computers, OS, equipment, places: of the room named, else where in the building
     facts = room_facts_finding(q, number) if number or not _SCHEDULE_ONLY.search(q) else None
     if facts:
         return facts.text, facts.actions, None

@@ -328,13 +328,6 @@
   font-weight: var(--weight-semibold);
   letter-spacing: 0;
 }
-.room-count {
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  font-size: var(--text-xs);
-  color: var(--text-2);
-}
 .room-tags {
   list-style: none;
   display: flex;
@@ -342,28 +335,12 @@
   gap: var(--space-2);
   margin-top: var(--space-2);
 }
-.room-tags > li:not(:has(button)) {
+.room-tags > li {
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-pill);
   background: var(--surface-2);
   font-size: var(--text-sm);
 }
-.room-tag-btn {
-  min-height: 2rem;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: pointer;
-  transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
-}
-@media (hover: hover) {
-  .room-tag-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
-}
-.room-more { margin-top: var(--space-2); }
 
 /* ---------- The plan in the chat and in the freshman guide ---------- */
 
@@ -404,5 +381,4 @@
   }
   .map-filters::-webkit-scrollbar { display: none; }
   .room-card { padding: var(--space-4); }
-  .room-tag-btn { min-height: var(--touch-target); }
 }

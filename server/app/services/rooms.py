@@ -1,4 +1,4 @@
-"""The rooms of корпус Б: places, computers, laptops, OS, equipment and software (app/assets/rooms.json).
+"""The rooms of корпус Б: places, computers, laptops, OS and equipment (app/assets/rooms.json).
 
 The file is built from the ИВИТШ rooms table by scripts/import_rooms.py; the map and ВИТШик read it from here.
 """
@@ -10,44 +10,6 @@ from typing import Dict, List, Optional
 
 DATA_FILE = Path(__file__).resolve().parents[1] / "assets" / "rooms.json"
 
-# Words students use for a program, besides its own name
-SOFTWARE_ALIASES = {
-    "Python 3": ["питон", "пайтон", "python"],
-    "PyCharm": ["пайчарм", "пучарм", "python", "питон", "пайтон"],
-    "IDLE": ["python", "питон", "пайтон"],
-    "1С:Предприятие": ["1с", "1c"],
-    "Visual Studio 2022": ["visual studio", "вижуал студио", "визуал студио", "вижл студио"],
-    "Visual Studio 2019": ["visual studio", "вижуал студио", "визуал студио", "вижл студио"],
-    "VS Code": ["vscode", "вс код", "vs code", "visual studio code"],
-    "IntelliJ IDEA": ["intellij", "интеллидж", "интелидж"],
-    "Unity Hub": ["unity", "юнити"],
-    "Unity 2019.4": ["unity", "юнити"],
-    "Blender": ["блендер"],
-    "GIMP": ["гимп"],
-    "Krita": ["крита"],
-    "Inkscape": ["инкскейп"],
-    "PostgreSQL": ["постгрес", "postgres", "постгре"],
-    "MySQL и MySQL Workbench": ["mysql", "майскл", "workbench"],
-    "MS SQL Server": ["sql server", "mssql", "ms sql"],
-    "SSMS": ["management studio"],
-    "КОМПАС-3D": ["компас", "kompas"],
-    "КуМир": ["кумир"],
-    "PascalABC": ["паскал", "pascal"],
-    "Lazarus": ["лазарус"],
-    "VirtualBox": ["виртуалбокс", "виртуал бокс", "virtual box"],
-    "Cisco Packet Tracer": ["cisco", "циско", "packet tracer", "пакет трейсер"],
-    "LibreOffice": ["либреофис", "либре офис", "libre office"],
-    "Android Studio": ["андроид", "android"],
-    "Java": ["джава", "java"],
-    "Code::Blocks": ["codeblocks", "code blocks", "кодблокс"],
-    "GNU Octave": ["octave", "октав"],
-    "DaVinci Resolve": ["davinci", "да винчи", "давинчи"],
-    "GameMaker": ["гейммейкер", "game maker"],
-    "nanoCAD": ["нанокад", "nanocad"],
-    "Loginom": ["логином"],
-    "Deductor": ["дедуктор"],
-    "Veyon": ["веон"],
-}
 OS_WORDS = {
     "Linux": r"линукс|linux|убунт|ubuntu",
     "Windows": r"виндо|windows|винд[аеуы]\b",
@@ -135,9 +97,6 @@ def details(room: dict) -> str:
     lines = [f"Б-{room['number']} — {summary(room)}, {room['floor']} этаж."]
     if room["equipment"]:
         lines.append("Есть: " + ", ".join(room["equipment"]) + ".")
-    programs = [p for p in room["software"] if p != "просмотр PDF"]
-    if programs:
-        lines.append("Программы: " + ", ".join(programs) + ".")
     return "\n".join(lines)
 
 
@@ -145,17 +104,6 @@ def _mentions(q: str, word: str) -> bool:
     # A Russian word may take an ending: «в питоне», «в блендере»
     ending = "[а-я]*" if re.search("[а-я]$", word) else ""
     return re.search(rf"(?<![a-zа-я0-9]){re.escape(word)}{ending}(?![a-zа-я0-9])", q) is not None
-
-
-def software_in(q: str) -> List[str]:
-    """Programs named in a question, as the table names them: "где есть питон" → Python 3, PyCharm, IDLE."""
-    installed = {p for r in rooms() for p in r["software"]}
-    found = []
-    for name in sorted(installed, key=str.lower):
-        words = [name.lower().replace("ё", "е")] + SOFTWARE_ALIASES.get(name, [])
-        if name != "просмотр PDF" and any(_mentions(q, w) for w in words):
-            found.append(name)
-    return found
 
 
 def os_in(q: str) -> Optional[str]:
@@ -175,14 +123,20 @@ def spaces_in(q: str) -> List[dict]:
     named = []
     for space in spaces():
         name = space["name"].lower().replace("ё", "е")
-        if name != "коворкинг витш" and (_mentions(q, name) or _mentions(q, name.replace(" ", ""))):
+        if _mentions(q, name) or _mentions(q, name.replace(" ", "")):
             named.append(space)
     if not named and "переговорн" in q:
         named = [s for s in spaces() if s["type"] == "переговорная"]
     return named
 
 
+# Places on the plans without a number
+PLACE_WORDS = {"ит-улей": "в центре 1 этажа корпуса Б, между лестницами", "коворкинг": "на 4 этаже корпуса Б"}
+
+
 def where(space: dict) -> str:
+    if space.get("room") in PLACE_WORDS:
+        return PLACE_WORDS[space["room"]]
     if space.get("room") and space["room"].isdigit():
         return f"Б-{space['room']}, {space['floor']} этаж корпуса Б"
     if space.get("floor"):

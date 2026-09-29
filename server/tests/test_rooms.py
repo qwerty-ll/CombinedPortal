@@ -8,24 +8,23 @@ from test_scenarios import ANSWERS, NOW
 def test_the_base_matches_the_table():
     by_number = {r["number"]: r for r in rooms.rooms()}
     assert len(by_number) == 28 and {"101", "209", "108"} & set(by_number) == {"101"}
-    assert by_number["101"] | {"software": None} == {
+    assert by_number["101"] == {
         "number": "101", "floor": 1, "type": "мультимедийный класс", "seats": 50, "teacher_pc": True, "pcs": 23, "laptops": 28,
         "os": "Windows", "equipment": ["переносная доска", "телевизор", "сенсорный стол", "веб-камера", "кликер", "наушники"],
-        "software": None,
     }
     assert by_number["104"]["os"] == "Linux" and by_number["407"]["seats"] == 180
     # "нет" and "-" in the table are no equipment and no computers
     assert "веб-камера" not in by_number["102"]["equipment"] and by_number["204"]["pcs"] == by_number["204"]["laptops"] == 0
     assert by_number["403"]["teacher_pc"] is False
-    # Two "Unity Hub" columns of the table are one program
-    assert by_number["201"]["software"].count("Unity Hub") == 1
-    assert {s["name"] for s in rooms.spaces()} == {"ИТ улей", "8 бит", "Переговорная 2 этажа", "16 бит", "64 бит", "Коворкинг ВИТШ"}
+    # Programs of the table are left out
+    assert all("software" not in r for r in by_number.values())
+    # «ковЁркинг» of the table is the same place as «64 бит», the coworking of the 4th floor
+    spaces = {s["name"]: s for s in rooms.spaces()}
+    assert set(spaces) == {"ИТ улей", "8 бит", "Переговорная 2 этажа", "16 бит", "64 бит"}
+    assert spaces["64 бит"]["room"] == "коворкинг" and spaces["ИТ улей"]["room"] == "ит-улей"
 
 
-def test_words_for_programs_and_systems():
-    assert rooms.software_in("где можно поработать в питоне") == ["IDLE", "PyCharm", "Python 3"]
-    assert rooms.software_in("где есть 1с") == ["1С:Предприятие"]
-    assert rooms.software_in("есть идея где поесть") == []
+def test_words_for_systems():
     assert rooms.os_in("где линукс") == "Linux" and rooms.os_in("на винде") == "Windows"
     assert rooms.summary(rooms.get("204")) == "лекционная: 75 мест, ПК преподавателя на Windows"
     assert rooms.summary(rooms.get("403")) == "лаборатория: 2 места, 2 ПК на Windows"

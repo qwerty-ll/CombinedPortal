@@ -1,4 +1,4 @@
-"""Builds app/assets/rooms.json from the rooms table of ИВИТШ (xlsx, sheet «Фонд»).
+"""Builds app/assets/rooms.json from the rooms table of ИВИТШ (xlsx, sheet «Фонд»); programs are left out.
 
     pip install openpyxl
     python scripts/import_rooms.py path/to/table.xlsx
@@ -27,42 +27,17 @@ EQUIPMENT = {
     "наушники": "наушники",
 }
 BOARDS = {"марк": "маркерная доска", "мел": "меловая доска"}
-SOFTWARE_NAMES = {
-    "Android studio": "Android Studio",
-    "Cisco packet tracer": "Cisco Packet Tracer",
-    "CodeBlocks": "Code::Blocks",
-    "Da Vinci": "DaVinci Resolve",
-    "Gambas3 (Basic)": "Gambas 3",
-    "Gimp": "GIMP",
-    "IDLE 3": "IDLE",
-    "InkScape": "Inkscape",
-    "Intelij IDEA": "IntelliJ IDEA",
-    "LTspice XVII": "LTspice",
-    "MS SQL Serv": "MS SQL Server",
-    "MySQL Community Server, MySQL Workbench": "MySQL и MySQL Workbench",
-    "Oracle Virtual Box": "VirtualBox",
-    "Pascal ABC": "PascalABC",
-    "PDF": "просмотр PDF",
-    "Putty portable": "PuTTY",
-    "Tina-TI": "TINA-TI",
-    "Unity 2019.4.12f1": "Unity 2019.4",
-    "Unity hub": "Unity Hub",
-    "VivePort": "Viveport",
-    "VS 2019": "Visual Studio 2019",
-    "VS 2022": "Visual Studio 2022",
-    "WPF form Visual": "WPF и Windows Forms",
-    "1С Предприятие": "1С:Предприятие",
-    "Кумир": "КуМир",
-    "Компас": "КОМПАС-3D",
-    "Deguctor": "Deductor",
-    "nanoCad": "nanoCAD",
-    "SmathStudio": "SMath Studio",
-    "Phoenix code": "Phoenix Code",
-}
 OS = {"W": "Windows", "L": "Linux"}
-# Coworkings and meeting rooms with a known place on the floor plans
-SPACE_PLACES = {"8 бит": {"floor": 1, "room": "108"}, "коверкинг": {"floor": 4, "room": "коворкинг"}, "2 эт.": {"floor": 2}}
-SPACE_NAMES = {"8 бит": "8 бит", "коверкинг": "Коворкинг ВИТШ", "2 эт.": "Переговорная 2 этажа"}
+# Coworkings and meeting rooms with a known place on the floor plans. The table lists the coworking of the
+# 4th floor twice, as «64 бит» and as «ковЁркинг»: the rows are one place.
+SPACE_PLACES = {
+    "8 бит": {"floor": 1, "room": "108"},
+    "ит улей": {"floor": 1, "room": "ит-улей"},
+    "64 бит": {"floor": 4, "room": "коворкинг"},
+    "2 эт.": {"floor": 2},
+}
+SPACE_NAMES = {"8 бит": "8 бит", "ит улей": "ИТ улей", "64 бит": "64 бит", "2 эт.": "Переговорная 2 этажа"}
+SAME_SPACE = {"коверкинг": "64 бит"}
 
 
 def header(value) -> str:
@@ -80,7 +55,6 @@ def main(path: str) -> None:
     rows = list(sheet.iter_rows(values_only=True))
     names = [header(v) for v in rows[1]]
     at = {name.lower(): i for i, name in enumerate(names) if name}
-    software_columns = range(at["ос w/l"] + 1, len(names))
 
     rooms, spaces = [], []
     for row in rows[2:]:
@@ -93,12 +67,6 @@ def main(path: str) -> None:
         ]
         if isinstance(row[0], (int, float)):
             number = str(int(row[0]))
-            software = []
-            for i in software_columns:
-                if str(row[i] or "").strip().lower() == "да":
-                    name = SOFTWARE_NAMES.get(names[i], names[i])
-                    if name not in software:
-                        software.append(name)
             rooms.append({
                 "number": number,
                 "floor": int(number[0]),
@@ -109,11 +77,15 @@ def main(path: str) -> None:
                 "laptops": count(cell("ноутбук кол-во")),
                 "os": OS.get(str(cell("ос w/l") or "").strip().upper(), ""),
                 "equipment": equipment,
-                "software": sorted(software, key=str.lower),
             })
         else:
             key = str(row[0]).strip().lower().replace("ё", "е")
+            same = next((s for s in spaces if s["key"] == SAME_SPACE.get(key)), None)
+            if same:
+                same["equipment"] += [e for e in equipment if e not in same["equipment"]]
+                continue
             spaces.append({
+                "key": key,
                 "name": SPACE_NAMES.get(key, str(row[0]).strip()),
                 "type": str(cell("тип аудитории")).strip(),
                 # For these rows the table gives the number of places in the first column after the type
@@ -121,6 +93,8 @@ def main(path: str) -> None:
                 "equipment": equipment,
                 **SPACE_PLACES.get(key, {}),
             })
+    for space in spaces:
+        del space["key"]
 
     OUT.write_text(json.dumps({"rooms": rooms, "spaces": spaces}, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"{OUT}: {len(rooms)} аудиторий, {len(spaces)} коворкингов и переговорных")

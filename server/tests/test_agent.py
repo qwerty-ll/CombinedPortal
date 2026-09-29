@@ -179,12 +179,11 @@ def test_rooms_facts_reach_the_model(student, monkeypatch):
     sent = script(
         monkeypatch,
         call("find_room", room="Б-301"),
-        call("search_portal", query="PyCharm"),
-        text("В Б-301 13 ПК и 12 ноутбуков на Linux, PyCharm там есть."),
+        call("search_portal", query="Linux"),
+        text("В Б-301 13 ПК и 12 ноутбуков на Linux."),
     )
     # The floor plan of the room found comes along
-    assert ask(student, "подскажи, куда пойти покодить вечером")[0] == \
-        "В Б-301 13 ПК и 12 ноутбуков на Linux, PyCharm там есть.\n\n[IMG:301.png]"
+    assert ask(student, "подскажи, куда пойти покодить вечером")[0] == "В Б-301 13 ПК и 12 ноутбуков на Linux.\n\n[IMG:301.png]"
     room, found = function_results(sent[2])
-    assert room["room"].startswith("Б-301 — учебная: 25 мест, 13 ПК и 12 ноутбуков на Linux, 3 этаж.")
-    assert found["results"][0].startswith("PyCharm есть в 12 аудиториях:")
+    assert room["room"] == "Б-301 — учебная: 25 мест, 13 ПК и 12 ноутбуков на Linux, 3 этаж.\nЕсть: переносная доска, телевизор, кликер."
+    assert found["results"][0].startswith("Компьютеры на Linux — в 6 аудиториях:")
