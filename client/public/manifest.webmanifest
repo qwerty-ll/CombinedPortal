@@ -1,0 +1,25 @@
+{
+  "name": "Портал ИВИТШ — гид студента",
+  "short_name": "ИВИТШ",
+  "description": "Расписание, карта корпуса, преподаватели, форум и ВИТШик — помощник студентов Высшей ИТ-школы КГУ",
+  "lang": "ru",
+  "dir": "ltr",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#EEF2F8",
+  "theme_color": "#E4ECF9",
+  "categories": ["education"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Расписание", "url": "/#schedule-section", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Карта корпуса", "url": "/map", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Преподаватели", "url": "/teachers", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

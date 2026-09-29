@@ -1,10 +1,13 @@
+import asyncio
 import re
-import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Optional
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException
+from sqlalchemy.orm import Session
 
-from app.services import eios
+from app.db.database import get_db
+from app.services import timetable
+import app.models as models
 
 router = APIRouter(prefix="/api/v1/schedule", tags=["Schedule"])
 
@@ -12,13 +15,10 @@ _YEAR_RE = re.compile(r'^\d{4}-\d{4}$')
 _DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 
 # Reference lists change rarely; the timetable itself can change during the day.
-_LIST_TTL = 6 * 60 * 60
-_RASP_TTL = 10 * 60
-# When EIOS is down we keep serving the last real answer for up to a day, marked as stale.
-_STALE_TTL = 24 * 60 * 60
-_MAX_CACHE_ENTRIES = 2000
+_LIST_TTL = timetable.LIST_TTL
+_RASP_TTL = timetable.RASP_TTL
 
-_cache: Dict[Tuple, Tuple[float, Any]] = {}
+_UNAVAILABLE = "Расписание ЭИОС КГУ сейчас недоступно. Попробуйте позже или откройте eios.kosgos.ru."
 
 
 def _validate_year(year: str) -> None:
@@ -32,28 +32,15 @@ def _validate_sdate(sdate: str) -> None:
 
 
 def clear_cache() -> None:
-    _cache.clear()
+    timetable.clear_cache()
 
 
 async def _cached_eios(endpoint: str, params: dict, ttl: int) -> dict:
-    key = (endpoint, tuple(sorted(params.items())))
-    now = time.time()
-    cached = _cache.get(key)
-    if cached and now - cached[0] < ttl:
-        return cached[1]
-
-    data = await eios.fetch_json(endpoint, params)
-    # An empty timetable (holidays) is a valid answer; only a missing payload or failed state is an error.
-    if isinstance(data, dict) and data.get("data") is not None and data.get("state", 1) == 1:
-        if len(_cache) >= _MAX_CACHE_ENTRIES:
-            _cache.pop(min(_cache, key=lambda k: _cache[k][0]))
-        _cache[key] = (now, data)
-        return data
-
-    if cached and now - cached[0] < _STALE_TTL:
-        return {**cached[1], "stale": True, "cached_at": int(cached[0])}
-    # Never invent a timetable: tell the client EIOS is unavailable instead.
-    raise HTTPException(status_code=503, detail="Расписание ЭИОС КГУ сейчас недоступно. Попробуйте позже или откройте eios.kosgos.ru.")
+    try:
+        return await timetable.cached(endpoint, params, ttl)
+    except timetable.TimetableUnavailable:
+        # Never invent a timetable: tell the client EIOS is unavailable instead.
+        raise HTTPException(status_code=503, detail=_UNAVAILABLE)
 
 
 @router.get("/years")
@@ -103,3 +90,43 @@ async def get_eios_rasp(
     if sdate:
         params["sdate"] = sdate
     return await _cached_eios("Rasp", params, _RASP_TTL)
+
+
+@router.get("/teachers/today")
+async def get_teachers_today(db: Session = Depends(get_db)):
+    """Today's lessons of every teacher on the portal, keyed by portal teacher id.
+
+    Teachers EIOS does not know by that exact name are left out. The client works out
+    "ведёт пару" / "свободен до" from these times with its own clock.
+    """
+    now = timetable.msk_now()
+    today = now.date()
+    try:
+        ids_by_name = await timetable.teacher_ids(timetable.academic_year(today))
+    except timetable.TimetableUnavailable:
+        raise HTTPException(status_code=503, detail=_UNAVAILABLE)
+
+    wanted = [
+        (teacher.id, ids_by_name[key])
+        for teacher in db.query(models.Teacher).all()
+        if (key := timetable.normalize_name(teacher.name)) in ids_by_name
+    ]
+    # A handful of requests at a time: the first visit of the day fills the cache for everyone.
+    slots = asyncio.Semaphore(4)
+
+    async def day_of(eios_ids):
+        async with slots:
+            try:
+                return await timetable.teacher_day(eios_ids, today)
+            except timetable.TimetableUnavailable:
+                return None
+
+    days = await asyncio.gather(*(day_of(eios_ids) for _, eios_ids in wanted))
+    return {
+        "date": today.isoformat(),
+        "teachers": {
+            str(teacher_id): [lesson.as_dict() for lesson in lessons]
+            for (teacher_id, _), lessons in zip(wanted, days)
+            if lessons is not None
+        },
+    }

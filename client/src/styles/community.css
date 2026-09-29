@@ -589,6 +589,60 @@
   color: var(--text-2);
 }
 
+/* Where the teacher is now: the text says it, the dot repeats it (red on a pair, green free) */
+.teacher-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.teacher-status-dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--text-3);
+}
+.teacher-status.is-busy .teacher-status-dot { background: var(--danger); }
+.teacher-status.is-free .teacher-status-dot { background: var(--success); }
+.teacher-modal-head .teacher-status { margin-top: var(--space-2); }
+
+.teacher-today { margin-bottom: var(--space-6); }
+.teacher-today-title {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-3);
+}
+.teacher-day-group { white-space: nowrap; }
+.teacher-day {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.teacher-day-item {
+  display: grid;
+  grid-template-columns: 6.25rem minmax(0, 1fr);
+  gap: var(--space-3);
+}
+.teacher-day-time { color: var(--text-2); }
+.teacher-day-title {
+  display: block;
+  font-weight: var(--weight-medium);
+}
+.teacher-day-meta {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.teacher-day-item.is-now .teacher-day-time { color: var(--accent); font-weight: var(--weight-medium); }
+.teacher-day-item.is-past,
+.teacher-day-item.is-past .teacher-day-time,
+.teacher-day-item.is-past .teacher-day-meta { color: var(--text-3); }
+.teacher-day-item.is-past .teacher-day-title { font-weight: var(--weight-regular); }
+
 .teacher-details {
   grid-area: details;
   display: flex;

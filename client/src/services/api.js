@@ -66,7 +66,9 @@ export const apiFetch = async (endpoint, options = {}) => {
     'X-Requested-With': 'XMLHttpRequest',
     ...extraHeaders,
   };
-  const maxRetries = retries !== undefined ? retries : (isGet ? 2 : 0);
+  // Offline there is nothing to wait for: go straight to the saved copy
+  const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  const maxRetries = offline ? 0 : (retries !== undefined ? retries : (isGet ? 2 : 0));
   const timeoutMs = timeout || 12000;
   const enableCache = useCache !== false && isGet && isCacheable(endpoint);
 
@@ -231,8 +233,9 @@ export const contentApi = {
 
 // Chatbot Services
 export const chatApi = {
-  sendMessage: (message, history) =>
-    apiFetch('/api/v1/chat', json('POST', { message, history })),
+  // group: the group picked in the dashboard schedule, for visitors who have not signed in
+  sendMessage: (message, history, group = null) =>
+    apiFetch('/api/v1/chat', json('POST', { message, history, ...(group ? { group } : {}) })),
 };
 
 // Schedule EIOS Services
@@ -252,5 +255,59 @@ export const scheduleApi = {
     if (idAud) query.append('idAud', idAud);
     if (sdate) query.append('sdate', sdate);
     return apiFetch(`/api/v1/schedule/rasp?${query.toString()}`);
+  },
+  // Today's lessons of the portal's teachers: { date, teachers: { [teacherId]: lessons[] } }
+  getTeachersToday: () =>
+    apiFetch('/api/v1/schedule/teachers/today', { retries: 0, timeout: 20000 }),
+};
+
+// Documents ВИТШик prepares (explanatory note, retake request), downloaded as Word or PDF
+const filenameOf = (disposition, fallback) => {
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(disposition || '');
+  if (star) {
+    try { return decodeURIComponent(star[1]); } catch { /* malformed: use the fallback */ }
   }
+  return fallback;
+};
+
+export const documentsApi = {
+  pairs: (date) => apiFetch(`/api/v1/documents/pairs?date=${encodeURIComponent(date)}`, { retries: 0 }),
+  download: async (kind, format, fields) => {
+    let res;
+    try {
+      res = await fetch(`${API_BASE_URL}/api/v1/documents/${kind}?format=${format}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify(fields),
+      });
+    } catch {
+      throw new ApiError('Нет соединения с сервером', 0);
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+      const detail = typeof data.detail === 'string'
+        ? data.detail
+        : (res.status === 422 ? 'Проверьте поля: что-то заполнено не так.' : `Ошибка сервера: ${res.status}`);
+      throw new ApiError(detail, res.status);
+    }
+    const blob = await res.blob();
+    const name = filenameOf(res.headers.get('Content-Disposition'), `document.${format}`);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    return name;
+  },
+};
+
+// iCalendar feed of a group's timetable, for subscribing in a phone calendar
+export const groupCalendarUrl = (groupName) => {
+  const base = /^https?:\/\//.test(API_BASE_URL) ? API_BASE_URL : `${window.location.origin}${API_BASE_URL}`;
+  return `${base}/api/v1/calendar/group.ics?name=${encodeURIComponent(groupName)}`;
 };

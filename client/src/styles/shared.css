@@ -372,3 +372,43 @@
   .page-heading { gap: var(--space-3); }
   .page-heading > .tile-lg { width: 2.5rem; height: 2.5rem; border-radius: var(--radius); }
 }
+
+/* ---------- Calendar subscription dialog ---------- */
+.calendar-modal { max-width: 32rem; }
+.calendar-modal-text { color: var(--text-2); max-width: var(--prose-width); }
+.calendar-modal-group { color: var(--text); font-weight: var(--weight-medium); white-space: nowrap; }
+.calendar-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+.calendar-option {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: var(--touch-target);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text);
+  text-decoration: none;
+  transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.calendar-option-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-medium);
+  color: var(--accent);
+}
+.calendar-option-hint { font-size: var(--text-sm); color: var(--text-2); }
+@media (hover: hover) {
+  .calendar-option:hover { background: var(--accent-soft); border-color: var(--accent); }
+}
+.calendar-link { margin-top: var(--space-5); }
+.calendar-link-row { display: flex; gap: var(--space-2); }
+.calendar-link-input { flex: 1; min-width: 0; font-size: var(--text-sm); }
+@media (max-width: 480px) {
+  .calendar-options { grid-template-columns: minmax(0, 1fr); }
+}

@@ -159,11 +159,12 @@ def evaluate_query(query: str):
     for chunk in KNOWLEDGE_CHUNKS:
         score = 0
         for kw in chunk["keywords"]:
-            if kw in q_lower:
-                if re.match(r"^\d{3}$", kw):
+            if re.match(r"^\d{3}$", kw):
+                # A room number, not part of "2026" or "4500"
+                if re.search(rf"(?<!\d){kw}(?!\d)", q_lower):
                     score += 35
-                else:
-                    score += 8
+            elif kw in q_lower:
+                score += 8
         for w in q_words:
             if w not in stop_words and len(w) >= 3 and w in chunk["content"].lower():
                 score += 2
@@ -174,32 +175,14 @@ def evaluate_query(query: str):
     return max_score, best_match
 
 
-OFF_TOPIC_REPLY = "Я — цифровой маскот ВИТШик и отвечаю исключительно на вопросы про Высшую ИТ-Школу КГУ, аудитории, расписание, стипендии, клубы и учебу! 😸 Задай мне вопрос по университету!"
+def clean_reply(reply: str) -> str:
+    """Drop the tag noise GigaChat sometimes invents, and emoji outside the basic plane."""
+    reply = re.sub(r'\[(SMILEY|EMOJI|TAG)_.*?\]', '', reply, flags=re.IGNORECASE)
+    return re.sub(r'[\U00010000-\U0010ffff]', '', reply).strip()
 
 
-async def generate_chatbot_reply(user_message: str, history: list, use_llm: bool = True) -> str:
-    """Answer from the local knowledge base; GigaChat only rephrases the matched chunk.
-
-    Anonymous visitors get the chunk as is, so the paid API cannot be burned without logging in.
-    """
-    score, chunk = evaluate_query(user_message)
-
-    if score < 4 or not chunk:
-        return OFF_TOPIC_REPLY
-    if not use_llm or not is_llm_configured():
-        return chunk["content"]
-
-    system_prompt = (
-        "Ты — маскот ВИТШик. Отвечай СТРОГО И ИСКЛЮЧИТЕЛЬНО на основе предоставленного текста ниже.\n\n"
-        "ПРАВИЛА:\n"
-        "1. ОТВЕЧАЙ ЕСТЕСТВЕННО И ДРУЖЕЛЮБНО (1-3 коротких предложения).\n"
-        "2. ЗАПРЕЩЕНО добавлять любые факты, отсутствующие в тексте ниже.\n"
-        "3. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО писать технические теги вида [SMILEY_...], [EMOJI_...] или вымышленные сведения.\n"
-        "4. ЕСЛИ СПРАШИВАЮТ про аудиторию или коворкинг, сохрани тег изображения [IMG:...].\n\n"
-        "Текст для ответа:\n"
-        f"{chunk['content']}"
-    )
-
+async def ask_gigachat(system_prompt: str, history: list, user_message: str, max_tokens: int = 350) -> str:
+    """One GigaChat completion; raises on any failure so the caller can fall back to its own answer."""
     turns = [t for t in (history or []) if t.get("role") in ("user", "assistant")]
     # Older clients included the current question in history; don't send it twice.
     if turns and turns[-1].get("role") == "user" and turns[-1].get("content", "").strip() == user_message.strip():
@@ -207,39 +190,16 @@ async def generate_chatbot_reply(user_message: str, history: list, use_llm: bool
     messages = [{"role": "system", "content": system_prompt}]
     for turn in turns[-4:]:
         messages.append({"role": turn["role"], "content": turn.get("content", "")})
-
     messages.append({"role": "user", "content": user_message})
 
-    try:
-        token = await get_access_token()
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": "GigaChat",
-            "messages": messages,
-            "temperature": 0.1,
-            "max_tokens": 250
-        }
-
-        async with httpx.AsyncClient(verify=_ssl_context, timeout=15.0) as client:
+    token = await get_access_token()
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    payload = {"model": "GigaChat", "messages": messages, "temperature": 0.1, "max_tokens": max_tokens}
+    async with httpx.AsyncClient(verify=_ssl_context, timeout=15.0) as client:
+        resp = await client.post(CHAT_URL, headers=headers, json=payload)
+        if resp.status_code == 401:
+            token = await get_access_token(force_refresh=True)
+            headers["Authorization"] = f"Bearer {token}"
             resp = await client.post(CHAT_URL, headers=headers, json=payload)
-
-            if resp.status_code == 401:
-                token = await get_access_token(force_refresh=True)
-                headers["Authorization"] = f"Bearer {token}"
-                resp = await client.post(CHAT_URL, headers=headers, json=payload)
-
-            resp.raise_for_status()
-            reply = resp.json()["choices"][0]["message"]["content"]
-
-        reply = re.sub(r'\[SMILEY_.*?\]', '', reply, flags=re.IGNORECASE)
-        reply = re.sub(r'\[EMOJI_.*?\]', '', reply, flags=re.IGNORECASE)
-        reply = re.sub(r'\[TAG_.*?\]', '', reply, flags=re.IGNORECASE)
-        reply = re.sub(r'[\U00010000-\U0010ffff]', '', reply).strip()
-
-        return reply if reply else chunk["content"]
-    except Exception as e:
-        logger.warning("GigaChat unavailable, answering from the knowledge base: %s", e)
-        return chunk["content"]
+        resp.raise_for_status()
+        return clean_reply(resp.json()["choices"][0]["message"]["content"])

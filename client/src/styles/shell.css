@@ -24,6 +24,18 @@
   margin-left: var(--sidebar-width);
 }
 .app-main:focus { outline: none; }
+/* Shown while the device is offline; the service worker keeps the app itself working */
+.offline-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-6);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+.offline-notice svg { flex-shrink: 0; }
 .sidebar-collapsed .app-main { margin-left: var(--sidebar-width-collapsed); }
 
 /* ---------- Sidebar: a light blue navigation panel on every page ---------- */

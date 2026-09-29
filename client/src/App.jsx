@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { X, Menu } from 'lucide-react';
+import { X, Menu, CloudOff } from 'lucide-react';
 import './styles/index.css';
 
 // Components
@@ -31,10 +31,12 @@ const PageLoader = () => (
 import { scheduleDailyActivityReminder } from './utils/notifications';
 import { markStep, ROUTE_STEPS } from './utils/onboarding';
 import { useAuth } from './context/AuthContext';
+import { useOnline } from './utils/install';
 
 function App() {
   const location = useLocation();
   const { user } = useAuth();
+  const online = useOnline();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -92,6 +94,12 @@ function App() {
 
       {/* MAIN CONTENT AREA */}
       <main id="main-content" className="app-main" tabIndex={-1}>
+        {!online && (
+          <p className="offline-notice" role="status">
+            <CloudOff size={16} strokeWidth={1.75} aria-hidden="true" />
+            Нет интернета. Показываем сохранённое: расписание и объявления могут быть не самыми свежими.
+          </p>
+        )}
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Dashboard />} />

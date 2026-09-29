@@ -56,6 +56,10 @@ class Settings:
         # GigaChat "Authorization key" (base64 of client_id:client_secret) from the Sber developer console.
         self.GIGACHAT_AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY") or os.getenv("GIGACHAT_SECRET", "")
         self.GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
+        # Whom the explanatory notes and retake requests ВИТШик prepares are addressed to (dative case).
+        # Without a name the line is left blank to fill in by hand.
+        self.DOCUMENT_ADDRESSEE_TITLE = os.getenv("DOCUMENT_ADDRESSEE_TITLE", "Директору Высшей ИТ-школы КГУ").strip()
+        self.DOCUMENT_ADDRESSEE_NAME = os.getenv("DOCUMENT_ADDRESSEE_NAME", "").strip()
         # Path to the Russian Trusted Root CA (PEM) that signs the GigaChat endpoints.
         self.GIGACHAT_CA_BUNDLE = os.getenv("GIGACHAT_CA_BUNDLE", "")
 
