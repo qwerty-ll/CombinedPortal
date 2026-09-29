@@ -155,15 +155,16 @@ def _by_subgroup(lessons: List[timetable.Lesson]) -> str:
     )
 
 
-def _lesson_line(lesson: timetable.Lesson) -> str:
-    parts = [f"{lesson.start}–{lesson.end}", f"{lesson.discipline} ({lesson.kind})"]
+def _lesson_line(lesson: timetable.Lesson, with_discipline: bool = True) -> str:
+    """"08:30–10:00 — Базы данных, лабораторная, Б-207, 1 подгруппа"; without the name when the list is about it."""
+    parts = ([lesson.discipline] if with_discipline else []) + [lesson.kind]
     if lesson.room:
         parts.append(lesson.room)
     if lesson.subgroup:
         parts.append(f"{lesson.subgroup} подгруппа")
     if lesson.replaced:
         parts.append("замена")
-    return " · ".join(parts)
+    return f"{lesson.start}–{lesson.end} — " + ", ".join(parts)
 
 
 # --- Timetable ---------------------------------------------------------------------------------
@@ -221,7 +222,8 @@ def _schedule_answer(q: str, lessons: List[timetable.Lesson], group: str, now: d
         if not pool:
             where = f" {_day_label(when[0], today)}" if when and when[0] == when[1] else (" в эти дни" if when else " в ближайшие две недели")
             return finish(f"{title}{where} в расписании группы {group} нет.", None)
-        lines = [f"• {_day_label(l.day, today)}, {_lesson_line(l)}" for l in pool[:4]]
+        # One discipline: its name is in the title, the lines say when, what kind and where
+        lines = [f"• {_day_label(l.day, today).capitalize()}, {_lesson_line(l, len(disciplines) > 1)}" for l in pool[:4]]
         return finish(f"{title} у группы {group}:\n" + "\n".join(lines), pool[0])
 
     if when:
@@ -231,7 +233,7 @@ def _schedule_answer(q: str, lessons: List[timetable.Lesson], group: str, now: d
             label = _day_label(first, today)
             if not pool:
                 return finish(f"{label.capitalize()} у группы {group} пар нет.", None)
-            lines = [f"• {_lesson_line(l)}" + (" · сейчас" if l.starts_at <= now < l.ends_at else "") for l in pool]
+            lines = [f"• {_lesson_line(l)}" + (", идёт сейчас" if l.starts_at <= now < l.ends_at else "") for l in pool]
             return finish(f"{label.capitalize()} у группы {group}:\n" + "\n".join(lines), next((l for l in pool if l.ends_at > now), None))
         if not pool:
             return finish(f"В эти дни у группы {group} пар нет.", None)

@@ -75,7 +75,7 @@ def test_the_model_asks_the_timetable_and_words_the_answer(student, monkeypatch)
 def test_made_up_details_send_the_data_itself(student, monkeypatch):
     script(monkeypatch, call("schedule"), text("Завтра в 14:00 пара в Б-999."))
     reply, _ = ask(student, "мне к какому часу приходить завтра")
-    assert reply.startswith("Пары группы 24-ИСбо-1 (25.09):\n• 25.09, 13:40–15:10 · Базы данных (лабораторная) · Б-407")
+    assert reply.startswith("Пары группы 24-ИСбо-1 (25.09):\n• 25.09, 13:40–15:10 — Базы данных, лабораторная, Б-407")
 
 
 def test_teacher_and_room_functions(student, monkeypatch):
@@ -164,7 +164,7 @@ def test_a_follow_up_about_pairs_is_answered_from_the_timetable(student, monkeyp
     history = [{"role": "user", "content": "что у меня в четверг"}, {"role": "assistant", "content": "В четверг 2 пары."}]
     r = student.post("/api/v1/chat", json={"message": "а в пятницу", "history": history},
                      headers={"X-Requested-With": "XMLHttpRequest"})
-    assert r.json()["reply"].startswith("Завтра у группы 24-ИСбо-1:\n• 13:40–15:10 · Базы данных")
+    assert r.json()["reply"].startswith("Завтра у группы 24-ИСбо-1:\n• 13:40–15:10 — Базы данных")
     assert sent == []
 
 

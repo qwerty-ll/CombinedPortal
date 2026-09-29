@@ -66,16 +66,16 @@ def test_next_pair_is_computed_from_the_timetable(student):
 
 def test_pairs_on_a_day_and_follow_up(student):
     reply, _ = ask(student, "Какие пары завтра?")
-    assert reply == "Завтра у группы 24-ИСбо-1:\n• 13:40–15:10 · Базы данных (лабораторная) · Б-407 · замена"
+    assert reply == "Завтра у группы 24-ИСбо-1:\n• 13:40–15:10 — Базы данных, лабораторная, Б-407, замена"
     reply, _ = ask(student, "а в понедельник?", history=[{"role": "user", "content": "Какие пары завтра?"}])
     assert reply.startswith("В понедельник, 28.09 у группы 24-ИСбо-1:") and "Философия" in reply
     reply, _ = ask(student, "Что сегодня?")
-    assert "• 10:10–11:40 · Программирование на Python (практика) · Б-214 · сейчас" in reply
+    assert "• 10:10–11:40 — Программирование на Python, практика, Б-214, идёт сейчас" in reply
 
 
 def test_when_is_a_discipline(student):
     reply, actions = ask(student, "Когда философия?")
-    assert reply == "«Философия» у группы 24-ИСбо-1:\n• в понедельник, 28.09, 08:30–10:00 · Философия (лекция) · Б-305"
+    assert reply == "«Философия» у группы 24-ИСбо-1:\n• В понедельник, 28.09, 08:30–10:00 — лекция, Б-305"
     assert ("Б-305 на карте", "/map?room=Б-305") in actions
     reply, _ = ask(student, "Философия на этой неделе будет?")
     assert reply == "«Философия» в эти дни в расписании группы 24-ИСбо-1 нет."
@@ -286,4 +286,4 @@ def test_parallel_subgroup_pairs_are_both_named(student, monkeypatch):
         "Следующая пара — сегодня в 11:50: Философия (лекция) у 2 подгруппы, Б-305."
     )
     reply, _ = ask(student, "Что сегодня?")
-    assert "• 10:10–11:40 · Базы данных (лабораторная) · Б-407 · 2 подгруппа · сейчас" in reply
+    assert "• 10:10–11:40 — Базы данных, лабораторная, Б-407, 2 подгруппа, идёт сейчас" in reply
